@@ -372,20 +372,38 @@ def build_and_run_graph(graph_data: dict) -> tuple[
         try:
             module = builder(props, input_shapes)
             modules[node_id] = module
-            output = module(inputs["in"])
-            results[node_id] = {"out": output}
-            meta: dict = {
-                "outputShape": list(output.shape),
-                "paramCount": sum(p.numel() for p in module.parameters()),
-            }
-            wi = module_weight_info(module)
-            if wi:
-                meta["weights"] = wi
-            meta["activations"] = activation_info(output)
-            node_results[node_id] = {
-                "outputs": {"out": tensor_info(output)},
-                "metadata": meta,
-            }
+            raw_output = module(inputs["in"])
+
+            # Handle multi-output nodes (LSTM/GRU return dicts)
+            if isinstance(raw_output, dict):
+                results[node_id] = raw_output
+                first_tensor = next(iter(raw_output.values()))
+                meta: dict = {
+                    "outputShape": list(first_tensor.shape),
+                    "paramCount": sum(p.numel() for p in module.parameters()),
+                }
+                wi = module_weight_info(module)
+                if wi:
+                    meta["weights"] = wi
+                meta["activations"] = activation_info(first_tensor)
+                node_results[node_id] = {
+                    "outputs": {k: tensor_info(v) for k, v in raw_output.items()},
+                    "metadata": meta,
+                }
+            else:
+                results[node_id] = {"out": raw_output}
+                meta = {
+                    "outputShape": list(raw_output.shape),
+                    "paramCount": sum(p.numel() for p in module.parameters()),
+                }
+                wi = module_weight_info(module)
+                if wi:
+                    meta["weights"] = wi
+                meta["activations"] = activation_info(raw_output)
+                node_results[node_id] = {
+                    "outputs": {"out": tensor_info(raw_output)},
+                    "metadata": meta,
+                }
         except Exception as e:
             node_results[node_id] = {
                 "outputs": {},
@@ -560,8 +578,11 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
                 # Layer node
                 inputs = gather_inputs(node_id, edges, batch_results)
                 if "in" in inputs:
-                    output = modules[node_id](inputs["in"])
-                    batch_results[node_id] = {"out": output}
+                    raw = modules[node_id](inputs["in"])
+                    if isinstance(raw, dict):
+                        batch_results[node_id] = raw
+                    else:
+                        batch_results[node_id] = {"out": raw}
 
             # Backward pass
             loss_tensor = batch_results.get(loss_node_id, {}).get("out")
@@ -667,14 +688,25 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
                     "metadata": {"outputShape": list(output.shape)},
                 }
             elif "in" in inputs:
-                output = modules[node_id](inputs["in"])
-                final_results[node_id] = {"out": output}
-                node_results[node_id] = {
-                    "outputs": {"out": tensor_info(output)},
-                    "metadata": {
-                        "outputShape": list(output.shape),
-                        "paramCount": sum(p.numel() for p in modules[node_id].parameters()),
-                    },
+                raw = modules[node_id](inputs["in"])
+                if isinstance(raw, dict):
+                    final_results[node_id] = raw
+                    first_t = next(iter(raw.values()))
+                    node_results[node_id] = {
+                        "outputs": {k: tensor_info(v) for k, v in raw.items()},
+                        "metadata": {
+                            "outputShape": list(first_t.shape),
+                            "paramCount": sum(p.numel() for p in modules[node_id].parameters()),
+                        },
+                    }
+                else:
+                    final_results[node_id] = {"out": raw}
+                    node_results[node_id] = {
+                        "outputs": {"out": tensor_info(raw)},
+                        "metadata": {
+                            "outputShape": list(raw.shape),
+                            "paramCount": sum(p.numel() for p in modules[node_id].parameters()),
+                        },
                 }
 
     # Store trained modules for inference
@@ -848,16 +880,21 @@ def infer_graph(graph_data: dict) -> dict:
                 continue
 
             try:
-                output = module(inputs["in"])
-                results[node_id] = {"out": output}
+                raw = module(inputs["in"])
+
+                # Handle multi-output (LSTM/GRU)
+                if isinstance(raw, dict):
+                    results[node_id] = raw
+                    output = next(iter(raw.values()))
+                else:
+                    results[node_id] = {"out": raw}
+                    output = raw
 
                 meta: dict = {
                     "outputShape": list(output.shape),
                     "paramCount": sum(p.numel() for p in module.parameters()),
                 }
 
-                # If this is the last layer before loss (output is [1, num_classes]),
-                # compute prediction
                 is_final = any(
                     e["source"]["nodeId"] == node_id
                     and nodes.get(e["target"]["nodeId"], {}).get("type") in LOSS_NODES
@@ -874,8 +911,9 @@ def infer_graph(graph_data: dict) -> dict:
                     }
                     meta["prediction"] = prediction
 
+                out_info = {k: tensor_info(v) for k, v in raw.items()} if isinstance(raw, dict) else {"out": tensor_info(output)}
                 node_results[node_id] = {
-                    "outputs": {"out": tensor_info(output)},
+                    "outputs": out_info,
                     "metadata": meta,
                 }
             except Exception as e:

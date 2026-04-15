@@ -13,6 +13,8 @@ import { layerNormNode } from './layernorm';
 import { embeddingNode } from './embedding';
 import { multiHeadAttentionNode } from './multihead-attention';
 import { attentionNode } from './attention';
+import { lstmNode } from './lstm';
+import { gruNode } from './gru';
 
 export const layerNodes: NodeDefinition[] = [
   conv2dNode,
@@ -29,4 +31,6 @@ export const layerNodes: NodeDefinition[] = [
   embeddingNode,
   multiHeadAttentionNode,
   attentionNode,
+  lstmNode,
+  gruNode,
 ];

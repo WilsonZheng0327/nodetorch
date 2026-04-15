@@ -81,6 +81,56 @@ def build_adaptive_avgpool2d(props: dict, input_shapes: dict) -> nn.Module:
     return nn.AdaptiveAvgPool2d((props["outputH"], props["outputW"]))
 
 
+class LSTMWrapper(nn.Module):
+    """Wraps nn.LSTM to return a dict of named outputs."""
+    def __init__(self, lstm: nn.LSTM):
+        super().__init__()
+        self.lstm = lstm
+
+    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+        output, (hidden, cell) = self.lstm(x)
+        return {"out": output, "hidden": hidden, "cell": cell}
+
+
+class GRUWrapper(nn.Module):
+    """Wraps nn.GRU to return a dict of named outputs."""
+    def __init__(self, gru: nn.GRU):
+        super().__init__()
+        self.gru = gru
+
+    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+        output, hidden = self.gru(x)
+        return {"out": output, "hidden": hidden}
+
+
+def build_lstm(props: dict, input_shapes: dict) -> nn.Module:
+    in_shape = input_shapes.get("in")
+    input_size = in_shape[-1] if in_shape else 1
+    lstm = nn.LSTM(
+        input_size=input_size,
+        hidden_size=props["hiddenSize"],
+        num_layers=props.get("numLayers", 1),
+        batch_first=True,
+        bidirectional=props.get("bidirectional", False),
+        dropout=props.get("dropout", 0) if props.get("numLayers", 1) > 1 else 0,
+    )
+    return LSTMWrapper(lstm)
+
+
+def build_gru(props: dict, input_shapes: dict) -> nn.Module:
+    in_shape = input_shapes.get("in")
+    input_size = in_shape[-1] if in_shape else 1
+    gru = nn.GRU(
+        input_size=input_size,
+        hidden_size=props["hiddenSize"],
+        num_layers=props.get("numLayers", 1),
+        batch_first=True,
+        bidirectional=props.get("bidirectional", False),
+        dropout=props.get("dropout", 0) if props.get("numLayers", 1) > 1 else 0,
+    )
+    return GRUWrapper(gru)
+
+
 def build_batchnorm1d(props: dict, input_shapes: dict) -> nn.Module:
     in_shape = input_shapes.get("in")
     num_features = in_shape[1] if in_shape else 1
@@ -257,6 +307,8 @@ NODE_BUILDERS: dict[str, callable] = {
     "ml.layers.layernorm": build_layernorm,
     "ml.layers.embedding": build_embedding,
     "ml.layers.attention": build_attention,
+    "ml.layers.lstm": build_lstm,
+    "ml.layers.gru": build_gru,
     "ml.layers.multihead_attention": build_multihead_attention,
     # Activations
     "ml.activations.relu": build_relu,
