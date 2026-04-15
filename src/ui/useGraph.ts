@@ -132,6 +132,18 @@ export function useGraph(domain: DomainContext) {
   const [modelTrained, setModelTrained] = useState(false);
   const [modelStale, setModelStale] = useState(false);
 
+  // --- Undo/Redo (refs + snapshot here, undo/redo functions after syncToRF) ---
+  const undoStack = useRef<string[]>([]);
+  const redoStack = useRef<string[]>([]);
+  const isUndoRedo = useRef(false);
+
+  const snapshot = useCallback(() => {
+    if (isUndoRedo.current) return;
+    undoStack.current.push(JSON.stringify(serializeGraphData(graphRef.current)));
+    redoStack.current = [];
+    if (undoStack.current.length > 50) undoStack.current.shift();
+  }, []);
+
   // --- Saved blocks ---
   interface SavedBlock {
     filename: string;
@@ -244,6 +256,27 @@ export function useGraph(domain: DomainContext) {
     syncToRF();
   }, [domain, syncToRF]);
 
+  // --- Undo/Redo actions ---
+  const undo = useCallback(async () => {
+    if (undoStack.current.length === 0) return;
+    redoStack.current.push(JSON.stringify(serializeGraphData(graphRef.current)));
+    const prev = undoStack.current.pop()!;
+    isUndoRedo.current = true;
+    graphRef.current = deserializeGraphData(JSON.parse(prev));
+    await runShape();
+    isUndoRedo.current = false;
+  }, [runShape]);
+
+  const redo = useCallback(async () => {
+    if (redoStack.current.length === 0) return;
+    undoStack.current.push(JSON.stringify(serializeGraphData(graphRef.current)));
+    const next = redoStack.current.pop()!;
+    isUndoRedo.current = true;
+    graphRef.current = deserializeGraphData(JSON.parse(next));
+    await runShape();
+    isUndoRedo.current = false;
+  }, [runShape]);
+
   // --- Connection Validation ---
 
   // Checks if a connection is valid before React Flow allows it.
@@ -326,21 +359,23 @@ export function useGraph(domain: DomainContext) {
         node.subgraph = innerGraph;
       }
 
+      snapshot();
       const currentGraph = getCurrentGraph();
       addNode(currentGraph, node);
       invalidateModel();
       await runShape();
     },
-    [domain, runShape, invalidateModel, getCurrentGraph],
+    [domain, runShape, invalidateModel, getCurrentGraph, snapshot],
   );
 
   const removeNodeFromGraph = useCallback(
     async (nodeId: string) => {
+      snapshot();
       removeNode(getCurrentGraph(), nodeId);
       invalidateModel();
       await runShape();
     },
-    [runShape, invalidateModel, getCurrentGraph],
+    [runShape, invalidateModel, getCurrentGraph, snapshot],
   );
 
   const connectNodes = useCallback(
@@ -349,6 +384,7 @@ export function useGraph(domain: DomainContext) {
         console.warn('[nodetorch] Connection missing handle ids', connection);
         return;
       }
+      snapshot();
       const currentGraph = getCurrentGraph();
       const edgeId = `e-${edgeCounter++}`;
       const edge = createEdge(
@@ -363,16 +399,17 @@ export function useGraph(domain: DomainContext) {
       invalidateModel();
       await runShape();
     },
-    [runShape, invalidateModel, getCurrentGraph],
+    [runShape, invalidateModel, getCurrentGraph, snapshot],
   );
 
   const updateProperty = useCallback(
     async (nodeId: string, key: string, value: any) => {
+      snapshot();
       setProperty(getCurrentGraph(), nodeId, key, value);
       invalidateModel();
       await runShape();
     },
-    [runShape, invalidateModel],
+    [runShape, invalidateModel, getCurrentGraph, snapshot],
   );
 
   // --- Serialization ---
@@ -712,6 +749,7 @@ export function useGraph(domain: DomainContext) {
           }
         }
         if (change.type === 'remove') {
+          snapshot();
           g.nodes.delete(change.id);
           g.edges = g.edges.filter(
             (e) => e.source.nodeId !== change.id && e.target.nodeId !== change.id,
@@ -721,7 +759,7 @@ export function useGraph(domain: DomainContext) {
       }
       setRFNodes((nds) => RF.applyNodeChanges(changes, nds));
     },
-    [invalidateModel, getCurrentGraph],
+    [invalidateModel, getCurrentGraph, snapshot],
   );
 
   const onEdgesChange = useCallback(
@@ -729,6 +767,7 @@ export function useGraph(domain: DomainContext) {
       const g = getCurrentGraph();
       for (const change of changes) {
         if (change.type === 'remove') {
+          snapshot();
           const edge = g.edges.find((e) => e.id === change.id);
           if (edge) {
             markDirty(g, edge.target.nodeId);
@@ -740,7 +779,7 @@ export function useGraph(domain: DomainContext) {
       }
       setRFEdges((eds) => RF.applyEdgeChanges(changes, eds));
     },
-    [invalidateModel, getCurrentGraph],
+    [invalidateModel, getCurrentGraph, snapshot],
   );
 
   // Re-sync React Flow when navigating into/out of subgraphs
@@ -774,6 +813,8 @@ export function useGraph(domain: DomainContext) {
     modelTrained,
     modelStale,
     trainingProgress,
+    undo,
+    redo,
     savedBlocks,
     saveBlock,
     deleteBlock,
