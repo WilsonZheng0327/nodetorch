@@ -786,6 +786,77 @@ export function useGraph(domain: DomainContext) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { syncToRF(); }, [navStack]);
 
+  // --- Copy/Paste ---
+  const clipboard = useRef<{ nodes: any[]; edges: any[] } | null>(null);
+
+  const copySelected = useCallback(() => {
+    const currentGraph = getCurrentGraph();
+    const selectedIds = new Set(
+      rfNodes.filter((n) => n.selected).map((n) => n.id),
+    );
+    if (selectedIds.size === 0) return;
+
+    const copiedNodes = Array.from(currentGraph.nodes.values())
+      .filter((n) => selectedIds.has(n.id))
+      .map((n) => ({
+        type: n.type,
+        position: { ...n.position },
+        properties: { ...n.properties },
+        subgraph: n.subgraph ? serializeGraphData(n.subgraph) : undefined,
+      }));
+
+    // Copy edges that connect only between selected nodes
+    const copiedEdges = currentGraph.edges
+      .filter((e) => selectedIds.has(e.source.nodeId) && selectedIds.has(e.target.nodeId))
+      .map((e) => ({
+        sourceIdx: Array.from(selectedIds).indexOf(e.source.nodeId),
+        sourcePort: e.source.portId,
+        targetIdx: Array.from(selectedIds).indexOf(e.target.nodeId),
+        targetPort: e.target.portId,
+      }));
+
+    clipboard.current = { nodes: copiedNodes, edges: copiedEdges };
+  }, [getCurrentGraph, rfNodes]);
+
+  const paste = useCallback(async () => {
+    if (!clipboard.current || clipboard.current.nodes.length === 0) return;
+
+    snapshot();
+    const currentGraph = getCurrentGraph();
+    const OFFSET = 50;
+    const newIds: string[] = [];
+
+    // Create new nodes with offset positions
+    for (const copied of clipboard.current.nodes) {
+      const id = `${copied.type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const node = createNode(id, copied.type, {
+        x: copied.position.x + OFFSET,
+        y: copied.position.y + OFFSET,
+      }, { ...copied.properties });
+
+      if (copied.subgraph) {
+        node.subgraph = deserializeGraphData(copied.subgraph);
+      }
+
+      addNode(currentGraph, node);
+      newIds.push(id);
+    }
+
+    // Recreate edges between pasted nodes
+    for (const ce of clipboard.current.edges) {
+      if (ce.sourceIdx >= 0 && ce.targetIdx >= 0 && ce.sourceIdx < newIds.length && ce.targetIdx < newIds.length) {
+        const edgeId = `e-${edgeCounter++}`;
+        const edge = createEdge(edgeId, newIds[ce.sourceIdx], ce.sourcePort, newIds[ce.targetIdx], ce.targetPort);
+        try {
+          addGraphEdge(currentGraph, edge);
+        } catch { /* skip invalid edges */ }
+      }
+    }
+
+    invalidateModel();
+    await runShape();
+  }, [getCurrentGraph, snapshot, invalidateModel, runShape]);
+
   return {
     graph: graphRef.current,
     currentGraph: getCurrentGraph(),
@@ -815,6 +886,8 @@ export function useGraph(domain: DomainContext) {
     trainingProgress,
     undo,
     redo,
+    copySelected,
+    paste,
     savedBlocks,
     saveBlock,
     deleteBlock,

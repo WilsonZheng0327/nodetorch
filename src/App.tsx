@@ -131,6 +131,18 @@ export default function App() {
         return;
       }
 
+      // Copy/Paste
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        graph.copySelected();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        graph.paste();
+        return;
+      }
+
       if (keyDirs[e.key]) {
         e.preventDefault();
         held.add(e.key);
