@@ -57,6 +57,36 @@ def build_layernorm(props: dict, input_shapes: dict) -> nn.Module:
     return nn.LayerNorm(normalized_shape)
 
 
+def build_conv1d(props: dict, input_shapes: dict) -> nn.Module:
+    in_shape = input_shapes.get("in")
+    in_channels = in_shape[1] if in_shape else 1
+    return nn.Conv1d(
+        in_channels=in_channels,
+        out_channels=props["outChannels"],
+        kernel_size=props["kernelSize"],
+        stride=props["stride"],
+        padding=props["padding"],
+    )
+
+
+def build_avgpool2d(props: dict, input_shapes: dict) -> nn.Module:
+    return nn.AvgPool2d(
+        kernel_size=props["kernelSize"],
+        stride=props["stride"],
+        padding=props["padding"],
+    )
+
+
+def build_adaptive_avgpool2d(props: dict, input_shapes: dict) -> nn.Module:
+    return nn.AdaptiveAvgPool2d((props["outputH"], props["outputW"]))
+
+
+def build_batchnorm1d(props: dict, input_shapes: dict) -> nn.Module:
+    in_shape = input_shapes.get("in")
+    num_features = in_shape[1] if in_shape else 1
+    return nn.BatchNorm1d(num_features=num_features)
+
+
 def build_embedding(props: dict, input_shapes: dict) -> nn.Module:
     return nn.Embedding(
         num_embeddings=props["numEmbeddings"],
@@ -157,6 +187,22 @@ class MHAWrapper(nn.Module):
         return output
 
 
+class AttentionModule(nn.Module):
+    """Scaled dot-product attention wrapping F.scaled_dot_product_attention."""
+    def __init__(self, dropout: float = 0.0):
+        super().__init__()
+        self.dropout = dropout
+
+    def forward(self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
+        return torch.nn.functional.scaled_dot_product_attention(
+            query, key, value, dropout_p=self.dropout if self.training else 0.0,
+        )
+
+
+def build_attention(props: dict, input_shapes: dict) -> nn.Module:
+    return AttentionModule(dropout=props.get("dropout", 0.0))
+
+
 def build_add(props: dict, input_shapes: dict) -> nn.Module:
     return AddModule()
 
@@ -199,13 +245,18 @@ def build_permute(props: dict, input_shapes: dict) -> nn.Module:
 NODE_BUILDERS: dict[str, callable] = {
     # Layers
     "ml.layers.conv2d": build_conv2d,
+    "ml.layers.conv1d": build_conv1d,
     "ml.layers.linear": build_linear,
     "ml.layers.flatten": build_flatten,
     "ml.layers.maxpool2d": build_maxpool2d,
+    "ml.layers.avgpool2d": build_avgpool2d,
+    "ml.layers.adaptive_avgpool2d": build_adaptive_avgpool2d,
     "ml.layers.batchnorm2d": build_batchnorm2d,
+    "ml.layers.batchnorm1d": build_batchnorm1d,
     "ml.layers.dropout": build_dropout,
     "ml.layers.layernorm": build_layernorm,
     "ml.layers.embedding": build_embedding,
+    "ml.layers.attention": build_attention,
     "ml.layers.multihead_attention": build_multihead_attention,
     # Activations
     "ml.activations.relu": build_relu,

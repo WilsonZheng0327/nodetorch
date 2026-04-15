@@ -13,7 +13,7 @@ from data_loaders import DATA_LOADERS, TRAIN_DATASETS, DENORMALIZERS
 LOSS_NODES = {"ml.loss.cross_entropy", "ml.loss.mse"}
 OPTIMIZER_NODES = {"ml.optimizers.sgd", "ml.optimizers.adam", "ml.optimizers.adamw"}
 # Structural nodes with multiple named inputs (passed as **kwargs)
-MULTI_INPUT_NODES = {"ml.structural.add", "ml.structural.concat", "ml.layers.multihead_attention"}
+MULTI_INPUT_NODES = {"ml.structural.add", "ml.structural.concat", "ml.layers.multihead_attention", "ml.layers.attention"}
 SUBGRAPH_TYPE = "subgraph.block"
 SENTINEL_INPUT = "subgraph.input"
 SENTINEL_OUTPUT = "subgraph.output"
