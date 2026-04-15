@@ -54,7 +54,7 @@ export function validateForward(graph: Graph, registry: NodeRegistry): Validatio
 // --- Training checks (includes all forward checks + training-specific) ---
 
 const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse'];
-const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam'];
+const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam', 'ml.optimizers.adamw'];
 const DATA_TYPES = ['data.mnist', 'data.cifar100'];
 
 export function validateTraining(graph: Graph, registry: NodeRegistry): ValidationError[] {

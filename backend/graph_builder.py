@@ -11,8 +11,9 @@ from data_loaders import DATA_LOADERS, TRAIN_DATASETS, DENORMALIZERS
 
 # Node types that take multiple named inputs instead of a single "in" port
 LOSS_NODES = {"ml.loss.cross_entropy", "ml.loss.mse"}
-OPTIMIZER_NODES = {"ml.optimizers.sgd", "ml.optimizers.adam"}
-STRUCTURAL_NODES = {"ml.structural.add"}
+OPTIMIZER_NODES = {"ml.optimizers.sgd", "ml.optimizers.adam", "ml.optimizers.adamw"}
+# Structural nodes with multiple named inputs (passed as **kwargs)
+MULTI_INPUT_NODES = {"ml.structural.add", "ml.structural.concat", "ml.layers.multihead_attention"}
 SUBGRAPH_TYPE = "subgraph.block"
 SENTINEL_INPUT = "subgraph.input"
 SENTINEL_OUTPUT = "subgraph.output"
@@ -104,7 +105,7 @@ class SubGraphModule(nn.Module):
 
             module = self.inner_modules[safe_key]
 
-            if node_type in STRUCTURAL_NODES:
+            if node_type in MULTI_INPUT_NODES:
                 output = module(**{k: v for k, v in node_inputs.items()})
             elif "in" in node_inputs:
                 output = module(node_inputs["in"])
@@ -281,7 +282,7 @@ def build_and_run_graph(graph_data: dict) -> tuple[
             continue
 
         # --- Structural nodes: multiple named inputs ---
-        if node_type in STRUCTURAL_NODES:
+        if node_type in MULTI_INPUT_NODES:
             inputs = gather_inputs(node_id, edges, results)
             builder = NODE_BUILDERS.get(node_type)
             if not builder:
@@ -457,6 +458,13 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
             betas=(props.get("beta1", 0.9), props.get("beta2", 0.999)),
             weight_decay=weight_decay,
         )
+    elif opt_type == "ml.optimizers.adamw":
+        optimizer = torch.optim.AdamW(
+            all_params,
+            lr=lr,
+            betas=(props.get("beta1", 0.9), props.get("beta2", 0.999)),
+            weight_decay=weight_decay,
+        )
     else:
         optimizer = torch.optim.SGD(
             all_params, lr=lr, momentum=momentum, weight_decay=weight_decay,
@@ -529,7 +537,7 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
                     continue
 
                 # Structural nodes (Add, etc.)
-                if node_type in STRUCTURAL_NODES:
+                if node_type in MULTI_INPUT_NODES:
                     inputs = gather_inputs(node_id, edges, batch_results)
                     output = modules[node_id](**{k: v for k, v in inputs.items()})
                     batch_results[node_id] = {"out": output}
@@ -646,7 +654,7 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
                             "paramCount": sum(p.numel() for p in modules[node_id].parameters()),
                         },
                     }
-            elif node_type in STRUCTURAL_NODES:
+            elif node_type in MULTI_INPUT_NODES:
                 output = modules[node_id](**{k: v for k, v in inputs.items()})
                 final_results[node_id] = {"out": output}
                 node_results[node_id] = {
@@ -780,7 +788,7 @@ def infer_graph(graph_data: dict) -> dict:
                 continue
 
             # Structural nodes pass all named inputs
-            if node_type in STRUCTURAL_NODES:
+            if node_type in MULTI_INPUT_NODES:
                 try:
                     output = module(**{k: v for k, v in inputs.items()})
                     results[node_id] = {"out": output}
