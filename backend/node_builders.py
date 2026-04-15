@@ -1,5 +1,20 @@
-# Per-node-type builder functions.
-# Each function takes (properties, input_shapes) and returns a torch.nn.Module.
+# node_builders.py — Per-node-type builder functions.
+#
+# Each builder takes (properties, input_shapes) and returns a torch.nn.Module.
+# input_shapes is a dict of port_id → shape list, derived from upstream tensors.
+# This is how nodes that need input dimensions (Conv2d needs in_channels, Linear needs
+# in_features) get them — the shapes are computed from actual tensor data during the
+# initial forward pass in build_and_run_graph().
+#
+# Wrapper modules (LSTMWrapper, GRUWrapper, MHAWrapper, ConcatModule, etc.) exist
+# because some PyTorch modules don't match our calling convention:
+#   - LSTM/GRU return tuples → wrappers return dicts for multi-output routing
+#   - MHA takes (Q,K,V) → wrapper accepts named kwargs
+#   - Concat needs sorted inputs → wrapper sorts by key prefix
+#   - F.scaled_dot_product_attention is functional → AttentionModule wraps it
+#
+# NODE_BUILDERS registry maps node type strings → builder functions.
+# graph_builder.py looks up builders from this registry.
 
 import torch
 import torch.nn as nn

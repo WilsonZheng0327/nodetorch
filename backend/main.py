@@ -1,5 +1,25 @@
-# FastAPI backend for NodeTorch.
-# Receives serialized graphs, runs PyTorch forward passes and training, returns results.
+# main.py — FastAPI backend for NodeTorch.
+#
+# Endpoints:
+#   GET  /health              — server health check
+#   POST /forward             — single forward pass, returns per-node results
+#   POST /train               — synchronous training (REST, no streaming)
+#   POST /infer               — inference using stored trained weights
+#   GET  /dataset/{type}      — dataset detail info (labels, sample images)
+#   GET  /blocks              — list saved + preset block templates
+#   POST /blocks/save         — save a custom block as JSON
+#   GET  /blocks/{filename}   — load a specific block
+#   DELETE /blocks/{filename} — delete a user-saved block
+#   WS   /ws                  — WebSocket for streaming training (epoch results in real-time)
+#
+# WebSocket protocol:
+#   Client sends: { type: "train", graph: {...} } or { type: "cancel" }
+#   Server sends: { type: "epoch", epoch, loss, accuracy, time, ... } per epoch
+#                 { type: "train_result", status, results, cancelled? } when done
+#
+# Training runs in a thread executor so the event loop stays responsive.
+# A separate reader task reads WebSocket messages concurrently with epoch streaming,
+# enabling cancel messages to be processed during training.
 
 import warnings
 warnings.filterwarnings("ignore", message="dtype.*align")

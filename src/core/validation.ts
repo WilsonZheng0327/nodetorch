@@ -1,5 +1,13 @@
 // Graph validation — pre-flight checks before running forward pass or training.
 // Returns a list of errors. Empty list = graph is valid.
+//
+// Two levels:
+//   validateForward() — checks every non-optional input port has a connection
+//   validateTraining() — all forward checks + requires data/loss/optimizer nodes,
+//                        validates loss has predictions+labels, optimizer has loss,
+//                        checks reachability from data to loss
+//
+// Called by useGraph before sending to backend — gives instant feedback.
 
 import type { Graph } from './graph';
 import type { NodeRegistry } from './nodedef';

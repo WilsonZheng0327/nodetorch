@@ -102,13 +102,17 @@ export class ExecutionEngine {
 
     const order = topologicalSort(graph);
 
+    // Main execution loop: walk nodes in dependency order.
+    // For each node: check cache → gather inputs → handle subgraph OR call executor → store result.
     for (const nodeId of order) {
       const node = graph.nodes.get(nodeId)!;
 
-      // If caching is on, skip clean nodes
+      // If caching is on, skip clean nodes (their lastResult is still valid)
       if (mode.caching && !node.dirty) continue;
 
       // Gather inputs: for each incoming edge, read the upstream node's output.
+      // Edge maps source.portId → target.portId, so multi-output nodes work:
+      // e.g., LSTM's "hidden" port routes to a downstream node's "in" port.
       const inputs: Record<string, any> = {};
       for (const edge of graph.edges) {
         if (edge.target.nodeId !== nodeId) continue;

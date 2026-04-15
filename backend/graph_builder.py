@@ -1,5 +1,23 @@
-# Converts a serialized NodeTorch graph into PyTorch modules and executes them.
+# graph_builder.py — Converts a serialized NodeTorch graph into PyTorch modules and executes them.
+#
 # Mirrors the TypeScript engine: topological sort → gather inputs → run module → store output.
+#
+# Main functions:
+#   build_and_run_graph() — builds nn.Module for each node, runs a single forward pass.
+#                           Returns (modules, tensor_results, display_results, nodes, edges).
+#   execute_graph()       — wraps build_and_run_graph with no_grad for the /forward endpoint.
+#   train_graph()         — builds modules, then loops: load batch → forward → loss → backward → step.
+#                           Streams per-epoch results via on_epoch callback. Supports cancellation.
+#   infer_graph()         — uses stored trained modules from _model_store for inference on a single sample.
+#
+# Node type routing:
+#   - DATA_LOADERS: produce tensors directly (MNIST, CIFAR)
+#   - OPTIMIZER_NODES: skipped during forward, drive training loop
+#   - LOSS_NODES: take named inputs (predictions + labels)
+#   - MULTI_INPUT_NODES: take multiple named inputs, called with **kwargs (Add, Concat, MHA, Attention)
+#   - SUBGRAPH_TYPE: SubGraphModule wraps inner graph, executes recursively
+#   - Everything else: single "in" → module(input) → "out"
+#   - Multi-output modules (LSTM/GRU): return dict instead of tensor, stored as-is in results
 
 import math
 import torch
@@ -59,7 +77,12 @@ def topological_sort(nodes: dict, edges: list) -> list[str]:
 
 class SubGraphModule(nn.Module):
     """Wraps an inner graph's modules into a single nn.Module.
-    Executes them in topological order, routing data through edges."""
+    Executes them in topological order, routing data through edges.
+
+    Key design: inner modules are registered via nn.ModuleDict so their
+    parameters are visible to the optimizer during training. The forward()
+    method takes **kwargs matching the GraphInput sentinel's port names,
+    and returns a dict matching GraphOutput sentinel's port names."""
 
     def __init__(self, inner_modules: dict[str, nn.Module], inner_nodes: dict,
                  inner_edges: list, inner_order: list[str]):
@@ -179,7 +202,16 @@ def build_subgraph_module(subgraph_data: dict, parent_input_shapes: dict) -> Sub
 def gather_inputs(
     node_id: str, edges: list, results: dict[str, dict[str, torch.Tensor]]
 ) -> dict[str, torch.Tensor]:
-    """For a given node, collect input tensors from upstream nodes via edges."""
+    """For a given node, collect input tensors from upstream nodes via edges.
+
+    Walks all edges, finds those targeting this node, reads the source node's
+    output at the specified port. result keys are the TARGET port ids.
+
+    Example: edge {source: {nodeId: "conv", portId: "out"}, target: {nodeId: "relu", portId: "in"}}
+    → inputs["in"] = results["conv"]["out"]
+
+    For multi-output nodes (LSTM), results["lstm"] = {"out": tensor, "hidden": tensor, "cell": tensor}
+    so the edge's source.portId selects which output to route."""
     inputs: dict[str, torch.Tensor] = {}
     for edge in edges:
         if edge["target"]["nodeId"] == node_id:

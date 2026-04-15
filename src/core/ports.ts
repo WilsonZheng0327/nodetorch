@@ -1,6 +1,10 @@
 // Port resolution — resolves the effective ports for any node instance.
 // For regular nodes, reads from the NodeDefinition.
 // For subgraph nodes, derives ports from inner GraphInput/GraphOutput sentinels.
+//
+// Used by: EngineNode (rendering), isValidConnection (validation),
+//          pruneInvalidEdges (cleanup). Centralizes the "what ports
+//          does this node have?" question so subgraph support is transparent.
 
 import type { NodeInstance, Graph } from './graph';
 import type { PortDefinition, NodeRegistry } from './nodedef';

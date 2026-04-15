@@ -1,7 +1,16 @@
-# Per-dataset loader functions.
-# All dataset-specific knowledge lives here — normalization constants,
-# dataset construction, denormalization for image preview.
-# graph_builder.py calls these generically.
+# data_loaders.py — Per-dataset loader functions.
+#
+# ALL dataset-specific knowledge lives here — normalization constants,
+# dataset construction, denormalization for image preview. graph_builder.py
+# calls these generically via four registries:
+#
+#   DATA_LOADERS:     (props) → { port_id: tensor }     — load a batch
+#   TRAIN_DATASETS:   () → Dataset                       — full training dataset
+#   DENORMALIZERS:    (tensor [C,H,W]) → tensor [C,H,W]  — undo normalization for preview
+#   DATASET_DETAILS:  () → dict                           — labels, sample images, stats
+#
+# Adding a new dataset: implement 4 functions, add to 4 registries.
+# No changes needed in graph_builder.py.
 
 import torch
 import torchvision
