@@ -1,0 +1,35 @@
+{
+  "name": "Transformer Encoder Layer",
+  "description": "Self-attention + FFN with residual connections and layer norms",
+  "subgraph": {
+    "id": "transformer-encoder-inner",
+    "name": "Transformer Encoder Layer",
+    "nodes": [
+      { "id": "input", "type": "subgraph.input", "position": { "x": 0, "y": 150 }, "properties": { "portCount": 1, "portNames": "in" } },
+      { "id": "mha", "type": "ml.layers.multihead_attention", "position": { "x": 250, "y": 100 }, "properties": { "embedDim": 256, "numHeads": 8, "dropout": 0.1 } },
+      { "id": "add1", "type": "ml.structural.add", "position": { "x": 500, "y": 150 }, "properties": {} },
+      { "id": "ln1", "type": "ml.layers.layernorm", "position": { "x": 700, "y": 150 }, "properties": { "numLastDims": 1 } },
+      { "id": "ff1", "type": "ml.layers.linear", "position": { "x": 900, "y": 100 }, "properties": { "outFeatures": 1024 } },
+      { "id": "gelu", "type": "ml.activations.gelu", "position": { "x": 1100, "y": 100 }, "properties": {} },
+      { "id": "ff2", "type": "ml.layers.linear", "position": { "x": 1300, "y": 100 }, "properties": { "outFeatures": 256 } },
+      { "id": "add2", "type": "ml.structural.add", "position": { "x": 1500, "y": 150 }, "properties": {} },
+      { "id": "ln2", "type": "ml.layers.layernorm", "position": { "x": 1700, "y": 150 }, "properties": { "numLastDims": 1 } },
+      { "id": "output", "type": "subgraph.output", "position": { "x": 1900, "y": 150 }, "properties": { "portCount": 1, "portNames": "out" } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "mha", "portId": "query" } },
+      { "id": "e2", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "mha", "portId": "key" } },
+      { "id": "e3", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "mha", "portId": "value" } },
+      { "id": "e4", "source": { "nodeId": "mha", "portId": "out" }, "target": { "nodeId": "add1", "portId": "a" } },
+      { "id": "e5", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "add1", "portId": "b" } },
+      { "id": "e6", "source": { "nodeId": "add1", "portId": "out" }, "target": { "nodeId": "ln1", "portId": "in" } },
+      { "id": "e7", "source": { "nodeId": "ln1", "portId": "out" }, "target": { "nodeId": "ff1", "portId": "in" } },
+      { "id": "e8", "source": { "nodeId": "ff1", "portId": "out" }, "target": { "nodeId": "gelu", "portId": "in" } },
+      { "id": "e9", "source": { "nodeId": "gelu", "portId": "out" }, "target": { "nodeId": "ff2", "portId": "in" } },
+      { "id": "e10", "source": { "nodeId": "ff2", "portId": "out" }, "target": { "nodeId": "add2", "portId": "a" } },
+      { "id": "e11", "source": { "nodeId": "ln1", "portId": "out" }, "target": { "nodeId": "add2", "portId": "b" } },
+      { "id": "e12", "source": { "nodeId": "add2", "portId": "out" }, "target": { "nodeId": "ln2", "portId": "in" } },
+      { "id": "e13", "source": { "nodeId": "ln2", "portId": "out" }, "target": { "nodeId": "output", "portId": "out" } }
+    ]
+  }
+}

@@ -18,6 +18,7 @@ from pathlib import Path
 
 BLOCKS_DIR = Path("./blocks")
 BLOCKS_DIR.mkdir(exist_ok=True)
+PRESETS_DIR = Path("./presets")  # shipped block templates, read-only
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nodetorch")
@@ -98,8 +99,22 @@ async def dataset_detail(dataset_type: str):
 
 @app.get("/blocks")
 async def list_blocks():
-    """List all saved blocks."""
+    """List all saved and preset blocks."""
     blocks = []
+    # Preset blocks (shipped, read-only)
+    if PRESETS_DIR.exists():
+        for f in PRESETS_DIR.glob("*.json"):
+            try:
+                data = json.loads(f.read_text())
+                blocks.append({
+                    "filename": f"preset:{f.name}",
+                    "name": data.get("name", f.stem),
+                    "description": data.get("description", ""),
+                    "preset": True,
+                })
+            except Exception:
+                continue
+    # User-saved blocks
     for f in BLOCKS_DIR.glob("*.json"):
         try:
             data = json.loads(f.read_text())
@@ -107,6 +122,7 @@ async def list_blocks():
                 "filename": f.name,
                 "name": data.get("name", f.stem),
                 "description": data.get("description", ""),
+                "preset": False,
             })
         except Exception:
             continue
@@ -124,19 +140,24 @@ async def save_block(block_data: dict):
     return {"status": "ok", "filename": filename}
 
 
-@app.get("/blocks/{filename}")
+@app.get("/blocks/{filename:path}")
 async def load_block(filename: str):
-    """Load a block definition."""
-    filepath = BLOCKS_DIR / filename
+    """Load a block definition (from presets or user blocks)."""
+    if filename.startswith("preset:"):
+        filepath = PRESETS_DIR / filename[7:]
+    else:
+        filepath = BLOCKS_DIR / filename
     if not filepath.exists():
         return {"status": "error", "error": f"Block not found: {filename}"}
     data = json.loads(filepath.read_text())
     return {"status": "ok", "block": data}
 
 
-@app.delete("/blocks/{filename}")
+@app.delete("/blocks/{filename:path}")
 async def delete_block(filename: str):
-    """Delete a saved block."""
+    """Delete a saved block (presets cannot be deleted)."""
+    if filename.startswith("preset:"):
+        return {"status": "error", "error": "Cannot delete preset blocks"}
     filepath = BLOCKS_DIR / filename
     if filepath.exists():
         filepath.unlink()

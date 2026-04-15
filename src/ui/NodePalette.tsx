@@ -90,6 +90,7 @@ interface SavedBlock {
   filename: string;
   name: string;
   description: string;
+  preset?: boolean;
 }
 
 interface PaletteProps {
@@ -173,13 +174,13 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
                         <span className="palette-item-name">{block.name}</span>
                         <span className="palette-item-desc">{block.description}</span>
                       </div>
-                      <button
+                      {!block.preset && <button
                         className="palette-saved-block-delete"
                         onClick={() => onDeleteBlock(block.filename)}
                         title="Delete block"
                       >
                         &times;
-                      </button>
+                      </button>}
                     </div>
                   ))}
               </div>
