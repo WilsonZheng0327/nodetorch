@@ -374,12 +374,17 @@ def build_and_run_graph(graph_data: dict) -> tuple[
             modules[node_id] = module
             output = module(inputs["in"])
             results[node_id] = {"out": output}
+            meta: dict = {
+                "outputShape": list(output.shape),
+                "paramCount": sum(p.numel() for p in module.parameters()),
+            }
+            wi = module_weight_info(module)
+            if wi:
+                meta["weights"] = wi
+            meta["activations"] = activation_info(output)
             node_results[node_id] = {
                 "outputs": {"out": tensor_info(output)},
-                "metadata": {
-                    "outputShape": list(output.shape),
-                    "paramCount": sum(p.numel() for p in module.parameters()),
-                },
+                "metadata": meta,
             }
         except Exception as e:
             node_results[node_id] = {
@@ -678,6 +683,41 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
     return {
         "nodeResults": node_results,
         "epochs": epoch_results,
+    }
+
+
+def module_weight_info(module: nn.Module) -> dict | None:
+    """Extract weight statistics and histogram bins for visualization."""
+    params = list(module.parameters())
+    if not params:
+        return None
+
+    all_weights = torch.cat([p.detach().flatten() for p in params]).float()
+    hist = torch.histogram(all_weights.cpu(), bins=30)
+
+    return {
+        "mean": _safe_float(float(all_weights.mean())),
+        "std": _safe_float(float(all_weights.std())),
+        "min": _safe_float(float(all_weights.min())),
+        "max": _safe_float(float(all_weights.max())),
+        "histBins": [_safe_float(float(x)) for x in hist.bin_edges[:-1]],
+        "histCounts": [int(x) for x in hist.hist],
+    }
+
+
+def activation_info(tensor: torch.Tensor) -> dict:
+    """Extract activation statistics and histogram bins for visualization."""
+    flat = tensor.detach().flatten().float()
+    hist = torch.histogram(flat.cpu(), bins=30)
+
+    return {
+        "mean": _safe_float(float(flat.mean())),
+        "std": _safe_float(float(flat.std())) if flat.numel() > 1 else 0.0,
+        "min": _safe_float(float(flat.min())),
+        "max": _safe_float(float(flat.max())),
+        "histBins": [_safe_float(float(x)) for x in hist.bin_edges[:-1]],
+        "histCounts": [int(x) for x in hist.hist],
+        "sparsity": _safe_float(float((flat == 0).sum()) / flat.numel()),
     }
 
 

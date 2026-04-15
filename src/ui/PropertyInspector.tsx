@@ -102,6 +102,40 @@ export function PropertyInspector({ node, onPropertyChange, onSaveBlock }: Props
           )}
         </div>
       )}
+      {metadata?.weights && (
+        <div className="inspector-section">
+          <div className="inspector-section-title">Weights</div>
+          <div className="inspector-info">
+            <span>Mean</span><span>{metadata.weights.mean?.toFixed(4)}</span>
+          </div>
+          <div className="inspector-info">
+            <span>Std</span><span>{metadata.weights.std?.toFixed(4)}</span>
+          </div>
+          <div className="inspector-info">
+            <span>Range</span><span>{metadata.weights.min?.toFixed(4)} to {metadata.weights.max?.toFixed(4)}</span>
+          </div>
+          {metadata.weights.histBins && (
+            <Histogram bins={metadata.weights.histBins} counts={metadata.weights.histCounts} color="#89b4fa" label="Weight distribution" />
+          )}
+        </div>
+      )}
+      {metadata?.activations && (
+        <div className="inspector-section">
+          <div className="inspector-section-title">Activations</div>
+          <div className="inspector-info">
+            <span>Mean</span><span>{metadata.activations.mean?.toFixed(4)}</span>
+          </div>
+          <div className="inspector-info">
+            <span>Std</span><span>{metadata.activations.std?.toFixed(4)}</span>
+          </div>
+          <div className="inspector-info">
+            <span>Sparsity</span><span>{metadata.activations.sparsity != null ? `${(metadata.activations.sparsity * 100).toFixed(1)}%` : '—'}</span>
+          </div>
+          {metadata.activations.histBins && (
+            <Histogram bins={metadata.activations.histBins} counts={metadata.activations.histCounts} color="#10b981" label="Activation distribution" />
+          )}
+        </div>
+      )}
       {metadata?.imagePixels && (
         <div className="inspector-section">
           <div className="inspector-section-title">Input Image</div>
@@ -313,6 +347,48 @@ function ProbabilityBars({ probs, predicted }: { probs: number[]; predicted: num
           <span className="inspector-prob-value">{(p * 100).toFixed(1)}%</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// --- Histogram ---
+
+function Histogram({ bins, counts, color, label }: { bins: number[]; counts: number[]; color: string; label: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || bins.length === 0) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    const w = rect.width;
+    const h = rect.height;
+    const maxCount = Math.max(...counts);
+    const barWidth = w / counts.length;
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.6;
+    for (let i = 0; i < counts.length; i++) {
+      const barH = (counts[i] / maxCount) * (h - 2);
+      ctx.fillRect(i * barWidth, h - barH, barWidth - 1, barH);
+    }
+    ctx.globalAlpha = 1;
+  }, [bins, counts, color]);
+
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ fontSize: 10, color: '#6c7086', marginBottom: 2 }}>{label}</div>
+      <canvas ref={canvasRef} style={{ width: '100%', height: 50, borderRadius: 4, background: '#313244' }} />
     </div>
   );
 }
