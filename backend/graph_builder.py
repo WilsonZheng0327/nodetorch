@@ -500,6 +500,186 @@ def execute_graph(graph_data: dict) -> dict:
     return node_results
 
 
+def get_layer_detail(graph_data: dict, node_id: str) -> dict:
+    """Return detailed visualization data for a specific node.
+
+    Runs a forward pass, then extracts:
+    - weightMatrix: 2D weight data for heatmap (Linear, Conv2d)
+    - featureMaps: per-channel activation grids (Conv2d)
+    - attentionMap: attention weight matrix (MHA, Attention)
+    - hiddenState: hidden/cell state matrix (LSTM, GRU)
+    - confusionData: predictions vs labels (loss nodes)
+    """
+    with torch.no_grad():
+        modules, results, _, nodes, edges = build_and_run_graph(graph_data)
+
+    # Resolve module — might be inside a subgraph
+    module = modules.get(node_id)
+    output = results.get(node_id, {}).get("out")
+    node = nodes.get(node_id)
+
+    # Check if node is inside a subgraph
+    if not node:
+        for nid, mod in modules.items():
+            if isinstance(mod, SubGraphModule) and node_id in mod._key_map:
+                safe_key = mod._key_map[node_id]
+                if safe_key in mod.inner_modules:
+                    module = mod.inner_modules[safe_key]
+                inner_results = getattr(mod, '_last_results', {})
+                output = inner_results.get(node_id, {}).get("out")
+                node = mod.inner_nodes.get(node_id)
+                break
+
+    if not node:
+        return {"error": f"Node {node_id} not found"}
+
+    node_type = node["type"]
+    detail: dict = {"nodeType": node_type}
+
+    # --- Weight matrix heatmap ---
+    if module is not None:
+        weight = None
+        for name, param in module.named_parameters():
+            if 'weight' in name:
+                weight = param.detach().cpu().float()
+                break
+        if weight is not None:
+            # Flatten to 2D for visualization
+            if weight.dim() == 1:
+                mat = weight.unsqueeze(0)
+            elif weight.dim() == 2:
+                mat = weight
+            elif weight.dim() == 4:
+                # Conv2d: [out_ch, in_ch, kH, kW] → [out_ch, in_ch * kH * kW]
+                mat = weight.reshape(weight.shape[0], -1)
+            else:
+                mat = weight.reshape(weight.shape[0], -1)
+            # Downsample if too large (max 64x64 for display)
+            if mat.shape[0] > 64:
+                mat = mat[:64]
+            if mat.shape[1] > 64:
+                mat = mat[:, :64]
+            detail["weightMatrix"] = {
+                "data": mat.tolist(),
+                "rows": mat.shape[0],
+                "cols": mat.shape[1],
+                "min": _safe_float(float(mat.min())),
+                "max": _safe_float(float(mat.max())),
+            }
+
+    # --- Feature maps (Conv output channels) ---
+    if output is not None and isinstance(output, torch.Tensor) and output.dim() == 4:
+        # [batch, channels, H, W] → take first sample, up to 16 channels
+        fmaps = output[0].detach().cpu().float()
+        n_maps = min(16, fmaps.shape[0])
+        maps_list = []
+        for c in range(n_maps):
+            fm = fmaps[c]
+            # Normalize to 0-255
+            fmin, fmax = float(fm.min()), float(fm.max())
+            rng = fmax - fmin if fmax != fmin else 1.0
+            normalized = ((fm - fmin) / rng * 255).clamp(0, 255).byte()
+            # Downsample if larger than 32x32
+            if normalized.shape[0] > 32 or normalized.shape[1] > 32:
+                normalized = torch.nn.functional.interpolate(
+                    normalized.unsqueeze(0).unsqueeze(0).float(),
+                    size=(min(32, normalized.shape[0]), min(32, normalized.shape[1])),
+                    mode='nearest',
+                ).squeeze().byte()
+            maps_list.append(normalized.tolist())
+        detail["featureMaps"] = {
+            "maps": maps_list,
+            "channels": n_maps,
+            "height": len(maps_list[0]),
+            "width": len(maps_list[0][0]) if maps_list[0] else 0,
+        }
+
+    # --- Attention map ---
+    # Re-run MHA/Attention to capture attention weights
+    if node_type in ("ml.layers.multihead_attention", "ml.layers.attention"):
+        if module is not None:
+            inputs = gather_inputs(node_id, edges, results)
+            inp = inputs.get("in")
+            if inp is not None:
+                try:
+                    if node_type == "ml.layers.multihead_attention":
+                        _, attn_weights = module.mha(inp, inp, inp)
+                    else:
+                        # Attention module: q=k=v=input
+                        q = module.q_proj(inp)
+                        k = module.k_proj(inp)
+                        d_k = q.shape[-1]
+                        scores = torch.matmul(q, k.transpose(-2, -1)) / (d_k ** 0.5)
+                        attn_weights = torch.softmax(scores, dim=-1)
+                    if attn_weights is not None:
+                        # Take first sample, first head
+                        am = attn_weights[0]
+                        if am.dim() == 3:
+                            am = am[0]  # first head
+                        am = am.detach().cpu().float()
+                        if am.shape[0] > 64:
+                            am = am[:64, :64]
+                        detail["attentionMap"] = {
+                            "data": am.tolist(),
+                            "rows": am.shape[0],
+                            "cols": am.shape[1],
+                        }
+                except Exception:
+                    pass  # Attention capture failed, skip
+
+    # --- Hidden state (LSTM/GRU) ---
+    if node_type in ("ml.layers.lstm", "ml.layers.gru"):
+        node_output = results.get(node_id, {})
+        hidden = node_output.get("hidden")
+        if hidden is not None and isinstance(hidden, torch.Tensor):
+            # [num_layers, batch, hidden_size] → take first sample
+            h = hidden[0, 0].detach().cpu().float() if hidden.dim() == 3 else hidden[0].detach().cpu().float()
+            detail["hiddenState"] = {
+                "data": h.unsqueeze(0).tolist(),
+                "rows": 1,
+                "cols": len(h),
+                "label": "Hidden State",
+            }
+        cell = node_output.get("cell")
+        if cell is not None and isinstance(cell, torch.Tensor):
+            c = cell[0, 0].detach().cpu().float() if cell.dim() == 3 else cell[0].detach().cpu().float()
+            detail["cellState"] = {
+                "data": c.unsqueeze(0).tolist(),
+                "rows": 1,
+                "cols": len(c),
+                "label": "Cell State",
+            }
+
+    # --- Confusion matrix (loss nodes) ---
+    if node_type in LOSS_NODES:
+        # Find prediction and label tensors feeding into the loss
+        pred_tensor = None
+        label_tensor = None
+        for edge in edges:
+            if edge["target"]["nodeId"] == node_id:
+                if edge["target"]["portId"] == "predictions":
+                    pred_tensor = results.get(edge["source"]["nodeId"], {}).get("out")
+                elif edge["target"]["portId"] == "labels":
+                    label_tensor = results.get(edge["source"]["nodeId"], {}).get("labels")
+                    if label_tensor is None:
+                        label_tensor = results.get(edge["source"]["nodeId"], {}).get("out")
+        if pred_tensor is not None and label_tensor is not None:
+            preds = pred_tensor.argmax(dim=1).cpu()
+            labels = label_tensor.cpu()
+            n_classes = min(int(preds.max().item()) + 1, int(labels.max().item()) + 1, 20)
+            n_classes = max(n_classes, 2)
+            matrix = [[0] * n_classes for _ in range(n_classes)]
+            for p, l in zip(preds.tolist(), labels.tolist()):
+                if 0 <= p < n_classes and 0 <= l < n_classes:
+                    matrix[l][p] += 1
+            detail["confusionMatrix"] = {
+                "data": matrix,
+                "size": n_classes,
+            }
+
+    return detail
+
+
 def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
     """
     Run a training loop. Finds the optimizer node, builds modules with

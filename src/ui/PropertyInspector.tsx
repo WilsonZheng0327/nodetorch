@@ -8,16 +8,19 @@ import type { NodeInstance } from '../core/graph';
 import type { PropertyDefinition } from '../core/nodedef';
 import { DomainCtx } from './EngineNode';
 import { DatasetDetail } from './DatasetDetail';
+import { LayerDetail } from './LayerDetail';
 
 interface Props {
   node: NodeInstance | null;
   onPropertyChange: (nodeId: string, key: string, value: any) => void;
   onSaveBlock?: (nodeId: string) => void;
+  graphJson?: string;
 }
 
-export function PropertyInspector({ node, onPropertyChange, onSaveBlock }: Props) {
+export function PropertyInspector({ node, onPropertyChange, onSaveBlock, graphJson }: Props) {
   const domain = useContext(DomainCtx);
   const [datasetDetailType, setDatasetDetailType] = useState<string | null>(null);
+  const [layerDetailNode, setLayerDetailNode] = useState<{ id: string; type: string } | null>(null);
 
   if (!node || !domain) {
     return (
@@ -43,6 +46,14 @@ export function PropertyInspector({ node, onPropertyChange, onSaveBlock }: Props
     <>
     {datasetDetailType && (
       <DatasetDetail datasetType={datasetDetailType} onClose={() => setDatasetDetailType(null)} />
+    )}
+    {layerDetailNode && graphJson && (
+      <LayerDetail
+        nodeId={layerDetailNode.id}
+        nodeType={layerDetailNode.type}
+        graphJson={graphJson}
+        onClose={() => setLayerDetailNode(null)}
+      />
     )}
     <div className="inspector">
       <div className="inspector-header">{def.displayName}</div>
@@ -167,6 +178,16 @@ export function PropertyInspector({ node, onPropertyChange, onSaveBlock }: Props
             onClick={() => onSaveBlock(node.id)}
           >
             Save Block to Library
+          </button>
+        </div>
+      )}
+      {metadata?.outputShape && !isDataNode && graphJson && (
+        <div className="inspector-section">
+          <button
+            className="inspector-dataset-btn"
+            onClick={() => setLayerDetailNode({ id: node.id, type: node.type })}
+          >
+            View Layer Detail
           </button>
         </div>
       )}

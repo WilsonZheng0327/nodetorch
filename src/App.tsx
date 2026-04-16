@@ -326,7 +326,7 @@ export default function App() {
           savedBlocks={graph.savedBlocks}
           onDeleteBlock={graph.deleteBlock}
         />
-        <PropertyInspector node={selectedNode} onPropertyChange={graph.updateProperty} onSaveBlock={graph.saveBlock} />
+        <PropertyInspector node={selectedNode} onPropertyChange={graph.updateProperty} onSaveBlock={graph.saveBlock} graphJson={graph.saveGraph()} />
         <TrainingDashboard progress={graph.trainingProgress} isTraining={graph.status.type === 'running'} />
       </div>
     </VizCtx.Provider>

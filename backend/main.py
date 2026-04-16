@@ -31,7 +31,7 @@ import asyncio
 import threading
 import logging
 
-from graph_builder import execute_graph, train_graph, infer_graph
+from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail
 from data_loaders import DATASET_DETAILS
 import os
 from pathlib import Path
@@ -99,6 +99,20 @@ async def infer(graph_data: dict):
         return {"status": "ok", "results": results}
     except Exception as e:
         logger.error(f"Inference failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/layer-detail")
+async def layer_detail(request: dict):
+    """Return detailed visualization data for a specific node (weight matrix, feature maps, etc.)."""
+    logger.info(f"Layer detail requested for node {request.get('nodeId')}")
+    try:
+        result = get_layer_detail(request["graph"], request["nodeId"])
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "detail": result}
+    except Exception as e:
+        logger.error(f"Layer detail failed: {e}")
         return {"status": "error", "error": str(e)}
 
 
