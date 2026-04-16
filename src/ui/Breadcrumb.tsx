@@ -1,6 +1,8 @@
 // Breadcrumb navigation — shows the path from root into nested subgraphs.
 // Click a breadcrumb to navigate back to that level.
 
+import './Breadcrumb.css';
+
 interface NavEntry {
   graphId: string;
   label: string;

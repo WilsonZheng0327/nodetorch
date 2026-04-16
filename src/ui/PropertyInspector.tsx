@@ -1,6 +1,8 @@
 // Property inspector panel — shows editable properties for the selected node.
 // Auto-generates widgets from PropertyDefinition.type (number → input, boolean → toggle, etc.)
 
+import './PropertyInspector.css';
+
 import { useContext, useRef, useEffect, useState } from 'react';
 import type { NodeInstance } from '../core/graph';
 import type { PropertyDefinition } from '../core/nodedef';

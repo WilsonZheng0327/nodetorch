@@ -19,13 +19,6 @@ export const graphOutputNode: NodeDefinition = {
       defaultValue: 1,
       affects: 'ports',
     },
-    {
-      id: 'portNames',
-      name: 'Port Names',
-      type: { kind: 'string' },
-      defaultValue: 'out',
-      affects: 'ports',
-    },
   ],
 
   getPorts: (properties) => {

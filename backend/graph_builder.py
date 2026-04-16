@@ -93,7 +93,8 @@ class SubGraphModule(nn.Module):
         # Register inner modules so their parameters are visible
         self.inner_modules = nn.ModuleDict()
         for nid, mod in inner_modules.items():
-            # Sanitize key for ModuleDict (no dots)
+            # Sanitize key for ModuleDict
+            # nn.ModuleDict doesn't allow dots or hyphens
             safe_key = nid.replace('.', '_').replace('-', '_')
             self.inner_modules[safe_key] = mod
         # Keep a mapping from node_id → safe_key
@@ -101,6 +102,7 @@ class SubGraphModule(nn.Module):
 
     def forward(self, **inputs: torch.Tensor) -> dict[str, torch.Tensor]:
         results: dict[str, dict[str, torch.Tensor]] = {}
+        output_node_id = None
 
         for node_id in self.inner_order:
             node = self.inner_nodes[node_id]
@@ -111,8 +113,9 @@ class SubGraphModule(nn.Module):
                 results[node_id] = inputs
                 continue
 
-            # Sentinel output: collect and return
+            # Sentinel output: save its results, remember its id
             if node_type == SENTINEL_OUTPUT:
+                output_node_id = node_id
                 node_inputs = gather_inputs(node_id, self.inner_edges, results)
                 results[node_id] = node_inputs
                 continue
@@ -122,12 +125,15 @@ class SubGraphModule(nn.Module):
                 continue
 
             node_inputs = gather_inputs(node_id, self.inner_edges, results)
+
+            # get sanitized safe key for module id
             safe_key = self._key_map.get(node_id)
             if not safe_key or safe_key not in self.inner_modules:
                 continue
 
             module = self.inner_modules[safe_key]
 
+            ### THIS IS THE ACTUAL MODULE EXECUTION ###
             if node_type in MULTI_INPUT_NODES:
                 output = module(**{k: v for k, v in node_inputs.items()})
             elif "in" in node_inputs:
@@ -137,12 +143,10 @@ class SubGraphModule(nn.Module):
 
             results[node_id] = {"out": output}
 
-        # Find output sentinel's results
-        for node_id in self.inner_order:
-            if self.inner_nodes[node_id]["type"] == SENTINEL_OUTPUT:
-                return results.get(node_id, {})
+        # Store inner results for visualization snapshots
+        self._last_results = results
 
-        return {}
+        return results.get(output_node_id, {}) if output_node_id else {}
 
 
 def build_subgraph_module(subgraph_data: dict, parent_input_shapes: dict) -> SubGraphModule:
@@ -258,7 +262,10 @@ def build_and_run_graph(graph_data: dict) -> tuple[
                 first_tensor = next(iter(tensors.values()))
                 node_results[node_id] = {
                     "outputs": outputs,
-                    "metadata": {"outputShape": list(first_tensor.shape)},
+                    "metadata": {
+                        "outputShape": list(first_tensor.shape),
+                        "activations": activation_info(first_tensor),
+                    },
                 }
             except Exception as e:
                 node_results[node_id] = {
@@ -367,9 +374,44 @@ def build_and_run_graph(graph_data: dict) -> tuple[
                 first_key = next(iter(sg_outputs), None)
                 if first_key:
                     results[node_id] = {"out": sg_outputs[first_key]}
+                    meta: dict = {
+                        "outputShape": list(sg_outputs[first_key].shape),
+                        "paramCount": sum(p.numel() for p in sg_module.parameters()),
+                    }
+                    # Activation info on the block node itself
+                    meta["activations"] = activation_info(sg_outputs[first_key])
+                    # Per-inner-node snapshots for visualization
+                    inner_snaps = {}
+                    inner_results = getattr(sg_module, '_last_results', {})
+                    # Sentinel and layer nodes
+                    for inner_nid, inner_node in sg_module.inner_nodes.items():
+                        inner_type = inner_node["type"]
+                        if inner_type == SENTINEL_INPUT:
+                            t = inner_results.get(inner_nid, {}).get("in")
+                            if t is not None and isinstance(t, torch.Tensor):
+                                inner_snaps[inner_nid] = {"activations": activation_info(t)}
+                        elif inner_type == SENTINEL_OUTPUT:
+                            t = inner_results.get(inner_nid, {}).get("out")
+                            if t is not None and isinstance(t, torch.Tensor):
+                                inner_snaps[inner_nid] = {"activations": activation_info(t)}
+                    for inner_nid, safe_key in sg_module._key_map.items():
+                        if safe_key not in sg_module.inner_modules:
+                            continue
+                        inner_mod = sg_module.inner_modules[safe_key]
+                        s: dict = {}
+                        wi = module_weight_info(inner_mod)
+                        if wi:
+                            s["weights"] = wi
+                        inner_out = inner_results.get(inner_nid, {}).get("out")
+                        if inner_out is not None and isinstance(inner_out, torch.Tensor):
+                            s["activations"] = activation_info(inner_out)
+                        if s:
+                            inner_snaps[inner_nid] = s
+                    if inner_snaps:
+                        meta["innerSnapshots"] = inner_snaps
                     node_results[node_id] = {
                         "outputs": {"out": tensor_info(sg_outputs[first_key])},
-                        "metadata": {"outputShape": list(sg_outputs[first_key].shape)},
+                        "metadata": meta,
                     }
                 else:
                     node_results[node_id] = {
@@ -417,6 +459,9 @@ def build_and_run_graph(graph_data: dict) -> tuple[
                 wi = module_weight_info(module)
                 if wi:
                     meta["weights"] = wi
+                bi = batchnorm_info(module)
+                if bi:
+                    meta["batchnorm"] = bi
                 meta["activations"] = activation_info(first_tensor)
                 node_results[node_id] = {
                     "outputs": {k: tensor_info(v) for k, v in raw_output.items()},
@@ -431,6 +476,9 @@ def build_and_run_graph(graph_data: dict) -> tuple[
                 wi = module_weight_info(module)
                 if wi:
                     meta["weights"] = wi
+                bi = batchnorm_info(module)
+                if bi:
+                    meta["batchnorm"] = bi
                 meta["activations"] = activation_info(raw_output)
                 node_results[node_id] = {
                     "outputs": {"out": tensor_info(raw_output)},
@@ -552,6 +600,13 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
     epoch_results = []
     total_batches = len(train_loader)
 
+    # Track weight norms for delta computation
+    prev_weight_norms: dict[str, float] = {}
+    for nid, mod in modules.items():
+        params = list(mod.parameters())
+        if params:
+            prev_weight_norms[nid] = float(torch.cat([p.detach().flatten() for p in params]).float().norm())
+
     for epoch in range(epochs):
         # Check for cancellation
         if cancel_event and cancel_event.is_set():
@@ -561,6 +616,8 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
         total_loss = 0.0
         correct = 0
         total = 0
+
+        last_batch_results: dict[str, dict[str, torch.Tensor]] = {}
 
         for batch_idx, (images, labels) in enumerate(train_loader):
             if cancel_event and cancel_event.is_set():
@@ -636,9 +693,77 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
                             total += labels.size(0)
                         break
 
+            last_batch_results = batch_results
+
         epoch_time = time.time() - epoch_start
         avg_loss = total_loss / len(train_loader)
         accuracy = correct / total if total > 0 else 0.0
+
+        # Per-node visualization snapshots (weights, gradients, activations)
+        node_snapshots = {}
+        for node_id, module in modules.items():
+            # Recurse into subgraph modules for per-inner-node snapshots
+            if isinstance(module, SubGraphModule):
+                inner_snaps = {}
+                inner_results = getattr(module, '_last_results', {})
+                # Sentinel nodes: input gets received distribution, output gets result
+                for inner_nid, inner_node in module.inner_nodes.items():
+                    inner_type = inner_node["type"]
+                    if inner_type == SENTINEL_INPUT:
+                        t = inner_results.get(inner_nid, {}).get("in")
+                        if t is not None and isinstance(t, torch.Tensor):
+                            inner_snaps[inner_nid] = {"activations": activation_info(t)}
+                    elif inner_type == SENTINEL_OUTPUT:
+                        t = inner_results.get(inner_nid, {}).get("out")
+                        if t is not None and isinstance(t, torch.Tensor):
+                            inner_snaps[inner_nid] = {"activations": activation_info(t)}
+                # Layer nodes: weights, gradients, activations
+                for inner_nid, safe_key in module._key_map.items():
+                    if safe_key not in module.inner_modules:
+                        continue
+                    inner_mod = module.inner_modules[safe_key]
+                    s = {}
+                    wi = module_weight_info(inner_mod)
+                    if wi:
+                        s["weights"] = wi
+                    gi = gradient_info(inner_mod)
+                    if gi:
+                        s["gradients"] = gi
+                    inner_out = inner_results.get(inner_nid, {}).get("out")
+                    if inner_out is not None and isinstance(inner_out, torch.Tensor):
+                        s["activations"] = activation_info(inner_out)
+                    if s:
+                        inner_snaps[inner_nid] = s
+                # Block node itself gets output activation + inner snapshots
+                block_snap: dict = {"innerSnapshots": inner_snaps} if inner_snaps else {}
+                out_tensor = last_batch_results.get(node_id, {}).get("out")
+                if out_tensor is not None and isinstance(out_tensor, torch.Tensor):
+                    block_snap["activations"] = activation_info(out_tensor)
+                if block_snap:
+                    node_snapshots[node_id] = block_snap
+                continue
+
+            snap = {}
+            wi = module_weight_info(module)
+            if wi:
+                snap["weights"] = wi
+            gi = gradient_info(module)
+            if gi:
+                snap["gradients"] = gi
+            bi = batchnorm_info(module)
+            if bi:
+                snap["batchnorm"] = bi
+            # Weight delta: change in weight norm since last epoch
+            params = list(module.parameters())
+            if params and node_id in prev_weight_norms:
+                cur_norm = float(torch.cat([p.detach().flatten() for p in params]).float().norm())
+                snap["weightDelta"] = _safe_float(abs(cur_norm - prev_weight_norms[node_id]))
+                prev_weight_norms[node_id] = cur_norm
+            out_tensor = last_batch_results.get(node_id, {}).get("out")
+            if out_tensor is not None and isinstance(out_tensor, torch.Tensor):
+                snap["activations"] = activation_info(out_tensor)
+            if snap:
+                node_snapshots[node_id] = snap
 
         epoch_result = {
             "epoch": epoch + 1,
@@ -648,6 +773,7 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
             "time": round(epoch_time, 2),
             "batches": total_batches,
             "samples": total,
+            "nodeSnapshots": node_snapshots,
         }
         epoch_results.append(epoch_result)
 
@@ -764,6 +890,52 @@ def module_weight_info(module: nn.Module) -> dict | None:
         "std": _safe_float(float(all_weights.std())),
         "min": _safe_float(float(all_weights.min())),
         "max": _safe_float(float(all_weights.max())),
+        "histBins": [_safe_float(float(x)) for x in hist.bin_edges[:-1]],
+        "histCounts": [int(x) for x in hist.hist],
+    }
+
+
+def batchnorm_info(module: nn.Module) -> dict | None:
+    """Extract running mean/var histograms from BatchNorm layers."""
+    rm = getattr(module, 'running_mean', None)
+    rv = getattr(module, 'running_var', None)
+    if rm is None or rv is None:
+        return None
+
+    rm_f = rm.detach().float().cpu()
+    rv_f = rv.detach().float().cpu()
+    rm_hist = torch.histogram(rm_f, bins=30)
+    rv_hist = torch.histogram(rv_f, bins=30)
+
+    return {
+        "runningMean": {
+            "mean": _safe_float(float(rm_f.mean())),
+            "std": _safe_float(float(rm_f.std())) if rm_f.numel() > 1 else 0.0,
+            "histBins": [_safe_float(float(x)) for x in rm_hist.bin_edges[:-1]],
+            "histCounts": [int(x) for x in rm_hist.hist],
+        },
+        "runningVar": {
+            "mean": _safe_float(float(rv_f.mean())),
+            "std": _safe_float(float(rv_f.std())) if rv_f.numel() > 1 else 0.0,
+            "histBins": [_safe_float(float(x)) for x in rv_hist.bin_edges[:-1]],
+            "histCounts": [int(x) for x in rv_hist.hist],
+        },
+    }
+
+
+def gradient_info(module: nn.Module) -> dict | None:
+    """Extract gradient statistics and histogram from the last backward pass."""
+    grads = [p.grad.detach().flatten() for p in module.parameters() if p.grad is not None]
+    if not grads:
+        return None
+
+    all_grads = torch.cat(grads).float()
+    hist = torch.histogram(all_grads.cpu(), bins=30)
+
+    return {
+        "mean": _safe_float(float(all_grads.mean())),
+        "std": _safe_float(float(all_grads.std())) if all_grads.numel() > 1 else 0.0,
+        "norm": _safe_float(float(all_grads.norm())),
         "histBins": [_safe_float(float(x)) for x in hist.bin_edges[:-1]],
         "histCounts": [int(x) for x in hist.hist],
     }

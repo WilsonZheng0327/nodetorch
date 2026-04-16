@@ -1,6 +1,7 @@
 // Toolbar — save/load graph, run forward pass, train.
 
 import { useRef, useState } from 'react';
+import './Toolbar.css';
 
 interface Props {
   onSave: () => string;
@@ -10,12 +11,13 @@ interface Props {
   onTrain: () => Promise<void>;
   onCancel: () => void;
   onClear: () => void;
+  onOrganize: () => void;
   status: { type: 'idle' | 'running' | 'success' | 'error'; message?: string };
   modelTrained: boolean;
   modelStale: boolean;
 }
 
-export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onClear, status, modelTrained, modelStale }: Props) {
+export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onClear, onOrganize, status, modelTrained, modelStale }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -124,6 +126,9 @@ export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onC
         </button>
         <button className="toolbar-btn" onClick={onClear} disabled={busy} title="Clear all nodes and edges">
           Clear
+        </button>
+        <button className="toolbar-btn" onClick={onOrganize} disabled={busy} title="Auto-organize node layout">
+          Organize
         </button>
         <input
           ref={fileInputRef}

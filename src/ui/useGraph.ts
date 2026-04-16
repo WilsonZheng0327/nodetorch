@@ -183,26 +183,43 @@ export function useGraph(domain: DomainContext) {
     return g;
   }, [navStack]);
 
+  // Helper: resolve graph from a specific nav stack (not from state)
+  const resolveGraph = useCallback((stack: NavEntry[]): Graph => {
+    let g = graphRef.current;
+    for (const entry of stack) {
+      const node = g.nodes.get(entry.nodeId);
+      if (node?.subgraph) g = node.subgraph;
+      else break;
+    }
+    return g;
+  }, []);
+
+  // Immediately sync RF to a specific graph (avoids flash from async state)
+  const syncToGraph = useCallback((graph: Graph) => {
+    setRFNodes(toRFNodes(graph));
+    setRFEdges(toRFEdges(graph));
+  }, []);
+
   // Enter a subgraph node (double-click)
   const enterSubgraph = useCallback((nodeId: string) => {
     const currentGraph = getCurrentGraph();
     const node = currentGraph.nodes.get(nodeId);
     if (!node || node.type !== 'subgraph.block' || !node.subgraph) return;
 
-    setNavStack((prev) => [
-      ...prev,
-      {
-        graphId: node.subgraph!.id,
-        label: node.properties.blockName || 'Block',
-        nodeId,
-      },
-    ]);
-  }, [getCurrentGraph]);
+    const newStack: NavEntry[] = [
+      ...navStack,
+      { graphId: node.subgraph.id, label: node.properties.blockName || 'Block', nodeId },
+    ];
+    setNavStack(newStack);
+    syncToGraph(resolveGraph(newStack));
+  }, [getCurrentGraph, navStack, resolveGraph, syncToGraph]);
 
   // Go back to a specific level in the breadcrumb
   const navigateTo = useCallback((depth: number) => {
-    setNavStack((prev) => prev.slice(0, depth));
-  }, []);
+    const newStack = navStack.slice(0, depth);
+    setNavStack(newStack);
+    syncToGraph(resolveGraph(newStack));
+  }, [navStack, resolveGraph, syncToGraph]);
 
   // Call this whenever the graph structure or properties change
   const invalidateModel = useCallback(() => {
@@ -629,6 +646,21 @@ export function useGraph(domain: DomainContext) {
 
   const [trainingProgress, setTrainingProgress] = useState<{ epoch: number; loss: number; accuracy: number }[]>([]);
 
+  // Live visualization snapshots (updated per epoch during training)
+  const [liveSnapshots, setLiveSnapshots] = useState<Record<string, any>>({});
+
+  // Which nodes have their viz panel pinned open
+  const [pinnedVizNodes, setPinnedVizNodes] = useState<Set<string>>(new Set());
+
+  const toggleVizPin = useCallback((nodeId: string) => {
+    setPinnedVizNodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  }, []);
+
   const trainWsRef = useRef<WebSocket | null>(null);
 
   const cancelTrain = useCallback(() => {
@@ -648,6 +680,7 @@ export function useGraph(domain: DomainContext) {
 
     setStatus({ type: 'running', message: 'Training...' });
     setTrainingProgress([]);
+    setLiveSnapshots({});
     const graphData = serializeGraph(graphRef.current);
 
     return new Promise<void>((resolve) => {
@@ -690,6 +723,10 @@ export function useGraph(domain: DomainContext) {
             batches: msg.batches,
             samples: msg.samples,
           }]);
+          // Update live visualization snapshots
+          if (msg.nodeSnapshots) {
+            setLiveSnapshots(msg.nodeSnapshots);
+          }
           const progressStr = msg.totalEpochs ? ` [${msg.epoch}/${msg.totalEpochs}]` : '';
           const timeStr = msg.time != null ? ` (${msg.time}s)` : '';
           setStatus({
@@ -782,9 +819,81 @@ export function useGraph(domain: DomainContext) {
     [invalidateModel, getCurrentGraph, snapshot],
   );
 
-  // Re-sync React Flow when navigating into/out of subgraphs
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { syncToRF(); }, [navStack]);
+
+  // --- Auto-organize: space nodes evenly along the topological order ---
+  const organizeGraph = useCallback(() => {
+    const g = getCurrentGraph();
+    if (g.nodes.size === 0) return;
+
+    // Build adjacency for a simple left-to-right layout
+    // Assign each node a "column" based on longest path from a root
+    const inDegree = new Map<string, number>();
+    const adj = new Map<string, string[]>();
+    for (const node of g.nodes.values()) {
+      inDegree.set(node.id, 0);
+      adj.set(node.id, []);
+    }
+    for (const edge of g.edges) {
+      const prev = inDegree.get(edge.target.nodeId) ?? 0;
+      inDegree.set(edge.target.nodeId, prev + 1);
+      adj.get(edge.source.nodeId)?.push(edge.target.nodeId);
+    }
+
+    // Longest-path layering (ensures connected nodes are in adjacent columns)
+    const depth = new Map<string, number>();
+    const queue: string[] = [];
+    for (const [id, deg] of inDegree) {
+      if (deg === 0) { depth.set(id, 0); queue.push(id); }
+    }
+    // Also handle disconnected nodes
+    if (queue.length === 0) {
+      for (const id of g.nodes.keys()) { depth.set(id, 0); queue.push(id); }
+    }
+
+    let maxDepth = 0;
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      const d = depth.get(id) ?? 0;
+      for (const tgt of adj.get(id) ?? []) {
+        const newD = d + 1;
+        if (newD > (depth.get(tgt) ?? 0)) {
+          depth.set(tgt, newD);
+          if (newD > maxDepth) maxDepth = newD;
+        }
+        const remaining = (inDegree.get(tgt) ?? 1) - 1;
+        inDegree.set(tgt, remaining);
+        if (remaining === 0) queue.push(tgt);
+      }
+    }
+
+    // Assign unvisited nodes (disconnected) to column 0
+    for (const id of g.nodes.keys()) {
+      if (!depth.has(id)) depth.set(id, 0);
+    }
+
+    // Group by column
+    const columns = new Map<number, string[]>();
+    for (const [id, d] of depth) {
+      if (!columns.has(d)) columns.set(d, []);
+      columns.get(d)!.push(id);
+    }
+
+    // Layout with spacing
+    const COL_GAP = 250;
+    const ROW_GAP = 120;
+    snapshot();
+    for (const [col, ids] of columns) {
+      // Sort nodes within column by their current Y to preserve relative order
+      ids.sort((a, b) => (g.nodes.get(a)!.position.y - g.nodes.get(b)!.position.y));
+      const totalHeight = (ids.length - 1) * ROW_GAP;
+      const startY = -totalHeight / 2;
+      for (let i = 0; i < ids.length; i++) {
+        const node = g.nodes.get(ids[i])!;
+        node.position = { x: col * COL_GAP, y: startY + i * ROW_GAP };
+      }
+    }
+    syncToRF();
+  }, [getCurrentGraph, syncToRF, snapshot]);
 
   // --- Copy/Paste ---
   const clipboard = useRef<{ nodes: any[]; edges: any[] } | null>(null);
@@ -857,6 +966,39 @@ export function useGraph(domain: DomainContext) {
     await runShape();
   }, [getCurrentGraph, snapshot, invalidateModel, runShape]);
 
+  // Resolve snapshots for current navigation depth.
+  // At root: use top-level snapshots directly.
+  // Inside a subgraph: extract innerSnapshots from the parent subgraph node.
+  // Checks both live training snapshots and forward pass metadata.
+  const resolvedSnapshots = (() => {
+    if (navStack.length === 0) return liveSnapshots;
+
+    // Try live training snapshots first
+    let snaps = liveSnapshots;
+    let found = true;
+    for (const entry of navStack) {
+      const parentSnap = snaps[entry.nodeId];
+      if (parentSnap?.innerSnapshots) {
+        snaps = parentSnap.innerSnapshots;
+      } else {
+        found = false;
+        break;
+      }
+    }
+    if (found && Object.keys(snaps).length > 0) return snaps;
+
+    // Fallback: check forward pass metadata on the subgraph node
+    let g = graphRef.current;
+    for (const entry of navStack) {
+      const node = g.nodes.get(entry.nodeId);
+      if (!node) return {};
+      const innerSnaps = node.lastResult?.metadata?.innerSnapshots;
+      if (innerSnaps) return innerSnaps;
+      if (node.subgraph) g = node.subgraph;
+    }
+    return {};
+  })();
+
   return {
     graph: graphRef.current,
     currentGraph: getCurrentGraph(),
@@ -892,5 +1034,9 @@ export function useGraph(domain: DomainContext) {
     saveBlock,
     deleteBlock,
     addBlockFromTemplate,
+    organizeGraph,
+    liveSnapshots: resolvedSnapshots,
+    pinnedVizNodes,
+    toggleVizPin,
   };
 }

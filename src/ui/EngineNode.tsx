@@ -7,6 +7,8 @@ import type { NodeInstance } from '../core/graph';
 import type { DomainContext } from '../domain';
 import { getNodePorts } from '../core/ports';
 import { createContext, useContext, useRef, useEffect } from 'react';
+import { VizPanel, type VizSnapshot } from './VizPanel';
+import './EngineNode.css';
 
 // The domain context is provided at the top of the React tree
 // so every node component can look up definitions.
@@ -15,6 +17,13 @@ export const DomainCtx = createContext<DomainContext | null>(null);
 // Callback context for actions that nodes can trigger
 export const GraphActionsCtx = createContext<{
   removeNode: (nodeId: string) => void;
+} | null>(null);
+
+// Visualization context for live training snapshots and pinned panels
+export const VizCtx = createContext<{
+  pinnedVizNodes: Set<string>;
+  toggleVizPin: (nodeId: string) => void;
+  liveSnapshots: Record<string, VizSnapshot>;
 } | null>(null);
 
 export type EngineNodeData = {
@@ -40,6 +49,7 @@ function getCategoryColor(category: string[]): string {
 export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) {
   const domain = useContext(DomainCtx);
   const actions = useContext(GraphActionsCtx);
+  const viz = useContext(VizCtx);
   if (!domain) return null;
 
   const { instance } = data;
@@ -54,19 +64,45 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
   const metadata = instance.lastResult?.metadata;
   const color = def.color ?? getCategoryColor(def.category);
 
+  // Viz panel state: pinned + snapshot data
+  const isPinned = viz?.pinnedVizNodes.has(id) ?? false;
+  const liveSnap = viz?.liveSnapshots[id];
+  // Build snapshot from live data or fallback to lastResult metadata
+  const vizSnapshot: VizSnapshot | null = liveSnap ?? (metadata ? {
+    weights: metadata.weights,
+    gradients: metadata.gradients,
+    activations: metadata.activations,
+    batchnorm: metadata.batchnorm,
+  } : null);
+
   return (
     <div className="layer-node">
-      {actions && (
-        <button
-          className="node-delete-btn"
-          onClick={() => actions.removeNode(id)}
-          title="Delete node"
-        >
-          &ndash;
-        </button>
-      )}
       <div className="layer-node-header" style={{ backgroundColor: color }}>
-        {instance.type === 'subgraph.block' ? (instance.properties.blockName || def.displayName) : def.displayName}
+        {viz && (
+          <button
+            className={`node-viz-btn ${isPinned ? 'node-viz-btn-active' : ''}`}
+            onClick={() => viz.toggleVizPin(id)}
+            title={isPinned ? 'Hide visualization' : 'Show visualization'}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12">
+              <rect x="1" y="6" width="2" height="6" fill="currentColor"/>
+              <rect x="5" y="3" width="2" height="9" fill="currentColor"/>
+              <rect x="9" y="0" width="2" height="12" fill="currentColor"/>
+            </svg>
+          </button>
+        )}
+        <span className="layer-node-title">
+          {instance.type === 'subgraph.block' ? (instance.properties.blockName || def.displayName) : def.displayName}
+        </span>
+        {actions && (
+          <button
+            className="node-delete-btn"
+            onClick={() => actions.removeNode(id)}
+            title="Delete node"
+          >
+            &ndash;
+          </button>
+        )}
       </div>
       <div className="layer-node-body">
         {/* Properties */}
@@ -175,6 +211,9 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
           </div>
         ))}
       </div>
+      {isPinned && vizSnapshot && viz && (
+        <VizPanel snapshot={vizSnapshot} onClose={() => viz.toggleVizPin(id)} />
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 // Node palette — collapsible sidebar listing all available node types.
 // Organized by nested categories. Drag a node type onto the canvas to add it.
 
+import './NodePalette.css';
+
 import { useContext, useState, useEffect, type DragEvent } from 'react';
 import type { NodeDefinition } from '../core/nodedef';
 import { DomainCtx } from './EngineNode';
@@ -45,7 +47,7 @@ function onDragStart(event: DragEvent, nodeType: string) {
 
 // Recursive category renderer
 function CategoryGroup({ node, depth }: { node: CategoryNode; depth: number }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(depth === 0);
   const hasContent = node.items.length > 0 || node.children.size > 0;
 
   if (!hasContent) return null;

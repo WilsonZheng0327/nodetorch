@@ -19,13 +19,6 @@ export const graphInputNode: NodeDefinition = {
       defaultValue: 1,
       affects: 'ports',
     },
-    {
-      id: 'portNames',
-      name: 'Port Names',
-      type: { kind: 'string' },
-      defaultValue: 'in',
-      affects: 'ports',
-    },
   ],
 
   getPorts: (properties) => {

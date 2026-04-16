@@ -1,6 +1,7 @@
 // Training dashboard — shows live training progress with loss/accuracy charts.
 
 import { useRef, useEffect, useState } from 'react';
+import './TrainingDashboard.css';
 
 export interface EpochData {
   epoch: number;

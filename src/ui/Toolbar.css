@@ -1,0 +1,136 @@
+.toolbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+}
+
+.toolbar-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.toolbar-btn {
+  padding: 6px 14px;
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  color: #cdd6f4;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.toolbar-btn:hover {
+  background: #313244;
+  border-color: #89b4fa;
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-btn-run {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+  font-weight: 600;
+}
+
+.toolbar-btn-run:hover:not(:disabled) {
+  background: #059669;
+  border-color: #059669;
+}
+
+.toolbar-btn-infer {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+}
+
+.toolbar-btn-infer:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.toolbar-btn-disabled-hint {
+  opacity: 0.4;
+}
+
+.toolbar-btn-stale {
+  background: #92400e;
+  border-color: #92400e;
+}
+
+.toolbar-btn-stale:hover:not(:disabled) {
+  background: #78350f;
+  border-color: #78350f;
+}
+
+.toolbar-btn-train {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  color: #fff;
+  font-weight: 600;
+}
+
+.toolbar-btn-train:hover:not(:disabled) {
+  background: #7c3aed;
+  border-color: #7c3aed;
+}
+
+.toolbar-btn-cancel {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+  font-weight: 600;
+}
+
+.toolbar-btn-cancel:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.toolbar-separator {
+  width: 1px;
+  background: #45475a;
+  margin: 0 4px;
+}
+
+.toolbar-status {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: 'Inter', system-ui, sans-serif;
+  text-align: left;
+  max-width: 500px;
+}
+
+.toolbar-status div + div {
+  margin-top: 2px;
+}
+
+.toolbar-status-error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.toolbar-status-running {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #a78bfa;
+}
+
+.toolbar-status-success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}

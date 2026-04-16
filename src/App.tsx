@@ -5,7 +5,7 @@ import './App.css';
 import { useMemo, useEffect, useCallback, useState, useRef, type DragEvent } from 'react';
 import { initDomain } from './domain';
 import { useGraph } from './ui/useGraph';
-import { EngineNode, DomainCtx, GraphActionsCtx } from './ui/EngineNode';
+import { EngineNode, DomainCtx, GraphActionsCtx, VizCtx } from './ui/EngineNode';
 import { PropertyInspector } from './ui/PropertyInspector';
 import { NodePalette } from './ui/NodePalette';
 import { Toolbar } from './ui/Toolbar';
@@ -49,6 +49,12 @@ export default function App() {
   const graphActions = useMemo(() => ({
     removeNode: graph.removeNode,
   }), [graph.removeNode]);
+
+  const vizCtx = useMemo(() => ({
+    pinnedVizNodes: graph.pinnedVizNodes,
+    toggleVizPin: graph.toggleVizPin,
+    liveSnapshots: graph.liveSnapshots,
+  }), [graph.pinnedVizNodes, graph.toggleVizPin, graph.liveSnapshots]);
 
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -262,12 +268,17 @@ export default function App() {
 
   // Fit view when navigating into/out of subgraphs
   useEffect(() => {
-    setTimeout(() => reactFlowInstance?.fitView({ padding: 0.3 }), 50);
+    // Use requestAnimationFrame so React Flow has measured the new nodes,
+    // then fitView with duration:0 for instant snap (no visible flash)
+    requestAnimationFrame(() => {
+      reactFlowInstance?.fitView({ padding: 0.3, duration: 0 });
+    });
   }, [graph.navStack, reactFlowInstance]);
 
   return (
     <DomainCtx.Provider value={domain}>
     <GraphActionsCtx.Provider value={graphActions}>
+    <VizCtx.Provider value={vizCtx}>
       <div ref={reactFlowWrapper} style={{ width: '100vw', height: '100vh' }}>
         <RF.ReactFlow
           nodes={graph.rfNodes}
@@ -276,6 +287,7 @@ export default function App() {
           onEdgesChange={graph.onEdgesChange}
           onConnect={graph.connect}
           isValidConnection={graph.isValidConnection}
+          onEdgeClick={(_e, _edge) => {/* no-op: right-click only */}}
           onEdgeContextMenu={onEdgeContextMenu}
           onNodeDoubleClick={onNodeDoubleClick}
           onSelectionChange={onSelectionChange}
@@ -283,6 +295,7 @@ export default function App() {
           onDragOver={onDragOver}
           onDrop={onDrop}
           nodeTypes={nodeTypes}
+          edgesFocusable={false}
           fitView
           defaultEdgeOptions={{ animated: true }}
         >
@@ -307,7 +320,7 @@ export default function App() {
             />
           </RF.Panel>
         </RF.ReactFlow>
-        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
         <NodePalette
           savedBlocks={graph.savedBlocks}
@@ -316,6 +329,7 @@ export default function App() {
         <PropertyInspector node={selectedNode} onPropertyChange={graph.updateProperty} onSaveBlock={graph.saveBlock} />
         <TrainingDashboard progress={graph.trainingProgress} isTraining={graph.status.type === 'running'} />
       </div>
+    </VizCtx.Provider>
     </GraphActionsCtx.Provider>
     </DomainCtx.Provider>
   );
