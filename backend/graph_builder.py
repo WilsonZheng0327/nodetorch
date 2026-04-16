@@ -616,6 +616,8 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
         total_loss = 0.0
         correct = 0
         total = 0
+        per_class_correct: dict[int, int] = {}
+        per_class_total: dict[int, int] = {}
 
         last_batch_results: dict[str, dict[str, torch.Tensor]] = {}
 
@@ -691,6 +693,12 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
                             predicted = preds.argmax(dim=1)
                             correct += (predicted == labels).sum().item()
                             total += labels.size(0)
+                            # Per-class accuracy tracking
+                            for cls in labels.unique().tolist():
+                                cls = int(cls)
+                                mask = labels == cls
+                                per_class_total[cls] = per_class_total.get(cls, 0) + mask.sum().item()
+                                per_class_correct[cls] = per_class_correct.get(cls, 0) + (predicted[mask] == cls).sum().item()
                         break
 
             last_batch_results = batch_results
@@ -765,6 +773,14 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
             if snap:
                 node_snapshots[node_id] = snap
 
+        # Gradient flow summary: gradient norm per trainable layer (in topo order)
+        gradient_flow = []
+        for nid in order:
+            snap = node_snapshots.get(nid)
+            if snap and "gradients" in snap:
+                label = nodes[nid]["type"].split(".")[-1]
+                gradient_flow.append({"name": label, "norm": snap["gradients"]["norm"]})
+
         epoch_result = {
             "epoch": epoch + 1,
             "totalEpochs": epochs,
@@ -773,6 +789,11 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
             "time": round(epoch_time, 2),
             "batches": total_batches,
             "samples": total,
+            "gradientFlow": gradient_flow,
+            "perClassAccuracy": [
+                {"cls": cls, "accuracy": _safe_float(per_class_correct.get(cls, 0) / per_class_total[cls]) if per_class_total.get(cls, 0) > 0 else 0.0}
+                for cls in sorted(per_class_total.keys())[:20]  # Limit to top 20 classes
+            ] if per_class_total else [],
             "nodeSnapshots": node_snapshots,
         }
         epoch_results.append(epoch_result)

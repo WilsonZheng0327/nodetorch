@@ -722,6 +722,8 @@ export function useGraph(domain: DomainContext) {
             time: msg.time,
             batches: msg.batches,
             samples: msg.samples,
+            gradientFlow: msg.gradientFlow,
+            perClassAccuracy: msg.perClassAccuracy,
           }]);
           // Update live visualization snapshots
           if (msg.nodeSnapshots) {

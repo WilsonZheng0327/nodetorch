@@ -11,6 +11,8 @@ export interface EpochData {
   time?: number;
   batches?: number;
   samples?: number;
+  gradientFlow?: { name: string; norm: number }[];
+  perClassAccuracy?: { cls: number; accuracy: number }[];
 }
 
 interface Props {
@@ -19,7 +21,7 @@ interface Props {
 }
 
 export function TrainingDashboard({ progress, isTraining }: Props) {
-  const [activeTab, setActiveTab] = useState<'loss' | 'accuracy'>('loss');
+  const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass'>('loss');
   const [open, setOpen] = useState(false);
 
   // Auto-open when training starts
@@ -98,16 +100,34 @@ export function TrainingDashboard({ progress, isTraining }: Props) {
         >
           Accuracy
         </button>
+        <button
+          className={`dashboard-tab ${activeTab === 'gradients' ? 'dashboard-tab-active' : ''}`}
+          onClick={() => setActiveTab('gradients')}
+        >
+          Gradients
+        </button>
+        <button
+          className={`dashboard-tab ${activeTab === 'perclass' ? 'dashboard-tab-active' : ''}`}
+          onClick={() => setActiveTab('perclass')}
+        >
+          Per-Class
+        </button>
       </div>
 
       {/* Chart */}
       {progress.length > 0 ? (
-        <Chart
-          data={progress.map((d) => activeTab === 'loss' ? d.loss : d.accuracy)}
-          labels={progress.map((d) => d.epoch)}
-          color={activeTab === 'loss' ? '#ef4444' : '#10b981'}
-          formatValue={activeTab === 'loss' ? (v) => v.toFixed(4) : (v) => (v * 100).toFixed(1) + '%'}
-        />
+        activeTab === 'gradients' ? (
+          <GradientFlowChart data={latest?.gradientFlow ?? []} />
+        ) : activeTab === 'perclass' ? (
+          <PerClassChart data={latest?.perClassAccuracy ?? []} />
+        ) : (
+          <Chart
+            data={progress.map((d) => activeTab === 'loss' ? d.loss : d.accuracy)}
+            labels={progress.map((d) => d.epoch)}
+            color={activeTab === 'loss' ? '#ef4444' : '#10b981'}
+            formatValue={activeTab === 'loss' ? (v) => v.toFixed(4) : (v) => (v * 100).toFixed(1) + '%'}
+          />
+        )
       ) : (
         <div className="dashboard-chart-placeholder">
           {isTraining ? 'Waiting for first epoch...' : 'No data yet'}
@@ -229,6 +249,134 @@ function Chart({ data, labels, color, formatValue }: ChartProps) {
       ctx.fill();
     }
   }, [data, labels, color, formatValue]);
+
+  return <canvas ref={canvasRef} className="dashboard-chart" />;
+}
+
+// --- Gradient flow horizontal bar chart ---
+
+function GradientFlowChart({ data }: { data: { name: string; norm: number }[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || data.length === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = rect.width;
+    const h = rect.height;
+    const labelW = 80;
+    const pad = { top: 8, right: 12, bottom: 8 };
+    const plotW = w - labelW - pad.right;
+    const barH = Math.min(20, (h - pad.top - pad.bottom) / data.length - 2);
+    const maxNorm = Math.max(...data.map((d) => d.norm), 1e-8);
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (let i = 0; i < data.length; i++) {
+      const y = pad.top + i * (barH + 2);
+      const barW = (data[i].norm / maxNorm) * plotW;
+
+      // Label
+      ctx.fillStyle = '#a6adc8';
+      ctx.font = '10px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(data[i].name, labelW - 6, y + barH / 2 + 3);
+
+      // Bar background
+      ctx.fillStyle = '#313244';
+      ctx.fillRect(labelW, y, plotW, barH);
+
+      // Bar
+      const ratio = data[i].norm / maxNorm;
+      // Color: green→yellow→red based on relative magnitude
+      const r = Math.round(Math.min(255, ratio * 2 * 255));
+      const g = Math.round(Math.min(255, (1 - ratio) * 2 * 255));
+      ctx.fillStyle = `rgba(${r}, ${g}, 100, 0.7)`;
+      ctx.fillRect(labelW, y, barW, barH);
+
+      // Value
+      ctx.fillStyle = '#6c7086';
+      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(data[i].norm.toExponential(1), labelW + barW + 4, y + barH / 2 + 3);
+    }
+  }, [data]);
+
+  if (data.length === 0) {
+    return <div className="dashboard-chart-placeholder">No gradient data yet</div>;
+  }
+
+  return <canvas ref={canvasRef} className="dashboard-chart" />;
+}
+
+// --- Per-class accuracy horizontal bar chart ---
+
+function PerClassChart({ data }: { data: { cls: number; accuracy: number }[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || data.length === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = rect.width;
+    const h = rect.height;
+    const labelW = 36;
+    const pad = { top: 8, right: 50, bottom: 8 };
+    const plotW = w - labelW - pad.right;
+    const barH = Math.min(14, (h - pad.top - pad.bottom) / data.length - 1);
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (let i = 0; i < data.length; i++) {
+      const y = pad.top + i * (barH + 1);
+      const barW = data[i].accuracy * plotW;
+
+      // Class label
+      ctx.fillStyle = '#6c7086';
+      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(String(data[i].cls), labelW - 4, y + barH / 2 + 3);
+
+      // Bar background
+      ctx.fillStyle = '#313244';
+      ctx.fillRect(labelW, y, plotW, barH);
+
+      // Bar — green for high accuracy, red for low
+      const acc = data[i].accuracy;
+      const r = Math.round((1 - acc) * 230);
+      const g = Math.round(acc * 200);
+      ctx.fillStyle = `rgba(${r}, ${g}, 100, 0.7)`;
+      ctx.fillRect(labelW, y, barW, barH);
+
+      // Value
+      ctx.fillStyle = '#a6adc8';
+      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${(acc * 100).toFixed(0)}%`, labelW + barW + 4, y + barH / 2 + 3);
+    }
+  }, [data]);
+
+  if (data.length === 0) {
+    return <div className="dashboard-chart-placeholder">No per-class data yet</div>;
+  }
 
   return <canvas ref={canvasRef} className="dashboard-chart" />;
 }
