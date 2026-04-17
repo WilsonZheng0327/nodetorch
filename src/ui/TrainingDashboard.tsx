@@ -24,6 +24,13 @@ interface SystemInfo {
   mpsAvailable?: boolean;
 }
 
+export interface ModelLayerInfo {
+  name: string;
+  type: string;
+  paramCount?: number;
+  outputShape?: number[] | string[];
+}
+
 interface Props {
   progress: EpochData[];
   isTraining: boolean;
@@ -31,10 +38,11 @@ interface Props {
   selectedEpoch: number | null;
   onSelectEpoch: (epoch: number | null) => void;
   totalSnapshotEpochs: number;
+  modelSummary?: ModelLayerInfo[];
 }
 
-export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs }: Props) {
-  const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'epochs' | 'system'>('loss');
+export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs, modelSummary }: Props) {
+  const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'epochs' | 'summary' | 'system'>('loss');
   const [open, setOpen] = useState(false);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
@@ -135,19 +143,19 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
 
       {/* Tab selector */}
       <div className="dashboard-tabs">
-        {(['loss', 'accuracy', 'gradients', 'perclass', 'epochs', 'system'] as const).map((tab) => (
+        {(['loss', 'accuracy', 'gradients', 'perclass', 'epochs', 'summary', 'system'] as const).map((tab) => (
           <button
             key={tab}
             className={`dashboard-tab ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {{ loss: 'Loss', accuracy: 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', epochs: 'Epochs', system: 'System' }[tab]}
+            {{ loss: 'Loss', accuracy: 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', epochs: 'Epochs', summary: 'Summary', system: 'System' }[tab]}
           </button>
         ))}
       </div>
 
       {/* Epoch slider — scrub through training history */}
-      {totalSnapshotEpochs >= 2 && activeTab !== 'system' && activeTab !== 'epochs' && (
+      {totalSnapshotEpochs >= 2 && activeTab !== 'system' && activeTab !== 'epochs' && activeTab !== 'summary' && (
         <div className="dashboard-epoch-slider">
           <span className="dashboard-epoch-slider-label">Epoch</span>
           <input
@@ -171,6 +179,8 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
       <div className="dashboard-tab-content">
         {activeTab === 'system' ? (
           <SystemInfoPanel info={systemInfo} />
+        ) : activeTab === 'summary' ? (
+          <ModelSummaryPanel layers={modelSummary ?? []} />
         ) : activeTab === 'epochs' ? (
           <div className="dashboard-table-wrap">
             {progress.length > 0 ? (
@@ -270,6 +280,45 @@ function SystemInfoPanel({ info }: { info: SystemInfo | null }) {
       {!info.cudaAvailable && !info.mpsAvailable && (
         <div className="system-info-note">Training will use CPU (slower)</div>
       )}
+    </div>
+  );
+}
+
+// --- Model summary panel ---
+
+function ModelSummaryPanel({ layers }: { layers: ModelLayerInfo[] }) {
+  if (layers.length === 0) {
+    return <div className="dashboard-chart-placeholder">Run forward pass to see model summary</div>;
+  }
+
+  const totalParams = layers.reduce((sum, l) => sum + (l.paramCount ?? 0), 0);
+
+  return (
+    <div className="model-summary">
+      <div className="model-summary-total">
+        <span>Total Parameters</span>
+        <span className="model-summary-total-value">{totalParams.toLocaleString()}</span>
+      </div>
+      <table className="dashboard-table">
+        <thead>
+          <tr>
+            <th>Layer</th>
+            <th>Type</th>
+            <th>Output</th>
+            <th>Params</th>
+          </tr>
+        </thead>
+        <tbody>
+          {layers.map((l, i) => (
+            <tr key={i}>
+              <td style={{ color: '#cdd6f4' }}>{l.name}</td>
+              <td>{l.type}</td>
+              <td>{l.outputShape ? `[${l.outputShape.join(', ')}]` : '—'}</td>
+              <td>{l.paramCount ? l.paramCount.toLocaleString() : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

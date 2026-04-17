@@ -9,7 +9,7 @@ import { EngineNode, DomainCtx, GraphActionsCtx, VizCtx } from './ui/EngineNode'
 import { PropertyInspector } from './ui/PropertyInspector';
 import { NodePalette } from './ui/NodePalette';
 import { Toolbar } from './ui/Toolbar';
-import { TrainingDashboard } from './ui/TrainingDashboard';
+import { TrainingDashboard, type ModelLayerInfo } from './ui/TrainingDashboard';
 import { Breadcrumb } from './ui/Breadcrumb';
 import { createNode as cn, addNode as an, createEdge as ce, addEdge as ae } from './core/graph';
 
@@ -56,6 +56,23 @@ export default function App() {
     liveSnapshots: graph.liveSnapshots,
   }), [graph.pinnedVizNodes, graph.toggleVizPin, graph.liveSnapshots]);
 
+
+  // Model summary derived from graph nodes (after shape inference)
+  const modelSummary = useMemo((): ModelLayerInfo[] => {
+    const layers: ModelLayerInfo[] = [];
+    for (const node of graph.graph.nodes.values()) {
+      const def = domain.nodeRegistry.get(node.type);
+      if (!def) continue;
+      const meta = node.lastResult?.metadata;
+      layers.push({
+        name: def.displayName,
+        type: node.type.split('.').pop() ?? node.type,
+        paramCount: meta?.paramCount,
+        outputShape: meta?.outputShape,
+      });
+    }
+    return layers;
+  }, [graph.rfNodes, domain]);
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const selectedNode = selectedNodeId ? graph.currentGraph.nodes.get(selectedNodeId) ?? null : null;
@@ -378,6 +395,7 @@ export default function App() {
           selectedEpoch={graph.selectedEpoch}
           onSelectEpoch={graph.setSelectedEpoch}
           totalSnapshotEpochs={graph.snapshotHistory.length}
+          modelSummary={modelSummary}
         />
       </div>
     </VizCtx.Provider>

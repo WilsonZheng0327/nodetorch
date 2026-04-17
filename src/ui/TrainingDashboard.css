@@ -383,6 +383,28 @@
   background: #313244;
 }
 
+/* Model summary */
+.model-summary {
+  padding: 8px 0;
+}
+
+.model-summary-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid #313244;
+  font-size: 13px;
+  color: #a6adc8;
+}
+
+.model-summary-total-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 16px;
+  color: #89b4fa;
+}
+
 /* System info panel */
 .system-info {
   padding: 12px 16px;
