@@ -275,7 +275,7 @@ def _build_stage(
         stage["insight"] = insight
 
     # Extras — additional type-specific visualizations
-    extras = _build_extras(node_type, input_tensor, output, module)
+    extras = _build_extras(node_type, input_tensor, output, module, inputs, out_dict)
     if extras:
         stage["extras"] = extras
 
@@ -421,7 +421,7 @@ def _viz_probabilities(probs: torch.Tensor) -> dict:
 # detail view. Each extra has a "kind" discriminator so new ones can be added without
 # breaking existing frontend code.
 
-def _build_extras(node_type: str, input_tensor, output, module) -> list | None:
+def _build_extras(node_type: str, input_tensor, output, module, inputs: dict, out_dict: dict) -> list | None:
     """Return a list of extras for this node, or None."""
     extras: list = []
 
@@ -459,7 +459,109 @@ def _build_extras(node_type: str, input_tensor, output, module) -> list | None:
         if wm_data:
             extras.append(wm_data)
 
+    # Attention map (MHA + scaled-dot-product Attention)
+    if node_type == "ml.layers.multihead_attention" and module is not None:
+        am = _extract_attention_map_mha(module, inputs)
+        if am:
+            extras.append(am)
+    elif node_type == "ml.layers.attention":
+        am = _extract_attention_map_sdpa(inputs)
+        if am:
+            extras.append(am)
+
+    # Recurrent state (LSTM/GRU/RNN return dicts with hidden/cell)
+    if node_type in ("ml.layers.lstm", "ml.layers.gru", "ml.layers.rnn"):
+        rs = _extract_recurrent_state(out_dict)
+        extras.extend(rs)
+
     return extras if extras else None
+
+
+def _extract_attention_map_mha(module, inputs: dict) -> dict | None:
+    """Re-run MHA with need_weights=True to capture attention weights."""
+    if not hasattr(module, 'mha'):
+        return None
+    query = inputs.get("query")
+    key = inputs.get("key")
+    value = inputs.get("value")
+    if query is None:
+        return None
+    # Default to self-attention if key/value not provided
+    key = key if key is not None else query
+    value = value if value is not None else query
+    try:
+        with torch.no_grad():
+            _, attn = module.mha(query, key, value, need_weights=True, average_attn_weights=True)
+    except Exception:
+        return None
+    if attn is None or attn.dim() < 2:
+        return None
+    am = attn[0] if attn.dim() >= 3 else attn  # take first sample
+    am = am.detach().cpu().float()
+    return _format_attention_map(am)
+
+
+def _extract_attention_map_sdpa(inputs: dict) -> dict | None:
+    """Compute attention weights manually for scaled_dot_product_attention."""
+    import math
+    query = inputs.get("query")
+    key = inputs.get("key")
+    if query is None:
+        return None
+    key = key if key is not None else query
+    try:
+        d_k = query.shape[-1]
+        scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+        attn = torch.softmax(scores, dim=-1)
+    except Exception:
+        return None
+    am = attn[0] if attn.dim() >= 3 else attn
+    am = am.detach().cpu().float()
+    return _format_attention_map(am)
+
+
+def _format_attention_map(am: torch.Tensor) -> dict:
+    """Downsample an attention matrix if large and return the extras dict."""
+    if am.dim() > 2:
+        am = am[0]  # first head, if still 3D
+    MAX = 64
+    actual_rows, actual_cols = am.shape[0], am.shape[1]
+    if am.shape[0] > MAX:
+        am = am[:MAX]
+    if am.shape[1] > MAX:
+        am = am[:, :MAX]
+    return {
+        "kind": "attention_map",
+        "data": am.tolist(),
+        "rows": am.shape[0],
+        "cols": am.shape[1],
+        "actualRows": actual_rows,
+        "actualCols": actual_cols,
+    }
+
+
+def _extract_recurrent_state(out_dict: dict) -> list:
+    """Extract hidden (and cell for LSTM) state from LSTM/GRU/RNN output dict."""
+    extras = []
+    for key, label in [("hidden", "Hidden State"), ("cell", "Cell State")]:
+        t = out_dict.get(key) if isinstance(out_dict, dict) else None
+        if t is None or not isinstance(t, torch.Tensor):
+            continue
+        # [num_layers * D, B, H] → first layer/direction, first sample, all hidden units
+        if t.dim() == 3:
+            v = t[0, 0]
+        elif t.dim() == 2:
+            v = t[0]
+        else:
+            v = t.flatten()
+        v = v.detach().cpu().float()
+        extras.append({
+            "kind": "recurrent_state",
+            "label": label,
+            "values": [_safe_float(x) for x in v.tolist()],
+            "totalLength": v.numel(),
+        })
+    return extras
 
 
 def _extract_conv_kernels(module) -> dict | None:

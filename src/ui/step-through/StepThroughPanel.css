@@ -692,3 +692,47 @@
   border-radius: 4px;
   background: linear-gradient(to right, #003264, #00c8c8, #64ff00, #ffff00);
 }
+
+.extra-attention-legend-bar {
+  background: linear-gradient(to right, #000, #c00, #ff0, #fff);
+}
+
+/* Attention map */
+
+.extra-attention-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.extra-attention-axis-y {
+  font-size: 9px;
+  color: #6c7086;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}
+
+.extra-attention-axis-x {
+  font-size: 9px;
+  color: #6c7086;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.extra-attention-canvas {
+  display: block;
+  border-radius: 3px;
+  border: 1px solid #45475a;
+  image-rendering: pixelated;
+  max-width: 100%;
+}
+
+/* Recurrent state */
+
+.extra-recurrent-canvas {
+  width: 100%;
+  height: 60px;
+  background: #181825;
+  border-radius: 3px;
+}

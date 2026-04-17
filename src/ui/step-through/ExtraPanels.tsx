@@ -22,6 +22,10 @@ function ExtraPanel({ extra }: { extra: Extra }) {
       return <ConvKernels data={extra} />;
     case 'weight_matrix':
       return <WeightMatrix data={extra} />;
+    case 'attention_map':
+      return <AttentionMap data={extra} />;
+    case 'recurrent_state':
+      return <RecurrentState data={extra} />;
     default:
       return null;
   }
@@ -211,6 +215,109 @@ function WeightMatrix({ data }: { data: Extract<Extra, { kind: 'weight_matrix' }
   );
 }
 
+// --- Attention map (heatmap) ---
+
+function AttentionMap({ data }: { data: Extract<Extra, { kind: 'attention_map' }> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const cellSize = Math.max(3, Math.min(10, Math.floor(400 / Math.max(data.rows, data.cols))));
+    canvas.width = data.cols * cellSize;
+    canvas.height = data.rows * cellSize;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    for (let r = 0; r < data.rows; r++) {
+      for (let c = 0; c < data.cols; c++) {
+        const v = data.data[r]?.[c] ?? 0;
+        // Attention weights are in [0, 1] already
+        ctx.fillStyle = warmColor(Math.max(0, Math.min(1, v)));
+        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+      }
+    }
+  }, [data]);
+
+  const downsampled = data.rows < data.actualRows || data.cols < data.actualCols;
+
+  return (
+    <div className="extra-panel">
+      <div className="extra-panel-title">
+        Attention Map ({data.actualRows} × {data.actualCols})
+        {downsampled && <span className="extra-panel-note"> — downsampled to {data.rows} × {data.cols}</span>}
+      </div>
+      <div className="extra-attention-wrap">
+        <div className="extra-attention-axis-y">query →</div>
+        <div>
+          <canvas ref={canvasRef} className="extra-attention-canvas" />
+          <div className="extra-attention-axis-x">← key</div>
+        </div>
+      </div>
+      <div className="extra-weight-legend">
+        <span>0</span>
+        <div className="extra-weight-legend-bar extra-attention-legend-bar" />
+        <span>1</span>
+      </div>
+    </div>
+  );
+}
+
+// --- Recurrent state (hidden/cell vector) ---
+
+function RecurrentState({ data }: { data: Extract<Extra, { kind: 'recurrent_state' }> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || data.values.length === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    const w = rect.width;
+    const h = rect.height;
+    const min = Math.min(0, ...data.values);
+    const max = Math.max(0, ...data.values);
+    const range = max - min || 1;
+    ctx.clearRect(0, 0, w, h);
+    const bw = w / data.values.length;
+    const zeroY = h - ((0 - min) / range) * h;
+
+    for (let i = 0; i < data.values.length; i++) {
+      const v = data.values[i];
+      const bh = Math.abs(v / range) * h;
+      const y = v >= 0 ? zeroY - bh : zeroY;
+      ctx.fillStyle = v >= 0 ? '#89b4fa' : '#f38ba8';
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(i * bw, y, Math.max(1, bw - 0.3), bh);
+    }
+    ctx.globalAlpha = 1;
+
+    // Zero line
+    ctx.strokeStyle = '#6c7086';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(0, zeroY);
+    ctx.lineTo(w, zeroY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }, [data]);
+
+  return (
+    <div className="extra-panel">
+      <div className="extra-panel-title">
+        {data.label} ({data.totalLength} units)
+      </div>
+      <canvas ref={canvasRef} className="extra-recurrent-canvas" />
+    </div>
+  );
+}
+
 // --- Utilities ---
 
 function fmt(v: number): string {
@@ -228,5 +335,14 @@ function heatColor(t: number): string {
   const r = Math.round(t < 0.5 ? 0 : (t - 0.5) * 2 * 255);
   const g = Math.round(t < 0.5 ? t * 2 * 200 : 200 + (t - 0.5) * 2 * 55);
   const b = Math.round(t < 0.5 ? 100 + t * 2 * 155 : 255 - (t - 0.5) * 2 * 255);
+  return `rgb(${r},${g},${b})`;
+}
+
+function warmColor(t: number): string {
+  t = Math.max(0, Math.min(1, t));
+  // Black → Red → Yellow → White
+  const r = Math.round(Math.min(255, t * 2 * 255));
+  const g = Math.round(Math.max(0, (t - 0.5) * 2 * 255));
+  const b = Math.round(Math.max(0, (t - 0.75) * 4 * 255));
   return `rgb(${r},${g},${b})`;
 }
