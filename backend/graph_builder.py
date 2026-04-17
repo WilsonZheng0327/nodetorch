@@ -800,6 +800,20 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
     momentum = props.get("momentum", 0.9)
     weight_decay = props.get("weightDecay", 0)
 
+    # Reproducibility: seed all random number generators before any model building
+    seed = props.get("seed", 42)
+    if seed is not None:
+        import random as _random
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        _random.seed(seed)
+        try:
+            import numpy as _np
+            _np.random.seed(seed)
+        except ImportError:
+            pass
+
     # Find the data node to get batch size
     data_node = None
     for n in nodes_list:

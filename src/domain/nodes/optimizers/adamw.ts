@@ -51,6 +51,13 @@ export const adamwNode: NodeDefinition = {
       defaultValue: 0.1,
       affects: 'execution',
     },
+    {
+      id: 'seed',
+      name: 'Random Seed',
+      type: { kind: 'number', min: 0, integer: true },
+      defaultValue: 42,
+      affects: 'execution',
+    },
   ],
 
   getPorts: () => [
