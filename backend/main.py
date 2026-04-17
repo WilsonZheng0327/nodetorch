@@ -283,24 +283,26 @@ async def websocket_endpoint(ws: WebSocket):
 
                     def on_epoch(epoch_data):
                         logger.info(f"Epoch {epoch_data['epoch']}: loss={epoch_data['loss']:.4f}, acc={epoch_data['accuracy']:.4f}")
-                        epoch_queue.put_nowait(epoch_data)
+                        epoch_queue.put_nowait(("epoch", epoch_data))
+
+                    def on_batch(batch_data):
+                        epoch_queue.put_nowait(("batch", batch_data))
 
                     loop = asyncio.get_event_loop()
                     ce = cancel_event
                     train_task = loop.run_in_executor(
-                        None, lambda: train_graph(msg["graph"], on_epoch=on_epoch, cancel_event=ce)
+                        None, lambda: train_graph(msg["graph"], on_epoch=on_epoch, on_batch=on_batch, cancel_event=ce)
                     )
 
-                    # Stream epoch results while also checking for cancel via msg_queue
+                    # Stream epoch/batch results while also checking for cancel via msg_queue
                     while not train_task.done():
-                        # Check for epoch data
                         try:
-                            epoch_data = await asyncio.wait_for(
+                            msg_type, data = await asyncio.wait_for(
                                 epoch_queue.get(), timeout=0.3
                             )
                             await ws.send_text(json.dumps({
-                                "type": "epoch",
-                                **epoch_data,
+                                "type": msg_type,
+                                **data,
                             }))
                         except asyncio.TimeoutError:
                             pass
@@ -315,12 +317,12 @@ async def websocket_endpoint(ws: WebSocket):
                                 logger.info("Disconnect during training, cancelling")
                                 cancel_event.set()
 
-                    # Drain remaining epoch results
+                    # Drain remaining results
                     while not epoch_queue.empty():
-                        epoch_data = epoch_queue.get_nowait()
+                        msg_type, data = epoch_queue.get_nowait()
                         await ws.send_text(json.dumps({
-                            "type": "epoch",
-                            **epoch_data,
+                            "type": msg_type,
+                            **data,
                         }))
 
                     results = train_task.result()

@@ -719,35 +719,40 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
 
     # --- Confusion matrix (loss nodes) ---
     if node_type in LOSS_NODES:
-        # Find prediction and label tensors feeding into the loss
-        pred_tensor = None
-        label_tensor = None
-        for edge in edges:
-            if edge["target"]["nodeId"] == node_id:
-                if edge["target"]["portId"] == "predictions":
-                    pred_tensor = results.get(edge["source"]["nodeId"], {}).get("out")
-                elif edge["target"]["portId"] == "labels":
-                    label_tensor = results.get(edge["source"]["nodeId"], {}).get("labels")
-                    if label_tensor is None:
-                        label_tensor = results.get(edge["source"]["nodeId"], {}).get("out")
-        if pred_tensor is not None and label_tensor is not None:
-            preds = pred_tensor.argmax(dim=1).cpu()
-            labels = label_tensor.cpu()
-            n_classes = min(int(preds.max().item()) + 1, int(labels.max().item()) + 1, 20)
-            n_classes = max(n_classes, 2)
-            matrix = [[0] * n_classes for _ in range(n_classes)]
-            for p, l in zip(preds.tolist(), labels.tolist()):
-                if 0 <= p < n_classes and 0 <= l < n_classes:
-                    matrix[l][p] += 1
-            detail["confusionMatrix"] = {
-                "data": matrix,
-                "size": n_classes,
-            }
+        # Use full confusion matrix accumulated during training if available
+        cached_cm = _last_run.get("confusionMatrix")
+        if cached_cm:
+            detail["confusionMatrix"] = cached_cm
+        else:
+            # Fallback: compute from current batch in results
+            pred_tensor = None
+            label_tensor = None
+            for edge in edges:
+                if edge["target"]["nodeId"] == node_id:
+                    if edge["target"]["portId"] == "predictions":
+                        pred_tensor = results.get(edge["source"]["nodeId"], {}).get("out")
+                    elif edge["target"]["portId"] == "labels":
+                        label_tensor = results.get(edge["source"]["nodeId"], {}).get("labels")
+                        if label_tensor is None:
+                            label_tensor = results.get(edge["source"]["nodeId"], {}).get("out")
+            if pred_tensor is not None and label_tensor is not None:
+                preds = pred_tensor.argmax(dim=1).cpu()
+                labels = label_tensor.cpu()
+                n_classes = max(int(preds.max().item()) + 1, int(labels.max().item()) + 1)
+                n_classes = max(n_classes, 2)
+                matrix = [[0] * n_classes for _ in range(n_classes)]
+                for p, l in zip(preds.tolist(), labels.tolist()):
+                    if 0 <= p < n_classes and 0 <= l < n_classes:
+                        matrix[l][p] += 1
+                detail["confusionMatrix"] = {
+                    "data": matrix,
+                    "size": n_classes,
+                }
 
     return detail
 
 
-def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
+def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=None) -> dict:
     """
     Run a training loop. Finds the optimizer node, builds modules with
     gradient tracking, and trains for the specified number of epochs.
@@ -835,7 +840,16 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
     dataset_builder = TRAIN_DATASETS.get(dataset_type)
     if not dataset_builder:
         return {"error": f"Training not supported for dataset: {dataset_type}"}
-    train_dataset = dataset_builder()
+    # Pass data node properties for datasets that need them (e.g., text vocab_size, max_len)
+    data_props = data_node.get("properties", {})
+    import inspect
+    if inspect.signature(dataset_builder).parameters:
+        train_dataset = dataset_builder(**{
+            k: data_props[k] for k in inspect.signature(dataset_builder).parameters
+            if k in data_props
+        })
+    else:
+        train_dataset = dataset_builder()
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True,
@@ -865,12 +879,24 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
         total = 0
         per_class_correct: dict[int, int] = {}
         per_class_total: dict[int, int] = {}
+        # Accumulate confusion matrix on last epoch
+        is_last_epoch = (epoch == epochs - 1)
+        confusion_preds: list[int] = []
+        confusion_labels: list[int] = []
 
         last_batch_results: dict[str, dict[str, torch.Tensor]] = {}
 
-        for batch_idx, (images, labels) in enumerate(train_loader):
+        from tqdm import tqdm
+        batch_report_interval = max(1, total_batches // 20)  # ~20 updates per epoch
+        for batch_idx, (images, labels) in enumerate(tqdm(
+            train_loader, desc=f"Epoch {epoch+1}/{epochs}", leave=False, ncols=80,
+        )):
             if cancel_event and cancel_event.is_set():
                 break
+
+            if on_batch and batch_idx % batch_report_interval == 0:
+                on_batch({"epoch": epoch + 1, "totalEpochs": epochs, "batch": batch_idx + 1, "totalBatches": total_batches})
+
             optimizer.zero_grad()
 
             # Forward pass through the graph
@@ -946,6 +972,10 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
                                 mask = labels == cls
                                 per_class_total[cls] = per_class_total.get(cls, 0) + mask.sum().item()
                                 per_class_correct[cls] = per_class_correct.get(cls, 0) + (predicted[mask] == cls).sum().item()
+                            # Accumulate confusion matrix on last epoch
+                            if is_last_epoch:
+                                confusion_preds.extend(predicted.cpu().tolist())
+                                confusion_labels.extend(labels.cpu().tolist())
                         break
 
             last_batch_results = batch_results
@@ -1152,6 +1182,23 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
 
     # Store trained modules for inference
     _model_store["current"] = modules
+
+    # Build full confusion matrix from last epoch and store in cache
+    _last_run.clear()
+    _last_run["modules"] = modules
+    _last_run["results"] = final_results
+    _last_run["nodes"] = nodes
+    _last_run["edges"] = edges
+    if confusion_preds and confusion_labels:
+        n_classes = max(max(confusion_preds), max(confusion_labels)) + 1
+        matrix = [[0] * n_classes for _ in range(n_classes)]
+        for p, l in zip(confusion_preds, confusion_labels):
+            if 0 <= p < n_classes and 0 <= l < n_classes:
+                matrix[l][p] += 1
+        _last_run["confusionMatrix"] = {
+            "data": matrix,
+            "size": n_classes,
+        }
 
     return {
         "nodeResults": node_results,

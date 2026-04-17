@@ -27,9 +27,10 @@ interface SystemInfo {
 interface Props {
   progress: EpochData[];
   isTraining: boolean;
+  batchProgress?: { batch: number; totalBatches: number } | null;
 }
 
-export function TrainingDashboard({ progress, isTraining }: Props) {
+export function TrainingDashboard({ progress, isTraining, batchProgress }: Props) {
   const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'epochs' | 'system'>('loss');
   const [open, setOpen] = useState(false);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
@@ -83,6 +84,19 @@ export function TrainingDashboard({ progress, isTraining }: Props) {
           />
           <span className="dashboard-progress-label">
             Epoch {latest.epoch} / {latest.totalEpochs}
+          </span>
+        </div>
+      )}
+
+      {/* Batch progress bar (within epoch) */}
+      {isTraining && batchProgress && (
+        <div className="dashboard-batch-progress">
+          <div
+            className="dashboard-batch-progress-bar"
+            style={{ width: `${(batchProgress.batch / batchProgress.totalBatches) * 100}%` }}
+          />
+          <span className="dashboard-batch-progress-label">
+            Batch {batchProgress.batch} / {batchProgress.totalBatches}
           </span>
         </div>
       )}

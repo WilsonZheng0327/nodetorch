@@ -2,7 +2,7 @@
 // Shows weight distribution, gradient distribution, and activation histogram.
 // Data comes from either live training snapshots or lastResult metadata.
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import './VizPanel.css';
 
 interface HistogramData {
@@ -89,15 +89,7 @@ export function VizPanel({ snapshot, onClose }: Props) {
             )}
 
             {hasWeightDelta && (
-              <div className="viz-section">
-                <div className="viz-section-title" style={{ color: '#fab387' }}>
-                  Weight Delta
-                  <span className="viz-tip" title="How much weights changed this epoch. Near-zero = converged or not learning.">?</span>
-                </div>
-                <div className="viz-stats">
-                  <span>norm: {snapshot.weightDelta!.toFixed(6)}</span>
-                </div>
-              </div>
+              <WeightDeltaSection value={snapshot.weightDelta!} />
             )}
           </>
         )}
@@ -115,12 +107,15 @@ function VizSection({ title, color, data, stats, tip }: {
   stats: { label: string; value?: number; pct?: boolean }[];
   tip?: string;
 }) {
+  const [showTip, setShowTip] = useState(false);
+
   return (
     <div className="viz-section">
       <div className="viz-section-title" style={{ color }}>
         {title}
-        {tip && <span className="viz-tip" title={tip}>?</span>}
+        {tip && <span className="viz-tip" onClick={() => setShowTip(!showTip)}>?</span>}
       </div>
+      {showTip && tip && <div className="viz-tip-text">{tip}</div>}
       <div className="viz-stats">
         {stats.map((s) => (
           <span key={s.label}>
@@ -133,6 +128,22 @@ function VizSection({ title, color, data, stats, tip }: {
       {data.histBins && data.histCounts && (
         <MiniHistogram bins={data.histBins} counts={data.histCounts} color={color} />
       )}
+    </div>
+  );
+}
+
+function WeightDeltaSection({ value }: { value: number }) {
+  const [showTip, setShowTip] = useState(false);
+  return (
+    <div className="viz-section">
+      <div className="viz-section-title" style={{ color: '#fab387' }}>
+        Weight Delta
+        <span className="viz-tip" onClick={() => setShowTip(!showTip)}>?</span>
+      </div>
+      {showTip && <div className="viz-tip-text">How much weights changed this epoch. Near-zero = converged or not learning.</div>}
+      <div className="viz-stats">
+        <span>norm: {value.toFixed(6)}</span>
+      </div>
     </div>
   );
 }

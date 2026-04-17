@@ -3,10 +3,12 @@ import { addNode } from './add';
 import { concatNode } from './concat';
 import { reshapeNode } from './reshape';
 import { permuteNode } from './permute';
+import { sequencePoolNode } from './sequence-pool';
 
 export const structuralNodes: NodeDefinition[] = [
   addNode,
   concatNode,
   reshapeNode,
   permuteNode,
+  sequencePoolNode,
 ];

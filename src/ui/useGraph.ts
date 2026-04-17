@@ -670,6 +670,9 @@ export function useGraph(domain: DomainContext) {
     setPinnedVizNodes(new Set());
   }, []);
 
+  // Batch-level progress within current epoch
+  const [batchProgress, setBatchProgress] = useState<{ batch: number; totalBatches: number } | null>(null);
+
   const trainWsRef = useRef<WebSocket | null>(null);
 
   const cancelTrain = useCallback(() => {
@@ -690,6 +693,7 @@ export function useGraph(domain: DomainContext) {
     setStatus({ type: 'running', message: 'Training...' });
     setTrainingProgress([]);
     setLiveSnapshots({});
+    setBatchProgress(null);
     const graphData = serializeGraph(graphRef.current);
 
     return new Promise<void>((resolve) => {
@@ -722,7 +726,13 @@ export function useGraph(domain: DomainContext) {
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
 
+        if (msg.type === 'batch') {
+          setBatchProgress({ batch: msg.batch, totalBatches: msg.totalBatches });
+          return;
+        }
+
         if (msg.type === 'epoch') {
+          setBatchProgress(null); // reset batch progress when epoch completes
           setTrainingProgress((prev) => [...prev, {
             epoch: msg.epoch,
             totalEpochs: msg.totalEpochs,
@@ -1037,6 +1047,7 @@ export function useGraph(domain: DomainContext) {
     modelTrained,
     modelStale,
     trainingProgress,
+    batchProgress,
     undo,
     redo,
     copySelected,

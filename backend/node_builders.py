@@ -321,6 +321,26 @@ def build_permute(props: dict, input_shapes: dict) -> nn.Module:
     return PermuteModule(dims)
 
 
+class SequencePoolModule(nn.Module):
+    """Why wrapper: sequence pooling (last/mean/max over dim=1) is a tensor op, not a module."""
+    def __init__(self, mode: str):
+        super().__init__()
+        self.mode = mode
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.mode == 'last':
+            return x[:, -1, :]
+        elif self.mode == 'mean':
+            return x.mean(dim=1)
+        elif self.mode == 'max':
+            return x.max(dim=1).values
+        return x[:, -1, :]
+
+
+def build_sequence_pool(props: dict, input_shapes: dict) -> nn.Module:
+    return SequencePoolModule(props.get("mode", "last"))
+
+
 # --- New layer builders ---
 
 def build_conv_transpose2d(props: dict, input_shapes: dict) -> nn.Module:
@@ -434,4 +454,5 @@ NODE_BUILDERS: dict[str, callable] = {
     "ml.structural.concat": build_concat,
     "ml.structural.reshape": build_reshape,
     "ml.structural.permute": build_permute,
+    "ml.structural.sequence_pool": build_sequence_pool,
 }

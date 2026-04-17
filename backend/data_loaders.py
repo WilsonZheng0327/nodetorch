@@ -153,6 +153,153 @@ def denormalize_fashion_mnist(img: torch.Tensor) -> torch.Tensor:
     return img * 0.3530 + 0.2860
 
 
+# --- Text dataset utilities ---
+
+import re
+from collections import Counter
+
+# Simple word-level tokenizer (lowercase, split on non-alpha)
+def _tokenize(text: str) -> list[str]:
+    return re.findall(r'[a-z]+', text.lower())
+
+
+# Cache built vocabs so they're only computed once
+_vocab_cache: dict[str, dict[str, int]] = {}
+
+
+def _build_vocab(texts: list[str], vocab_size: int, cache_key: str) -> dict[str, int]:
+    """Build a word→index mapping from texts. Cached per cache_key."""
+    full_key = f"{cache_key}_{vocab_size}"
+    if full_key in _vocab_cache:
+        return _vocab_cache[full_key]
+
+    counter: Counter = Counter()
+    for text in texts:
+        counter.update(_tokenize(text))
+
+    # Reserve 0=pad, 1=unknown
+    vocab = {"<pad>": 0, "<unk>": 1}
+    for word, _ in counter.most_common(vocab_size - 2):
+        vocab[word] = len(vocab)
+
+    _vocab_cache[full_key] = vocab
+    return vocab
+
+
+def _encode_texts(texts: list[str], vocab: dict[str, int], max_len: int) -> torch.Tensor:
+    """Tokenize and encode a list of texts to padded integer tensor."""
+    unk = vocab.get("<unk>", 1)
+    encoded = []
+    for text in texts:
+        tokens = _tokenize(text)
+        ids = [vocab.get(t, unk) for t in tokens[:max_len]]
+        # Pad to max_len
+        ids = ids + [0] * (max_len - len(ids))
+        encoded.append(ids)
+    return torch.tensor(encoded, dtype=torch.long)
+
+
+# --- IMDb ---
+
+_imdb_cache: dict[str, object] = {}
+
+def _get_imdb_dataset():
+    if "ds" not in _imdb_cache:
+        from datasets import load_dataset
+        _imdb_cache["ds"] = load_dataset("imdb", split="train")
+    return _imdb_cache["ds"]
+
+
+def load_imdb(props: dict) -> dict[str, torch.Tensor]:
+    batch_size = props.get("batchSize", 32)
+    max_len = props.get("maxLen", 256)
+    vocab_size = props.get("vocabSize", 10000)
+
+    ds = _get_imdb_dataset()
+    vocab = _build_vocab(ds["text"][:5000], vocab_size, "imdb")  # Build from first 5K for speed
+
+    # Sample a batch
+    indices = torch.randperm(len(ds))[:batch_size].tolist()
+    texts = [ds[i]["text"] for i in indices]
+    labels = torch.tensor([ds[i]["label"] for i in indices], dtype=torch.long)
+    tokens = _encode_texts(texts, vocab, max_len)
+
+    return {"out": tokens, "labels": labels}
+
+
+class IMDbDataset(torch.utils.data.Dataset):
+    def __init__(self, vocab_size=10000, max_len=256):
+        self.ds = _get_imdb_dataset()
+        self.vocab = _build_vocab(self.ds["text"][:5000], vocab_size, "imdb")
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __getitem__(self, idx):
+        text = self.ds[idx]["text"]
+        label = self.ds[idx]["label"]
+        unk = self.vocab.get("<unk>", 1)
+        tokens = _tokenize(text)
+        ids = [self.vocab.get(t, unk) for t in tokens[:self.max_len]]
+        ids = ids + [0] * (self.max_len - len(ids))
+        return torch.tensor(ids, dtype=torch.long), torch.tensor(label, dtype=torch.long)
+
+
+def train_dataset_imdb(vocab_size=10000, max_len=256) -> torch.utils.data.Dataset:
+    return IMDbDataset(vocab_size, max_len)
+
+
+# --- AG News ---
+
+_agnews_cache: dict[str, object] = {}
+
+def _get_agnews_dataset():
+    if "ds" not in _agnews_cache:
+        from datasets import load_dataset
+        _agnews_cache["ds"] = load_dataset("ag_news", split="train")
+    return _agnews_cache["ds"]
+
+
+def load_ag_news(props: dict) -> dict[str, torch.Tensor]:
+    batch_size = props.get("batchSize", 32)
+    max_len = props.get("maxLen", 128)
+    vocab_size = props.get("vocabSize", 10000)
+
+    ds = _get_agnews_dataset()
+    vocab = _build_vocab(ds["text"][:5000], vocab_size, "agnews")
+
+    indices = torch.randperm(len(ds))[:batch_size].tolist()
+    texts = [ds[i]["text"] for i in indices]
+    labels = torch.tensor([ds[i]["label"] for i in indices], dtype=torch.long)
+    tokens = _encode_texts(texts, vocab, max_len)
+
+    return {"out": tokens, "labels": labels}
+
+
+class AGNewsDataset(torch.utils.data.Dataset):
+    def __init__(self, vocab_size=10000, max_len=128):
+        self.ds = _get_agnews_dataset()
+        self.vocab = _build_vocab(self.ds["text"][:5000], vocab_size, "agnews")
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __getitem__(self, idx):
+        text = self.ds[idx]["text"]
+        label = self.ds[idx]["label"]
+        unk = self.vocab.get("<unk>", 1)
+        tokens = _tokenize(text)
+        ids = [self.vocab.get(t, unk) for t in tokens[:self.max_len]]
+        ids = ids + [0] * (self.max_len - len(ids))
+        return torch.tensor(ids, dtype=torch.long), torch.tensor(label, dtype=torch.long)
+
+
+def train_dataset_ag_news(vocab_size=10000, max_len=128) -> torch.utils.data.Dataset:
+    return AGNewsDataset(vocab_size, max_len)
+
+
 # --- Registries ---
 # Each registry maps node type string → function.
 # graph_builder.py uses these — no if/else chains needed.
@@ -163,6 +310,8 @@ DATA_LOADERS: dict[str, callable] = {
     "data.cifar10": load_cifar10,
     "data.cifar100": load_cifar100,
     "data.fashion_mnist": load_fashion_mnist,
+    "data.imdb": load_imdb,
+    "data.ag_news": load_ag_news,
 }
 
 # Get full training dataset: () → Dataset
@@ -171,6 +320,8 @@ TRAIN_DATASETS: dict[str, callable] = {
     "data.cifar10": train_dataset_cifar10,
     "data.cifar100": train_dataset_cifar100,
     "data.fashion_mnist": train_dataset_fashion_mnist,
+    "data.imdb": train_dataset_imdb,
+    "data.ag_news": train_dataset_ag_news,
 }
 
 # Undo normalization for image preview: (tensor [C,H,W]) → tensor [C,H,W] in 0-1
@@ -329,10 +480,56 @@ def detail_fashion_mnist() -> dict:
     }
 
 
+def detail_imdb() -> dict:
+    ds = _get_imdb_dataset()
+    # Sample texts per class
+    samples: dict[int, list] = {0: [], 1: []}
+    for item in ds:
+        label = item["label"]
+        if len(samples[label]) < 3:
+            text = item["text"][:200] + ("..." if len(item["text"]) > 200 else "")
+            samples[label].append(text)
+        if all(len(v) >= 3 for v in samples.values()):
+            break
+    return {
+        "name": "IMDb",
+        "description": "Movie review sentiment classification (binary)",
+        "labels": ["Negative", "Positive"],
+        "trainSamples": len(ds),
+        "diskSize": "~80 MB",
+        "isText": True,
+        "sampleTexts": {["Negative", "Positive"][k]: v for k, v in samples.items()},
+    }
+
+
+def detail_ag_news() -> dict:
+    ds = _get_agnews_dataset()
+    label_names = ["World", "Sports", "Business", "Sci/Tech"]
+    samples: dict[int, list] = {i: [] for i in range(4)}
+    for item in ds:
+        label = item["label"]
+        if len(samples[label]) < 3:
+            text = item["text"][:200] + ("..." if len(item["text"]) > 200 else "")
+            samples[label].append(text)
+        if all(len(v) >= 3 for v in samples.values()):
+            break
+    return {
+        "name": "AG News",
+        "description": "News article classification (4 classes)",
+        "labels": label_names,
+        "trainSamples": len(ds),
+        "diskSize": "~30 MB",
+        "isText": True,
+        "sampleTexts": {label_names[k]: v for k, v in samples.items()},
+    }
+
+
 # Get dataset detail info: () → dict
 DATASET_DETAILS: dict[str, callable] = {
     "data.mnist": detail_mnist,
     "data.cifar10": detail_cifar10,
     "data.cifar100": detail_cifar100,
     "data.fashion_mnist": detail_fashion_mnist,
+    "data.imdb": detail_imdb,
+    "data.ag_news": detail_ag_news,
 }

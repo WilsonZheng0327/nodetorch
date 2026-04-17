@@ -95,10 +95,25 @@
   color: #6c7086;
   font-size: 8px;
   font-weight: 700;
-  cursor: help;
+  cursor: pointer;
   flex-shrink: 0;
   text-transform: none;
   letter-spacing: 0;
+}
+
+.viz-tip:hover {
+  background: #45475a;
+  color: #cdd6f4;
+}
+
+.viz-tip-text {
+  font-size: 9px;
+  color: #a6adc8;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.4;
+  padding: 3px 0;
 }
 
 .viz-stats {
