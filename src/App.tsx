@@ -10,6 +10,7 @@ import { PropertyInspector } from './ui/PropertyInspector';
 import { NodePalette } from './ui/NodePalette';
 import { Toolbar } from './ui/Toolbar';
 import { TrainingDashboard, type ModelLayerInfo } from './ui/TrainingDashboard';
+import { StepThroughPanel } from './ui/step-through/StepThroughPanel';
 import { Breadcrumb } from './ui/Breadcrumb';
 import { createNode as cn, addNode as an, createEdge as ce, addEdge as ae } from './core/graph';
 
@@ -75,6 +76,7 @@ export default function App() {
   }, [graph.rfNodes, domain]);
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [stepThroughOpen, setStepThroughOpen] = useState(false);
   const selectedNode = selectedNodeId ? graph.currentGraph.nodes.get(selectedNodeId) ?? null : null;
 
   // Track which node is selected
@@ -381,7 +383,7 @@ export default function App() {
             />
           </RF.Panel>
         </RF.ReactFlow>
-        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => setStepThroughOpen(true)} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
         <NodePalette
           savedBlocks={graph.savedBlocks}
@@ -396,6 +398,11 @@ export default function App() {
           onSelectEpoch={graph.setSelectedEpoch}
           totalSnapshotEpochs={graph.snapshotHistory.length}
           modelSummary={modelSummary}
+        />
+        <StepThroughPanel
+          open={stepThroughOpen}
+          graphJson={graph.saveGraph()}
+          onClose={() => setStepThroughOpen(false)}
         />
       </div>
     </VizCtx.Provider>

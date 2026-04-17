@@ -32,6 +32,7 @@ import threading
 import logging
 
 from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail, get_device_name, set_device
+from step_through import run_step_through
 from data_loaders import DATASET_DETAILS
 import os
 from pathlib import Path
@@ -141,6 +142,22 @@ async def infer(graph_data: dict):
         return {"status": "ok", "results": results}
     except Exception as e:
         logger.error(f"Inference failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/step-through")
+async def step_through(request: dict):
+    """Run a forward pass through the graph on a single sample, returning ordered stages.
+
+    Request: { graph, sampleIdx? }
+    Response: { status: "ok", result: { stages, sample } } or error
+    """
+    logger.info("Step-through requested")
+    try:
+        result = run_step_through(request["graph"], request.get("sampleIdx"))
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Step-through failed: {e}")
         return {"status": "error", "error": str(e)}
 
 

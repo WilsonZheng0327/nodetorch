@@ -14,12 +14,13 @@ interface Props {
   onOrganize: () => void;
   onShowAllViz: () => void;
   onHideAllViz: () => void;
+  onStepThrough: () => void;
   status: { type: 'idle' | 'running' | 'success' | 'error'; message?: string };
   modelTrained: boolean;
   modelStale: boolean;
 }
 
-export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, status, modelTrained, modelStale }: Props) {
+export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, status, modelTrained, modelStale }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -137,6 +138,9 @@ export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onC
         </button>
         <button className="toolbar-btn" onClick={onHideAllViz} title="Hide all viz panels">
           Hide Viz
+        </button>
+        <button className="toolbar-btn" onClick={onStepThrough} title="Step through forward pass">
+          Step Through
         </button>
         <input
           ref={fileInputRef}
