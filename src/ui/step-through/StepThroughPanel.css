@@ -873,3 +873,20 @@
   background: #181825;
   border-radius: 3px;
 }
+
+/* Saliency map */
+
+.extra-saliency-desc {
+  font-size: 11px;
+  color: #a6adc8;
+  margin-bottom: 8px;
+}
+
+.extra-saliency-canvas {
+  display: block;
+  border-radius: 3px;
+  border: 1px solid #45475a;
+  image-rendering: pixelated;
+  width: 160px;
+  height: 160px;
+}

@@ -140,6 +140,17 @@ def run_step_through(graph_data: dict, sample_idx: int | None = None, mask: list
         if stage:
             stages.append(stage)
 
+    # Compute saliency map (if possible) and attach to the data node stage
+    saliency = _compute_saliency(modules, nodes, edges)
+    if saliency is not None:
+        for st in stages:
+            node_type_st = st.get("nodeType")
+            if node_type_st in DATA_LOADERS:
+                extras = st.get("extras", [])
+                extras.append(saliency)
+                st["extras"] = extras
+                break
+
     return {
         "stages": stages,
         "sample": sample_info,
@@ -358,6 +369,115 @@ def _build_subgraph_stages(
             stages.append(stage)
 
     return stages
+
+
+# --- Saliency maps (input gradient) ---
+
+def _compute_saliency(modules: dict, nodes: dict, edges: list) -> dict | None:
+    """Compute saliency = |∂logit_predicted / ∂input|, reduced across channels.
+
+    Runs a fresh forward pass with gradient tracking on the input, then backprops
+    from the predicted class logit. Returns 2D pixel data [H][W] in 0-255.
+    """
+    data_nid = None
+    loss_nid = None
+    for nid, n in nodes.items():
+        if n["type"] in DATA_LOADERS:
+            data_nid = nid
+        if n["type"] in LOSS_NODES:
+            loss_nid = nid
+    if not data_nid or not loss_nid:
+        return None
+
+    pred_nid = None
+    for edge in edges:
+        if edge["target"]["nodeId"] == loss_nid and edge["target"]["portId"] == "predictions":
+            pred_nid = edge["source"]["nodeId"]
+            break
+    if not pred_nid:
+        return None
+
+    data_node = nodes[data_nid]
+    loader = DATA_LOADERS.get(data_node["type"])
+    if not loader:
+        return None
+    try:
+        props = {**data_node.get("properties", {}), "batchSize": 1}
+        tensors = loader(props)
+    except Exception:
+        return None
+
+    dev = get_device()
+    img = tensors["out"].to(dev).detach().clone()
+    if img.dim() != 4:
+        return None  # image datasets only
+    img.requires_grad_(True)
+
+    labels = tensors.get("labels")
+    if labels is not None and isinstance(labels, torch.Tensor):
+        labels = labels.to(dev)
+
+    order = topological_sort(nodes, edges)
+    results: dict[str, dict] = {data_nid: {"out": img, "labels": labels}}
+
+    try:
+        for node_id in order:
+            if node_id == data_nid:
+                continue
+            n = nodes[node_id]
+            ntype = n["type"]
+            if ntype in OPTIMIZER_NODES:
+                continue
+            mod = modules.get(node_id)
+            if mod is None:
+                continue
+            mod.eval()
+            inputs = gather_inputs(node_id, edges, results)
+            if ntype in LOSS_NODES:
+                continue  # skip loss — we want raw logits
+            if ntype == SUBGRAPH_TYPE:
+                sg = mod(**inputs)
+                fk = next(iter(sg), None)
+                if fk:
+                    results[node_id] = {"out": sg[fk]}
+                continue
+            if ntype in MULTI_INPUT_NODES:
+                results[node_id] = {"out": mod(**inputs)}
+                continue
+            if "in" in inputs:
+                raw = mod(inputs["in"])
+                results[node_id] = raw if isinstance(raw, dict) else {"out": raw}
+    except Exception:
+        return None
+
+    preds = results.get(pred_nid, {}).get("out")
+    if preds is None or not isinstance(preds, torch.Tensor) or preds.dim() < 2:
+        return None
+
+    try:
+        pred_class = int(preds.argmax(dim=1)[0])
+        score = preds[0, pred_class]
+        score.backward()
+    except Exception:
+        return None
+
+    if img.grad is None:
+        return None
+
+    saliency = img.grad[0].abs()
+    if saliency.dim() == 3:
+        saliency = saliency.max(dim=0).values
+    smin, smax = float(saliency.min()), float(saliency.max())
+    rng = smax - smin if smax > smin else 1.0
+    norm = ((saliency - smin) / rng * 255).clamp(0, 255).byte().cpu()
+
+    return {
+        "kind": "saliency_map",
+        "pixels": norm.tolist(),
+        "predictedClass": pred_class,
+        "height": int(norm.shape[0]),
+        "width": int(norm.shape[1]),
+    }
 
 
 # --- Sample extraction (for the "header" preview) ---

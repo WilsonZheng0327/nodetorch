@@ -26,6 +26,8 @@ function ExtraPanel({ extra }: { extra: Extra }) {
       return <AttentionMap data={extra} />;
     case 'recurrent_state':
       return <RecurrentState data={extra} />;
+    case 'saliency_map':
+      return <SaliencyMap data={extra} />;
     default:
       return null;
   }
@@ -314,6 +316,48 @@ function RecurrentState({ data }: { data: Extract<Extra, { kind: 'recurrent_stat
         {data.label} ({data.totalLength} units)
       </div>
       <canvas ref={canvasRef} className="extra-recurrent-canvas" />
+    </div>
+  );
+}
+
+// --- Saliency map ---
+
+function SaliencyMap({ data }: { data: Extract<Extra, { kind: 'saliency_map' }> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || data.pixels.length === 0) return;
+    canvas.width = data.width;
+    canvas.height = data.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const img = ctx.createImageData(data.width, data.height);
+    for (let y = 0; y < data.height; y++) {
+      for (let x = 0; x < data.width; x++) {
+        const idx = (y * data.width + x) * 4;
+        const v = data.pixels[y][x] ?? 0;
+        // Warm heatmap: low = black, high = bright yellow
+        const t = v / 255;
+        img.data[idx] = Math.round(Math.min(255, t * 2 * 255));
+        img.data[idx + 1] = Math.round(Math.max(0, (t - 0.5) * 2 * 255));
+        img.data[idx + 2] = 0;
+        img.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }, [data]);
+
+  return (
+    <div className="extra-panel">
+      <div className="extra-panel-title">
+        Saliency Map — gradient of predicted class w.r.t. input
+        <span className="extra-panel-note"> &middot; predicted class {data.predictedClass}</span>
+      </div>
+      <div className="extra-saliency-desc">
+        Bright pixels = model's decision depends on them heavily.
+      </div>
+      <canvas ref={canvasRef} className="extra-saliency-canvas" />
     </div>
   );
 }

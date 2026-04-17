@@ -53,7 +53,8 @@ export type Extra =
   | { kind: 'conv_kernels'; kernels: number[][][]; showing: number; totalFilters: number; inChannels: number; kernelHeight: number; kernelWidth: number }
   | { kind: 'weight_matrix'; data: number[][]; rows: number; cols: number; actualRows: number; actualCols: number; min: number; max: number }
   | { kind: 'attention_map'; data: number[][]; rows: number; cols: number; actualRows: number; actualCols: number }
-  | { kind: 'recurrent_state'; label: string; values: number[]; totalLength: number };
+  | { kind: 'recurrent_state'; label: string; values: number[]; totalLength: number }
+  | { kind: 'saliency_map'; pixels: number[][]; predictedClass: number; height: number; width: number };
 
 export interface Stage {
   stageId: string;        // unique — used as React key, derived from path
