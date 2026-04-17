@@ -35,6 +35,29 @@ export interface ModelLayerInfo {
   outputShape?: number[] | string[];
 }
 
+export interface SavedRun {
+  id: string;
+  timestamp: string;
+  datasetType: string;
+  epochs: number;
+  learningRate: number;
+  optimizer: string;
+  scheduler: string;
+  finalLoss: number | null;
+  finalAccuracy: number | null;
+  bestValAccuracy: number | null;
+  duration: number;
+  totalParams: number;
+  nodeCount: number;
+}
+
+export interface FullRun extends SavedRun {
+  batchSize: number;
+  seed: number;
+  valSplit: number;
+  epochHistory: EpochData[];
+}
+
 interface Props {
   progress: EpochData[];
   isTraining: boolean;
@@ -46,7 +69,10 @@ interface Props {
 }
 
 export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs, modelSummary }: Props) {
-  const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'epochs' | 'summary' | 'system'>('loss');
+  const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'epochs' | 'summary' | 'runs' | 'system'>('loss');
+  const [savedRuns, setSavedRuns] = useState<SavedRun[] | null>(null);
+  const [runsLoading, setRunsLoading] = useState(false);
+  const [compareRun, setCompareRun] = useState<FullRun | null>(null);
   const [open, setOpen] = useState(false);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
@@ -62,6 +88,49 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
   useEffect(() => {
     if (isTraining) setOpen(true);
   }, [isTraining]);
+
+  // Fetch runs when tab becomes runs, and after training completes
+  const fetchRuns = () => {
+    setRunsLoading(true);
+    fetch('http://localhost:8000/runs')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok') setSavedRuns(data.runs);
+      })
+      .catch(() => {})
+      .finally(() => setRunsLoading(false));
+  };
+
+  useEffect(() => {
+    if (activeTab === 'runs' && savedRuns === null) fetchRuns();
+  }, [activeTab, savedRuns]);
+
+  // Refetch runs when training ends (a new run was just saved)
+  const wasTraining = useRef(false);
+  useEffect(() => {
+    if (wasTraining.current && !isTraining) {
+      setSavedRuns(null);  // force reload on next visit
+    }
+    wasTraining.current = isTraining;
+  }, [isTraining]);
+
+  const loadCompareRun = (id: string) => {
+    fetch(`http://localhost:8000/runs/${id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok') setCompareRun(data.run);
+      })
+      .catch(() => {});
+  };
+
+  const deleteRun = (id: string) => {
+    fetch(`http://localhost:8000/runs/${id}`, { method: 'DELETE' })
+      .then(() => {
+        setSavedRuns((prev) => prev ? prev.filter((r) => r.id !== id) : null);
+        if (compareRun?.id === id) setCompareRun(null);
+      })
+      .catch(() => {});
+  };
 
   const latest = progress.length > 0 ? progress[progress.length - 1] : null;
   const finished = !isTraining && progress.length > 0;
@@ -147,19 +216,19 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
 
       {/* Tab selector */}
       <div className="dashboard-tabs">
-        {(['loss', 'accuracy', 'gradients', 'perclass', 'epochs', 'summary', 'system'] as const).map((tab) => (
+        {(['loss', 'accuracy', 'gradients', 'perclass', 'epochs', 'summary', 'runs', 'system'] as const).map((tab) => (
           <button
             key={tab}
             className={`dashboard-tab ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {{ loss: 'Loss', accuracy: 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', epochs: 'Epochs', summary: 'Summary', system: 'System' }[tab]}
+            {{ loss: 'Loss', accuracy: 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', epochs: 'Epochs', summary: 'Summary', runs: 'Runs', system: 'System' }[tab]}
           </button>
         ))}
       </div>
 
       {/* Epoch slider — scrub through training history */}
-      {totalSnapshotEpochs >= 2 && activeTab !== 'system' && activeTab !== 'epochs' && activeTab !== 'summary' && (
+      {totalSnapshotEpochs >= 2 && activeTab !== 'system' && activeTab !== 'epochs' && activeTab !== 'summary' && activeTab !== 'runs' && (
         <div className="dashboard-epoch-slider">
           <span className="dashboard-epoch-slider-label">Epoch</span>
           <input
@@ -185,6 +254,16 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
           <SystemInfoPanel info={systemInfo} />
         ) : activeTab === 'summary' ? (
           <ModelSummaryPanel layers={modelSummary ?? []} />
+        ) : activeTab === 'runs' ? (
+          <RunsPanel
+            runs={savedRuns}
+            loading={runsLoading}
+            onRefresh={fetchRuns}
+            onCompare={loadCompareRun}
+            onDelete={deleteRun}
+            compareRun={compareRun}
+            onClearCompare={() => setCompareRun(null)}
+          />
         ) : activeTab === 'epochs' ? (
           <div className="dashboard-table-wrap">
             {progress.length > 0 ? (
@@ -227,9 +306,12 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
             <Chart
               data={progress.map((d) => activeTab === 'loss' ? d.loss : d.accuracy)}
               valData={progress.map((d) => activeTab === 'loss' ? d.valLoss : d.valAccuracy)}
+              compareData={compareRun ? compareRun.epochHistory.map((d) => activeTab === 'loss' ? d.loss : d.accuracy) : undefined}
+              compareLabel={compareRun ? `${compareRun.optimizer} lr=${compareRun.learningRate} ep=${compareRun.epochs}` : undefined}
               labels={progress.map((d) => d.epoch)}
               color={activeTab === 'loss' ? '#ef4444' : '#10b981'}
               valColor="#fab387"
+              compareColor="#cba6f7"
               formatValue={activeTab === 'loss' ? (v) => v.toFixed(4) : (v) => (v * 100).toFixed(1) + '%'}
               selectedIndex={selectedEpoch != null ? selectedEpoch - 1 : null}
             />
@@ -388,9 +470,12 @@ interface ChartProps {
   selectedIndex?: number | null;
   valData?: (number | null | undefined)[];
   valColor?: string;
+  compareData?: (number | null | undefined)[];
+  compareColor?: string;
+  compareLabel?: string;
 }
 
-function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valData, valColor }: ChartProps) {
+function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valData, valColor, compareData, compareColor, compareLabel }: ChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -401,6 +486,7 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
     const data = rawData.map((v) => (v == null || !isFinite(v)) ? 0 : v);
     // Sanitize valData (preserve null = "no val for this epoch")
     const valClean = valData?.map((v) => (v != null && isFinite(v) ? v : null));
+    const compareClean = compareData?.map((v) => (v != null && isFinite(v) ? v : null));
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -419,9 +505,10 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
 
     ctx.clearRect(0, 0, w, h);
 
-    // Compute min/max across both series
+    // Compute min/max across all series
     const valValuesForRange = (valClean?.filter((v): v is number => v != null)) ?? [];
-    const allValues = [...data, ...valValuesForRange];
+    const compareValuesForRange = (compareClean?.filter((v): v is number => v != null)) ?? [];
+    const allValues = [...data, ...valValuesForRange, ...compareValuesForRange];
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
     const range = max - min || 1;
@@ -513,6 +600,35 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
       }
     }
 
+    // Compare line (dotted, purple by default)
+    if (compareClean && compareClean.length > 0) {
+      const cColor = compareColor ?? '#cba6f7';
+      ctx.strokeStyle = cColor;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([1, 3]);
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < compareClean.length; i++) {
+        const v = compareClean[i];
+        if (v == null) {
+          started = false;
+          continue;
+        }
+        const x = pad.left + (plotW * i) / Math.max(compareClean.length - 1, 1);
+        const y = pad.top + plotH - (plotH * (v - min)) / range;
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+
     // Legend (if val line present)
     if (valClean) {
       ctx.font = '10px Inter, system-ui, sans-serif';
@@ -532,6 +648,19 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
       ctx.setLineDash([]);
       ctx.fillStyle = '#a6adc8';
       ctx.fillText('val', pad.left + 74, 10);
+      // Compare legend
+      if (compareClean && compareClean.length > 0) {
+        ctx.strokeStyle = compareColor ?? '#cba6f7';
+        ctx.setLineDash([1, 3]);
+        ctx.beginPath();
+        ctx.moveTo(pad.left + 110, 5);
+        ctx.lineTo(pad.left + 120, 5);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#cba6f7';
+        const labelText = compareLabel && compareLabel.length < 40 ? compareLabel : 'compare';
+        ctx.fillText(labelText, pad.left + 124, 10);
+      }
     }
 
     // Selected epoch marker (vertical line + larger dot)
@@ -558,7 +687,7 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
       ctx.textAlign = 'center';
       ctx.fillText(formatValue(data[selectedIndex]), sx, sy - 10);
     }
-  }, [rawData, labels, color, formatValue, selectedIndex, valData, valColor]);
+  }, [rawData, labels, color, formatValue, selectedIndex, valData, valColor, compareData, compareColor, compareLabel]);
 
   return <canvas ref={canvasRef} className="dashboard-chart" />;
 }
@@ -639,6 +768,79 @@ function GradientFlowChart({ data }: { data: { name: string; norm: number }[] })
 }
 
 // --- Per-class accuracy bar chart (all classes, sorted worst-first, scrollable) ---
+
+// --- Runs panel (training history) ---
+
+function RunsPanel({
+  runs, loading, onRefresh, onCompare, onDelete, compareRun, onClearCompare,
+}: {
+  runs: SavedRun[] | null;
+  loading: boolean;
+  onRefresh: () => void;
+  onCompare: (id: string) => void;
+  onDelete: (id: string) => void;
+  compareRun: FullRun | null;
+  onClearCompare: () => void;
+}) {
+  if (loading) {
+    return <div className="dashboard-chart-placeholder">Loading runs...</div>;
+  }
+  if (!runs || runs.length === 0) {
+    return <div className="dashboard-chart-placeholder">No saved runs yet — train a model to create one</div>;
+  }
+  return (
+    <div className="runs-panel">
+      <div className="runs-panel-header">
+        <span>{runs.length} saved run{runs.length === 1 ? '' : 's'}</span>
+        {compareRun && (
+          <button className="dashboard-tab" onClick={onClearCompare} title="Stop comparing">
+            Clear compare ({compareRun.id.slice(-8)})
+          </button>
+        )}
+        <button className="dashboard-tab" onClick={onRefresh} style={{ marginLeft: 'auto' }}>Refresh</button>
+      </div>
+      <table className="dashboard-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Dataset</th>
+            <th>Opt</th>
+            <th>LR</th>
+            <th>Ep</th>
+            <th>Params</th>
+            <th>Val Acc</th>
+            <th>Best Val</th>
+            <th>Dur</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {runs.map((r) => (
+            <tr key={r.id} className={compareRun?.id === r.id ? 'runs-row-active' : ''}>
+              <td>{r.timestamp?.replace('T', ' ') ?? '—'}</td>
+              <td>{r.datasetType?.split('.').pop()}</td>
+              <td>{r.optimizer}</td>
+              <td>{r.learningRate?.toExponential(1)}</td>
+              <td>{r.epochs}</td>
+              <td>{r.totalParams?.toLocaleString()}</td>
+              <td>{r.bestValAccuracy != null ? `${(r.bestValAccuracy * 100).toFixed(1)}%` : '—'}</td>
+              <td>{r.finalAccuracy != null ? `${(r.finalAccuracy * 100).toFixed(1)}%` : '—'}</td>
+              <td>{r.duration}s</td>
+              <td>
+                <button className="runs-action-btn" onClick={() => onCompare(r.id)} title="Overlay on loss/accuracy charts">
+                  Compare
+                </button>
+                <button className="runs-action-btn runs-action-delete" onClick={() => onDelete(r.id)} title="Delete">
+                  ×
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function PerClassChart({ data }: { data: { cls: number; accuracy: number }[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);

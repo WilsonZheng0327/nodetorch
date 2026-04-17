@@ -387,6 +387,52 @@
   background: #313244;
 }
 
+/* Runs history */
+.runs-panel {
+  padding: 0;
+}
+
+.runs-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #313244;
+  font-size: 11px;
+  color: #a6adc8;
+}
+
+.runs-row-active {
+  background: rgba(203, 166, 247, 0.1);
+}
+
+.runs-action-btn {
+  padding: 2px 8px;
+  margin-right: 2px;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 3px;
+  color: #cdd6f4;
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.runs-action-btn:hover {
+  background: #45475a;
+  border-color: #89b4fa;
+}
+
+.runs-action-delete {
+  color: #f38ba8;
+  padding: 2px 6px;
+}
+
+.runs-action-delete:hover {
+  background: rgba(243, 139, 168, 0.2);
+  border-color: #f38ba8;
+}
+
 /* Model summary */
 .model-summary {
   padding: 8px 0;

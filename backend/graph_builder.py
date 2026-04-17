@@ -926,6 +926,7 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
 
     # Training loop
     import time
+    training_start_time = time.time()
     order = topological_sort(nodes, edges)
     epoch_results = []
     total_batches = len(train_loader)
@@ -1354,6 +1355,25 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
             "data": matrix,
             "size": n_classes,
         }
+
+    # Persist this run to disk for the history tab
+    try:
+        from runs_store import build_run_record, save_run
+        total_params = sum(
+            p.numel() for m in modules.values() for p in m.parameters()
+        )
+        record = build_run_record(
+            graph_data=graph_data,
+            epoch_results=epoch_results,
+            optimizer_props={**props, "__type__": optimizer_node["type"].split(".")[-1]},
+            data_node=data_node,
+            duration_seconds=time.time() - training_start_time,
+            module_param_count=total_params,
+        )
+        save_run(record)
+    except Exception as e:
+        # Don't fail training just because run save failed
+        print(f"Warning: failed to save run history: {e}")
 
     return {
         "nodeResults": node_results,

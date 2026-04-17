@@ -35,6 +35,7 @@ from graph_builder import execute_graph, train_graph, infer_graph, get_layer_det
 from step_through import run_step_through
 from activation_max import activation_maximization
 from backprop_sim import simulate_backprop
+from runs_store import list_runs, load_run, delete_run
 from data_loaders import DATASET_DETAILS
 import os
 from pathlib import Path
@@ -165,6 +166,27 @@ async def step_through(request: dict):
     except Exception as e:
         logger.error(f"Step-through failed: {e}")
         return {"status": "error", "error": str(e)}
+
+
+@app.get("/runs")
+async def get_runs():
+    """List all saved training runs (summary only)."""
+    return {"status": "ok", "runs": list_runs()}
+
+
+@app.get("/runs/{run_id}")
+async def get_run(run_id: str):
+    """Load a full training run including per-epoch history."""
+    data = load_run(run_id)
+    if data is None:
+        return {"status": "error", "error": "Run not found"}
+    return {"status": "ok", "run": data}
+
+
+@app.delete("/runs/{run_id}")
+async def remove_run(run_id: str):
+    ok = delete_run(run_id)
+    return {"status": "ok" if ok else "error"}
 
 
 @app.post("/simulate-backprop")
