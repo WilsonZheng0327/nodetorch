@@ -10,6 +10,30 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* Backprop pulse animation — triggered by BackpropCtx */
+@keyframes backprop-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(249, 226, 175, 0), 0 2px 8px rgba(0, 0, 0, 0.3);
+    border-color: #45475a;
+  }
+  30% {
+    box-shadow: 0 0 0 4px rgba(249, 226, 175, calc(0.8 * var(--backprop-intensity, 1))),
+                0 0 24px 8px rgba(249, 226, 175, calc(0.5 * var(--backprop-intensity, 1))),
+                0 2px 8px rgba(0, 0, 0, 0.3);
+    border-color: #f9e2af;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(249, 226, 175, 0), 0 2px 8px rgba(0, 0, 0, 0.3);
+    border-color: #45475a;
+  }
+}
+
+.layer-node-backprop-pulse {
+  animation: backprop-pulse 600ms ease-out;
+  animation-delay: var(--backprop-delay, 0ms);
+  animation-fill-mode: backwards;
+}
+
 .layer-node-header {
   display: flex;
   align-items: center;

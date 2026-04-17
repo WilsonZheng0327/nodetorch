@@ -5,7 +5,7 @@ import './App.css';
 import { useMemo, useEffect, useCallback, useState, useRef, type DragEvent } from 'react';
 import { initDomain } from './domain';
 import { useGraph } from './ui/useGraph';
-import { EngineNode, DomainCtx, GraphActionsCtx, VizCtx } from './ui/EngineNode';
+import { EngineNode, DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './ui/EngineNode';
 import { PropertyInspector } from './ui/PropertyInspector';
 import { NodePalette } from './ui/NodePalette';
 import { Toolbar } from './ui/Toolbar';
@@ -342,6 +342,7 @@ export default function App() {
     <DomainCtx.Provider value={domain}>
     <GraphActionsCtx.Provider value={graphActions}>
     <VizCtx.Provider value={vizCtx}>
+    <BackpropCtx.Provider value={graph.backpropAnim}>
       <div ref={reactFlowWrapper} style={{ width: '100vw', height: '100vh' }}>
         <RF.ReactFlow
           nodes={graph.rfNodes}
@@ -383,7 +384,7 @@ export default function App() {
             />
           </RF.Panel>
         </RF.ReactFlow>
-        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => setStepThroughOpen(true)} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => setStepThroughOpen(true)} onSimulateBackprop={graph.simulateBackprop} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
         <NodePalette
           savedBlocks={graph.savedBlocks}
@@ -405,6 +406,7 @@ export default function App() {
           onClose={() => setStepThroughOpen(false)}
         />
       </div>
+    </BackpropCtx.Provider>
     </VizCtx.Provider>
     </GraphActionsCtx.Provider>
     </DomainCtx.Provider>

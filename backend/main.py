@@ -34,6 +34,7 @@ import logging
 from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail, get_device_name, set_device
 from step_through import run_step_through
 from activation_max import activation_maximization
+from backprop_sim import simulate_backprop
 from data_loaders import DATASET_DETAILS
 import os
 from pathlib import Path
@@ -163,6 +164,20 @@ async def step_through(request: dict):
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Step-through failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/simulate-backprop")
+async def sim_backprop(request: dict):
+    """Run one forward+backward pass and return per-node gradient magnitudes."""
+    logger.info("Backprop simulation requested")
+    try:
+        result = simulate_backprop(request["graph"])
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Backprop simulation failed: {e}")
         return {"status": "error", "error": str(e)}
 
 

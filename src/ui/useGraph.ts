@@ -685,6 +685,46 @@ export function useGraph(domain: DomainContext) {
   // Batch-level progress within current epoch
   const [batchProgress, setBatchProgress] = useState<{ batch: number; totalBatches: number } | null>(null);
 
+  // Backprop animation: map of nodeId -> { delayMs, intensity }
+  const [backpropAnim, setBackpropAnim] = useState<Record<string, { delayMs: number; intensity: number }> | null>(null);
+
+  const simulateBackprop = useCallback(async () => {
+    setStatus({ type: 'running', message: 'Simulating backprop...' });
+    try {
+      const res = await fetch('http://localhost:8000/simulate-backprop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
+      });
+      const data = await res.json();
+      if (data.status !== 'ok') {
+        setStatus({ type: 'error', message: data.error ?? 'Backprop simulation failed' });
+        return;
+      }
+      const flow: { nodeId: string; norm: number }[] = data.result.flow;
+      // Reverse: animate from last layer backward to first
+      const reversed = [...flow].reverse();
+      const maxNorm = Math.max(...reversed.map((f) => f.norm), 1e-8);
+      const stepMs = 150;
+      const anim: Record<string, { delayMs: number; intensity: number }> = {};
+      reversed.forEach((f, i) => {
+        anim[f.nodeId] = {
+          delayMs: i * stepMs,
+          intensity: Math.min(1, 0.3 + (f.norm / maxNorm) * 0.7),
+        };
+      });
+      setBackpropAnim(anim);
+      setStatus({ type: 'success', message: `Backprop: loss=${data.result.loss?.toFixed(4)}` });
+      const totalDuration = reversed.length * stepMs + 800;
+      setTimeout(() => {
+        setBackpropAnim(null);
+        setStatus((s) => s.type === 'success' ? { type: 'idle' } : s);
+      }, totalDuration);
+    } catch (e) {
+      setStatus({ type: 'error', message: 'Cannot connect to backend' });
+    }
+  }, []);
+
   const trainWsRef = useRef<WebSocket | null>(null);
 
   const cancelTrain = useCallback(() => {
@@ -1077,6 +1117,8 @@ export function useGraph(domain: DomainContext) {
     snapshotHistory,
     selectedEpoch,
     setSelectedEpoch,
+    backpropAnim,
+    simulateBackprop,
     pinnedVizNodes,
     toggleVizPin,
     showAllViz,
