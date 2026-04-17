@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "LeNet-5 — MNIST",
+    "nodes": [
+      { "id": "mnist", "type": "data.mnist", "position": { "x": 0, "y": 200 }, "properties": { "batchSize": 32 } },
+      { "id": "conv1", "type": "ml.layers.conv2d", "position": { "x": 240, "y": 200 }, "properties": { "outChannels": 6, "kernelSize": 5, "stride": 1, "padding": 0 } },
+      { "id": "relu1", "type": "ml.activations.relu", "position": { "x": 440, "y": 200 }, "properties": {} },
+      { "id": "pool1", "type": "ml.layers.avgpool2d", "position": { "x": 600, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+      { "id": "conv2", "type": "ml.layers.conv2d", "position": { "x": 800, "y": 200 }, "properties": { "outChannels": 16, "kernelSize": 5, "stride": 1, "padding": 0 } },
+      { "id": "relu2", "type": "ml.activations.relu", "position": { "x": 1000, "y": 200 }, "properties": {} },
+      { "id": "pool2", "type": "ml.layers.avgpool2d", "position": { "x": 1160, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+      { "id": "flatten", "type": "ml.layers.flatten", "position": { "x": 1360, "y": 200 }, "properties": {} },
+      { "id": "fc1", "type": "ml.layers.linear", "position": { "x": 1520, "y": 200 }, "properties": { "outFeatures": 120 } },
+      { "id": "relu3", "type": "ml.activations.relu", "position": { "x": 1700, "y": 200 }, "properties": {} },
+      { "id": "fc2", "type": "ml.layers.linear", "position": { "x": 1860, "y": 200 }, "properties": { "outFeatures": 84 } },
+      { "id": "relu4", "type": "ml.activations.relu", "position": { "x": 2040, "y": 200 }, "properties": {} },
+      { "id": "fc3", "type": "ml.layers.linear", "position": { "x": 2200, "y": 200 }, "properties": { "outFeatures": 10 } },
+      { "id": "loss", "type": "ml.loss.cross_entropy", "position": { "x": 2420, "y": 250 }, "properties": {} },
+      { "id": "adam", "type": "ml.optimizers.adam", "position": { "x": 2640, "y": 300 }, "properties": { "lr": 0.001, "epochs": 10 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "mnist", "portId": "out" }, "target": { "nodeId": "conv1", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "conv1", "portId": "out" }, "target": { "nodeId": "relu1", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "relu1", "portId": "out" }, "target": { "nodeId": "pool1", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "pool1", "portId": "out" }, "target": { "nodeId": "conv2", "portId": "in" } },
+      { "id": "e5", "source": { "nodeId": "conv2", "portId": "out" }, "target": { "nodeId": "relu2", "portId": "in" } },
+      { "id": "e6", "source": { "nodeId": "relu2", "portId": "out" }, "target": { "nodeId": "pool2", "portId": "in" } },
+      { "id": "e7", "source": { "nodeId": "pool2", "portId": "out" }, "target": { "nodeId": "flatten", "portId": "in" } },
+      { "id": "e8", "source": { "nodeId": "flatten", "portId": "out" }, "target": { "nodeId": "fc1", "portId": "in" } },
+      { "id": "e9", "source": { "nodeId": "fc1", "portId": "out" }, "target": { "nodeId": "relu3", "portId": "in" } },
+      { "id": "e10", "source": { "nodeId": "relu3", "portId": "out" }, "target": { "nodeId": "fc2", "portId": "in" } },
+      { "id": "e11", "source": { "nodeId": "fc2", "portId": "out" }, "target": { "nodeId": "relu4", "portId": "in" } },
+      { "id": "e12", "source": { "nodeId": "relu4", "portId": "out" }, "target": { "nodeId": "fc3", "portId": "in" } },
+      { "id": "e13", "source": { "nodeId": "fc3", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e14", "source": { "nodeId": "mnist", "portId": "labels" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e15", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}

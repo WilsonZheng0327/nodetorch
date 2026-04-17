@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "VGG-lite — CIFAR-10",
+    "nodes": [
+      { "id": "cifar", "type": "data.cifar10", "position": { "x": 0, "y": 200 }, "properties": { "batchSize": 32 } },
+      { "id": "conv1", "type": "ml.layers.conv2d", "position": { "x": 240, "y": 200 }, "properties": { "outChannels": 32, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn1", "type": "ml.layers.batchnorm2d", "position": { "x": 440, "y": 200 }, "properties": {} },
+      { "id": "relu1", "type": "ml.activations.relu", "position": { "x": 600, "y": 200 }, "properties": {} },
+      { "id": "conv2", "type": "ml.layers.conv2d", "position": { "x": 760, "y": 200 }, "properties": { "outChannels": 32, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn2", "type": "ml.layers.batchnorm2d", "position": { "x": 940, "y": 200 }, "properties": {} },
+      { "id": "relu2", "type": "ml.activations.relu", "position": { "x": 1080, "y": 200 }, "properties": {} },
+      { "id": "pool1", "type": "ml.layers.maxpool2d", "position": { "x": 1220, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+      { "id": "conv3", "type": "ml.layers.conv2d", "position": { "x": 1420, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn3", "type": "ml.layers.batchnorm2d", "position": { "x": 1600, "y": 200 }, "properties": {} },
+      { "id": "relu3", "type": "ml.activations.relu", "position": { "x": 1740, "y": 200 }, "properties": {} },
+      { "id": "conv4", "type": "ml.layers.conv2d", "position": { "x": 1880, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn4", "type": "ml.layers.batchnorm2d", "position": { "x": 2060, "y": 200 }, "properties": {} },
+      { "id": "relu4", "type": "ml.activations.relu", "position": { "x": 2200, "y": 200 }, "properties": {} },
+      { "id": "pool2", "type": "ml.layers.maxpool2d", "position": { "x": 2340, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+      { "id": "avgpool", "type": "ml.layers.adaptive_avgpool2d", "position": { "x": 2540, "y": 200 }, "properties": { "outputH": 1, "outputW": 1 } },
+      { "id": "flatten", "type": "ml.layers.flatten", "position": { "x": 2720, "y": 200 }, "properties": {} },
+      { "id": "fc", "type": "ml.layers.linear", "position": { "x": 2880, "y": 200 }, "properties": { "outFeatures": 10 } },
+      { "id": "loss", "type": "ml.loss.cross_entropy", "position": { "x": 3080, "y": 250 }, "properties": {} },
+      { "id": "adam", "type": "ml.optimizers.adam", "position": { "x": 3300, "y": 300 }, "properties": { "lr": 0.001, "epochs": 20 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "cifar", "portId": "out" }, "target": { "nodeId": "conv1", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "conv1", "portId": "out" }, "target": { "nodeId": "bn1", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "bn1", "portId": "out" }, "target": { "nodeId": "relu1", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "relu1", "portId": "out" }, "target": { "nodeId": "conv2", "portId": "in" } },
+      { "id": "e5", "source": { "nodeId": "conv2", "portId": "out" }, "target": { "nodeId": "bn2", "portId": "in" } },
+      { "id": "e6", "source": { "nodeId": "bn2", "portId": "out" }, "target": { "nodeId": "relu2", "portId": "in" } },
+      { "id": "e7", "source": { "nodeId": "relu2", "portId": "out" }, "target": { "nodeId": "pool1", "portId": "in" } },
+      { "id": "e8", "source": { "nodeId": "pool1", "portId": "out" }, "target": { "nodeId": "conv3", "portId": "in" } },
+      { "id": "e9", "source": { "nodeId": "conv3", "portId": "out" }, "target": { "nodeId": "bn3", "portId": "in" } },
+      { "id": "e10", "source": { "nodeId": "bn3", "portId": "out" }, "target": { "nodeId": "relu3", "portId": "in" } },
+      { "id": "e11", "source": { "nodeId": "relu3", "portId": "out" }, "target": { "nodeId": "conv4", "portId": "in" } },
+      { "id": "e12", "source": { "nodeId": "conv4", "portId": "out" }, "target": { "nodeId": "bn4", "portId": "in" } },
+      { "id": "e13", "source": { "nodeId": "bn4", "portId": "out" }, "target": { "nodeId": "relu4", "portId": "in" } },
+      { "id": "e14", "source": { "nodeId": "relu4", "portId": "out" }, "target": { "nodeId": "pool2", "portId": "in" } },
+      { "id": "e15", "source": { "nodeId": "pool2", "portId": "out" }, "target": { "nodeId": "avgpool", "portId": "in" } },
+      { "id": "e16", "source": { "nodeId": "avgpool", "portId": "out" }, "target": { "nodeId": "flatten", "portId": "in" } },
+      { "id": "e17", "source": { "nodeId": "flatten", "portId": "out" }, "target": { "nodeId": "fc", "portId": "in" } },
+      { "id": "e18", "source": { "nodeId": "fc", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e19", "source": { "nodeId": "cifar", "portId": "labels" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e20", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}

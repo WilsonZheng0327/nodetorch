@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "MLP — MNIST",
+    "nodes": [
+      { "id": "mnist", "type": "data.mnist", "position": { "x": 0, "y": 200 }, "properties": { "batchSize": 32 } },
+      { "id": "flatten", "type": "ml.layers.flatten", "position": { "x": 240, "y": 200 }, "properties": {} },
+      { "id": "linear1", "type": "ml.layers.linear", "position": { "x": 440, "y": 200 }, "properties": { "outFeatures": 256 } },
+      { "id": "relu1", "type": "ml.activations.relu", "position": { "x": 640, "y": 200 }, "properties": {} },
+      { "id": "dropout", "type": "ml.layers.dropout", "position": { "x": 800, "y": 200 }, "properties": { "p": 0.3 } },
+      { "id": "linear2", "type": "ml.layers.linear", "position": { "x": 960, "y": 200 }, "properties": { "outFeatures": 128 } },
+      { "id": "relu2", "type": "ml.activations.relu", "position": { "x": 1140, "y": 200 }, "properties": {} },
+      { "id": "linear3", "type": "ml.layers.linear", "position": { "x": 1300, "y": 200 }, "properties": { "outFeatures": 10 } },
+      { "id": "loss", "type": "ml.loss.cross_entropy", "position": { "x": 1520, "y": 250 }, "properties": {} },
+      { "id": "adam", "type": "ml.optimizers.adam", "position": { "x": 1740, "y": 300 }, "properties": { "lr": 0.001, "epochs": 10 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "mnist", "portId": "out" }, "target": { "nodeId": "flatten", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "flatten", "portId": "out" }, "target": { "nodeId": "linear1", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "linear1", "portId": "out" }, "target": { "nodeId": "relu1", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "relu1", "portId": "out" }, "target": { "nodeId": "dropout", "portId": "in" } },
+      { "id": "e5", "source": { "nodeId": "dropout", "portId": "out" }, "target": { "nodeId": "linear2", "portId": "in" } },
+      { "id": "e6", "source": { "nodeId": "linear2", "portId": "out" }, "target": { "nodeId": "relu2", "portId": "in" } },
+      { "id": "e7", "source": { "nodeId": "relu2", "portId": "out" }, "target": { "nodeId": "linear3", "portId": "in" } },
+      { "id": "e8", "source": { "nodeId": "linear3", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e9", "source": { "nodeId": "mnist", "portId": "labels" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e10", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}

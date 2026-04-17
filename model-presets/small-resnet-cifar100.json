@@ -1,0 +1,89 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "Small ResNet — CIFAR-100",
+    "nodes": [
+      { "id": "cifar", "type": "data.cifar100", "position": { "x": 0, "y": 200 }, "properties": { "batchSize": 32 } },
+      { "id": "stem_conv", "type": "ml.layers.conv2d", "position": { "x": 240, "y": 200 }, "properties": { "outChannels": 16, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "stem_bn", "type": "ml.layers.batchnorm2d", "position": { "x": 440, "y": 200 }, "properties": {} },
+      { "id": "stem_relu", "type": "ml.activations.relu", "position": { "x": 600, "y": 200 }, "properties": {} },
+      {
+        "id": "resblock1", "type": "subgraph.block", "position": { "x": 780, "y": 200 },
+        "properties": { "blockName": "ResBlock 1" },
+        "subgraph": {
+          "id": "resblock1-inner", "name": "Inner Graph",
+          "nodes": [
+            { "id": "input", "type": "subgraph.input", "position": { "x": 0, "y": 100 }, "properties": { "portCount": 1, "portNames": "in" } },
+            { "id": "conv1", "type": "ml.layers.conv2d", "position": { "x": 150, "y": 100 }, "properties": { "outChannels": 16, "kernelSize": 3, "stride": 1, "padding": 1 } },
+            { "id": "bn1", "type": "ml.layers.batchnorm2d", "position": { "x": 300, "y": 100 }, "properties": {} },
+            { "id": "relu1", "type": "ml.activations.relu", "position": { "x": 440, "y": 100 }, "properties": {} },
+            { "id": "conv2", "type": "ml.layers.conv2d", "position": { "x": 580, "y": 100 }, "properties": { "outChannels": 16, "kernelSize": 3, "stride": 1, "padding": 1 } },
+            { "id": "bn2", "type": "ml.layers.batchnorm2d", "position": { "x": 730, "y": 100 }, "properties": {} },
+            { "id": "add", "type": "ml.structural.add", "position": { "x": 870, "y": 100 }, "properties": {} },
+            { "id": "relu2", "type": "ml.activations.relu", "position": { "x": 990, "y": 100 }, "properties": {} },
+            { "id": "output", "type": "subgraph.output", "position": { "x": 1100, "y": 100 }, "properties": { "portCount": 1, "portNames": "out" } }
+          ],
+          "edges": [
+            { "id": "r1", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "conv1", "portId": "in" } },
+            { "id": "r2", "source": { "nodeId": "conv1", "portId": "out" }, "target": { "nodeId": "bn1", "portId": "in" } },
+            { "id": "r3", "source": { "nodeId": "bn1", "portId": "out" }, "target": { "nodeId": "relu1", "portId": "in" } },
+            { "id": "r4", "source": { "nodeId": "relu1", "portId": "out" }, "target": { "nodeId": "conv2", "portId": "in" } },
+            { "id": "r5", "source": { "nodeId": "conv2", "portId": "out" }, "target": { "nodeId": "bn2", "portId": "in" } },
+            { "id": "r6", "source": { "nodeId": "bn2", "portId": "out" }, "target": { "nodeId": "add", "portId": "a" } },
+            { "id": "r7", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "add", "portId": "b" } },
+            { "id": "r8", "source": { "nodeId": "add", "portId": "out" }, "target": { "nodeId": "relu2", "portId": "in" } },
+            { "id": "r9", "source": { "nodeId": "relu2", "portId": "out" }, "target": { "nodeId": "output", "portId": "out" } }
+          ]
+        }
+      },
+      {
+        "id": "resblock2", "type": "subgraph.block", "position": { "x": 1000, "y": 200 },
+        "properties": { "blockName": "ResBlock 2" },
+        "subgraph": {
+          "id": "resblock2-inner", "name": "Inner Graph",
+          "nodes": [
+            { "id": "input", "type": "subgraph.input", "position": { "x": 0, "y": 100 }, "properties": { "portCount": 1, "portNames": "in" } },
+            { "id": "conv1", "type": "ml.layers.conv2d", "position": { "x": 150, "y": 100 }, "properties": { "outChannels": 16, "kernelSize": 3, "stride": 1, "padding": 1 } },
+            { "id": "bn1", "type": "ml.layers.batchnorm2d", "position": { "x": 300, "y": 100 }, "properties": {} },
+            { "id": "relu1", "type": "ml.activations.relu", "position": { "x": 440, "y": 100 }, "properties": {} },
+            { "id": "conv2", "type": "ml.layers.conv2d", "position": { "x": 580, "y": 100 }, "properties": { "outChannels": 16, "kernelSize": 3, "stride": 1, "padding": 1 } },
+            { "id": "bn2", "type": "ml.layers.batchnorm2d", "position": { "x": 730, "y": 100 }, "properties": {} },
+            { "id": "add", "type": "ml.structural.add", "position": { "x": 870, "y": 100 }, "properties": {} },
+            { "id": "relu2", "type": "ml.activations.relu", "position": { "x": 990, "y": 100 }, "properties": {} },
+            { "id": "output", "type": "subgraph.output", "position": { "x": 1100, "y": 100 }, "properties": { "portCount": 1, "portNames": "out" } }
+          ],
+          "edges": [
+            { "id": "r1", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "conv1", "portId": "in" } },
+            { "id": "r2", "source": { "nodeId": "conv1", "portId": "out" }, "target": { "nodeId": "bn1", "portId": "in" } },
+            { "id": "r3", "source": { "nodeId": "bn1", "portId": "out" }, "target": { "nodeId": "relu1", "portId": "in" } },
+            { "id": "r4", "source": { "nodeId": "relu1", "portId": "out" }, "target": { "nodeId": "conv2", "portId": "in" } },
+            { "id": "r5", "source": { "nodeId": "conv2", "portId": "out" }, "target": { "nodeId": "bn2", "portId": "in" } },
+            { "id": "r6", "source": { "nodeId": "bn2", "portId": "out" }, "target": { "nodeId": "add", "portId": "a" } },
+            { "id": "r7", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "add", "portId": "b" } },
+            { "id": "r8", "source": { "nodeId": "add", "portId": "out" }, "target": { "nodeId": "relu2", "portId": "in" } },
+            { "id": "r9", "source": { "nodeId": "relu2", "portId": "out" }, "target": { "nodeId": "output", "portId": "out" } }
+          ]
+        }
+      },
+      { "id": "avgpool", "type": "ml.layers.adaptive_avgpool2d", "position": { "x": 1220, "y": 200 }, "properties": { "outputH": 1, "outputW": 1 } },
+      { "id": "flatten", "type": "ml.layers.flatten", "position": { "x": 1420, "y": 200 }, "properties": {} },
+      { "id": "linear", "type": "ml.layers.linear", "position": { "x": 1600, "y": 200 }, "properties": { "outFeatures": 100 } },
+      { "id": "loss", "type": "ml.loss.cross_entropy", "position": { "x": 1820, "y": 250 }, "properties": {} },
+      { "id": "adam", "type": "ml.optimizers.adam", "position": { "x": 2060, "y": 300 }, "properties": { "lr": 0.001, "epochs": 30 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "cifar", "portId": "out" }, "target": { "nodeId": "stem_conv", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "stem_conv", "portId": "out" }, "target": { "nodeId": "stem_bn", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "stem_bn", "portId": "out" }, "target": { "nodeId": "stem_relu", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "stem_relu", "portId": "out" }, "target": { "nodeId": "resblock1", "portId": "in" } },
+      { "id": "e5", "source": { "nodeId": "resblock1", "portId": "out" }, "target": { "nodeId": "resblock2", "portId": "in" } },
+      { "id": "e6", "source": { "nodeId": "resblock2", "portId": "out" }, "target": { "nodeId": "avgpool", "portId": "in" } },
+      { "id": "e7", "source": { "nodeId": "avgpool", "portId": "out" }, "target": { "nodeId": "flatten", "portId": "in" } },
+      { "id": "e8", "source": { "nodeId": "flatten", "portId": "out" }, "target": { "nodeId": "linear", "portId": "in" } },
+      { "id": "e9", "source": { "nodeId": "linear", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e10", "source": { "nodeId": "cifar", "portId": "labels" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e11", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}
