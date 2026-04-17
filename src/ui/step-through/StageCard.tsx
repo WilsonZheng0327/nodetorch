@@ -12,12 +12,19 @@ interface Props {
 }
 
 export function StageCard({ stage, active, onClick }: Props) {
+  const title = stage.blockName
+    ? `${stage.blockName} › ${stage.displayName}`
+    : stage.displayName;
+
   return (
     <button
-      className={`stage-card ${active ? 'stage-card-active' : ''}`}
+      className={`stage-card ${active ? 'stage-card-active' : ''} ${stage.depth > 0 ? 'stage-card-nested' : ''}`}
       onClick={onClick}
-      title={stage.displayName}
+      title={title}
     >
+      {stage.blockName && (
+        <div className="stage-card-block">{stage.blockName}</div>
+      )}
       <div className="stage-card-name">{stage.displayName}</div>
       <div className="stage-card-preview">
         <StageMiniViz stage={stage} />

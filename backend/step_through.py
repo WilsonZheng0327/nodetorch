@@ -26,6 +26,10 @@ from graph_builder import (
     _safe_float,
     LOSS_NODES,
     OPTIMIZER_NODES,
+    SUBGRAPH_TYPE,
+    SENTINEL_INPUT,
+    SENTINEL_OUTPUT,
+    SubGraphModule,
 )
 from data_loaders import DATA_LOADERS, DENORMALIZERS
 
@@ -85,11 +89,25 @@ def run_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
         if node_type in OPTIMIZER_NODES:
             continue
 
+        # Subgraph block: recurse into inner modules, emit one stage per inner layer
+        if node_type == SUBGRAPH_TYPE:
+            sg_module = modules.get(node_id)
+            if isinstance(sg_module, SubGraphModule):
+                block_name = node.get("properties", {}).get("blockName") or node_id
+                inner_stages = _build_subgraph_stages(
+                    sg_module=sg_module,
+                    block_name=block_name,
+                    depth=1,
+                    parent_path=[node_id],
+                )
+                stages.extend(inner_stages)
+                continue
+
         stage = _build_stage(
             node=node,
             node_id=node_id,
-            path=[node_id],           # Phase 1: flat (Phase 2 will populate with subgraph path)
-            depth=0,                  # Phase 1: always root (Phase 2 will increase for inner nodes)
+            path=[node_id],
+            depth=0,
             edges=edges,
             results=results,
             nodes=nodes,
@@ -98,6 +116,68 @@ def run_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
             stages.append(stage)
 
     return {"stages": stages, "sample": sample_info}
+
+
+# --- Subgraph recursion ---
+
+def _build_subgraph_stages(
+    *,
+    sg_module: SubGraphModule,
+    block_name: str,
+    depth: int,
+    parent_path: list[str],
+) -> list[dict]:
+    """Walk a SubGraphModule's inner nodes and emit one stage per trainable/structural inner node.
+
+    Handles nested subgraphs via recursive call. Skips sentinels (input/output) since they're
+    redundant — the last outer stage is the subgraph's input, and the subgraph's output is
+    captured by the final inner stage.
+    """
+    inner_nodes = sg_module.inner_nodes
+    inner_edges = sg_module.inner_edges
+    inner_order = sg_module.inner_order
+    inner_results = getattr(sg_module, '_last_results', {})
+
+    stages: list[dict] = []
+    for inner_nid in inner_order:
+        inner_node = inner_nodes[inner_nid]
+        inner_type = inner_node["type"]
+
+        # Skip sentinels (pass-through) and optimizer/loss nodes
+        if inner_type in (SENTINEL_INPUT, SENTINEL_OUTPUT):
+            continue
+        if inner_type in OPTIMIZER_NODES:
+            continue
+
+        # Nested subgraph: recurse
+        safe_key = sg_module._key_map.get(inner_nid)
+        inner_mod = sg_module.inner_modules.get(safe_key) if safe_key else None
+        if isinstance(inner_mod, SubGraphModule):
+            nested_name = inner_node.get("properties", {}).get("blockName") or inner_nid
+            nested_stages = _build_subgraph_stages(
+                sg_module=inner_mod,
+                block_name=nested_name,
+                depth=depth + 1,
+                parent_path=parent_path + [inner_nid],
+            )
+            stages.extend(nested_stages)
+            continue
+
+        # Regular inner node — emit a stage
+        stage = _build_stage(
+            node=inner_node,
+            node_id=inner_nid,
+            path=parent_path + [inner_nid],
+            depth=depth,
+            edges=inner_edges,
+            results=inner_results,
+            nodes=inner_nodes,
+        )
+        if stage:
+            stage["blockName"] = block_name
+            stages.append(stage)
+
+    return stages
 
 
 # --- Sample extraction (for the "header" preview) ---

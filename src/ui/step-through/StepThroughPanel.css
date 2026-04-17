@@ -251,6 +251,33 @@
   padding: 0 2px;
 }
 
+/* Block entry/exit markers */
+.stage-timeline-block-enter,
+.stage-timeline-block-exit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  margin: 0 4px;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.stage-timeline-block-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #cba6f7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.stage-timeline-block-bracket {
+  font-size: 18px;
+  color: #cba6f7;
+  line-height: 1;
+}
+
 /* --- Stage Card --- */
 
 .stage-card {
@@ -277,6 +304,30 @@
   background: rgba(137, 180, 250, 0.15);
   border-color: #89b4fa;
   box-shadow: 0 0 0 1px #89b4fa;
+}
+
+/* Nested card styling — cards inside a subgraph block */
+.stage-card-nested {
+  background: rgba(203, 166, 247, 0.06);
+  border-color: rgba(203, 166, 247, 0.3);
+}
+
+.stage-card-nested.stage-card-active {
+  background: rgba(137, 180, 250, 0.18);
+  border-color: #89b4fa;
+}
+
+.stage-card-block {
+  font-size: 8px;
+  font-weight: 600;
+  color: #cba6f7;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stage-card-name {
@@ -358,6 +409,20 @@
   font-size: 15px;
   font-weight: 600;
   color: #cdd6f4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage-detail-block {
+  font-size: 10px;
+  font-weight: 600;
+  color: #cba6f7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  background: rgba(203, 166, 247, 0.12);
+  border-radius: 3px;
 }
 
 .stage-detail-shape {

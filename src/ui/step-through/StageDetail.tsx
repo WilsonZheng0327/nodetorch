@@ -15,7 +15,12 @@ export function StageDetail({ stage }: Props) {
   return (
     <div className="stage-detail">
       <div className="stage-detail-header">
-        <span className="stage-detail-name">{stage.displayName}</span>
+        <span className="stage-detail-name">
+          {stage.blockName && (
+            <span className="stage-detail-block">{stage.blockName}</span>
+          )}
+          {stage.displayName}
+        </span>
         <span className="stage-detail-shape">
           {formatShape(stage.inputShape)} &rarr; {formatShape(stage.outputShape)}
         </span>

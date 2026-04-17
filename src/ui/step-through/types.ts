@@ -48,11 +48,12 @@ export interface Viz {
 
 export interface Stage {
   stageId: string;        // unique — used as React key, derived from path
-  path: string[];         // hierarchical location (Phase 2 will populate with subgraph chain)
+  path: string[];         // hierarchical location, e.g. ["conv1"] at root, ["resblock1", "conv1"] inside
   nodeId: string;
   nodeType: string;
   displayName: string;
   depth: number;          // nesting level (0 at root; >0 for subgraph interior)
+  blockName?: string;     // populated for inner stages — the containing block's name
   inputShape?: number[];
   outputShape?: number[];
   stats?: Stats;
