@@ -63,14 +63,14 @@ export function VizPanel({ snapshot, onClose }: Props) {
               <VizSection title="Gradients" color="#f9e2af" data={snapshot.gradients!} tip="Gradient magnitudes from backward pass. Tiny = vanishing gradients. Huge = exploding gradients." stats={[
                 { label: 'mean', value: snapshot.gradients!.mean },
                 { label: 'norm', value: snapshot.gradients!.norm },
-              ]} />
+              ]} warning={detectGradientIssue(snapshot.gradients!)} />
             )}
 
             {hasActivations && (
               <VizSection title="Activations" color="#10b981" data={snapshot.activations!} tip="Distribution of this layer's output values. High sparsity may mean dead neurons." stats={[
                 { label: 'mean', value: snapshot.activations!.mean },
                 { label: 'sparsity', value: snapshot.activations!.sparsity, pct: true },
-              ]} />
+              ]} warning={detectActivationIssue(snapshot.activations!)} />
             )}
 
             {hasBatchNorm && (
@@ -98,14 +98,31 @@ export function VizPanel({ snapshot, onClose }: Props) {
   );
 }
 
+// --- Health heuristics ---
+
+function detectGradientIssue(g: HistogramData): string | null {
+  if (g.norm != null) {
+    if (g.norm < 1e-7) return 'Vanishing';
+    if (g.norm > 100) return 'Exploding';
+  }
+  return null;
+}
+
+function detectActivationIssue(a: HistogramData): string | null {
+  if (a.sparsity != null && a.sparsity > 0.9) return 'Dead neurons';
+  if (a.std != null && a.std < 0.01) return 'Saturated';
+  return null;
+}
+
 // --- Section with stats + histogram ---
 
-function VizSection({ title, color, data, stats, tip }: {
+function VizSection({ title, color, data, stats, tip, warning }: {
   title: string;
   color: string;
   data: HistogramData;
   stats: { label: string; value?: number; pct?: boolean }[];
   tip?: string;
+  warning?: string | null;
 }) {
   const [showTip, setShowTip] = useState(false);
 
@@ -113,6 +130,7 @@ function VizSection({ title, color, data, stats, tip }: {
     <div className="viz-section">
       <div className="viz-section-title" style={{ color }}>
         {title}
+        {warning && <span className="viz-warning">{warning}</span>}
         {tip && <span className="viz-tip" onClick={() => setShowTip(!showTip)}>?</span>}
       </div>
       {showTip && tip && <div className="viz-tip-text">{tip}</div>}
@@ -134,10 +152,12 @@ function VizSection({ title, color, data, stats, tip }: {
 
 function WeightDeltaSection({ value }: { value: number }) {
   const [showTip, setShowTip] = useState(false);
+  const warning = value < 1e-8 ? 'Not learning' : null;
   return (
     <div className="viz-section">
       <div className="viz-section-title" style={{ color: '#fab387' }}>
         Weight Delta
+        {warning && <span className="viz-warning">{warning}</span>}
         <span className="viz-tip" onClick={() => setShowTip(!showTip)}>?</span>
       </div>
       {showTip && <div className="viz-tip-text">How much weights changed this epoch. Near-zero = converged or not learning.</div>}
