@@ -70,14 +70,15 @@
   border-radius: 3px;
 }
 
-.layer-detail-loading,
-.layer-detail-error {
+.layer-detail-loading {
   padding: 24px;
   text-align: center;
   color: #6c7086;
 }
 
 .layer-detail-error {
+  padding: 24px;
+  text-align: center;
   color: #ef4444;
 }
 

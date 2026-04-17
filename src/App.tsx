@@ -6,10 +6,10 @@ import { useMemo, useEffect, useCallback, useState, useRef, type DragEvent } fro
 import { initDomain } from './domain';
 import { useGraph } from './ui/useGraph';
 import { EngineNode, DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './ui/EngineNode';
-import { PropertyInspector } from './ui/PropertyInspector';
+import { PropertyInspector } from './ui/inspector/PropertyInspector';
 import { NodePalette } from './ui/NodePalette';
 import { Toolbar } from './ui/Toolbar';
-import { TrainingDashboard, type ModelLayerInfo } from './ui/TrainingDashboard';
+import { TrainingDashboard, type ModelLayerInfo } from './ui/dashboard/TrainingDashboard';
 import { StepThroughPanel } from './ui/step-through/StepThroughPanel';
 import { Breadcrumb } from './ui/Breadcrumb';
 import { createNode as cn, addNode as an, createEdge as ce, addEdge as ae } from './core/graph';

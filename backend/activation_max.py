@@ -25,11 +25,10 @@ from graph_builder import (
     get_device,
     OPTIMIZER_NODES,
     LOSS_NODES,
-    SUBGRAPH_TYPE,
     SubGraphModule,
-    MULTI_INPUT_NODES,
 )
 from data_loaders import DATA_LOADERS
+from forward_utils import execute_node
 
 
 def activation_maximization(
@@ -118,16 +117,9 @@ def activation_maximization(
                     if mod is None:
                         continue
                     inputs = gather_inputs(nid, edges, results)
-                    if ntype == SUBGRAPH_TYPE:
-                        sg = mod(**inputs)
-                        fk = next(iter(sg), None)
-                        if fk:
-                            results[nid] = {"out": sg[fk]}
-                    elif ntype in MULTI_INPUT_NODES:
-                        results[nid] = {"out": mod(**inputs)}
-                    elif "in" in inputs:
-                        raw = mod(inputs["in"])
-                        results[nid] = raw if isinstance(raw, dict) else {"out": raw}
+                    out = execute_node(ntype, mod, inputs)
+                    if out is not None:
+                        results[nid] = out
                     if 'value' in captured:
                         hit_target = True
                         break

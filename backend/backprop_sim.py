@@ -18,10 +18,9 @@ from graph_builder import (
     get_device,
     OPTIMIZER_NODES,
     LOSS_NODES,
-    SUBGRAPH_TYPE,
-    MULTI_INPUT_NODES,
 )
 from data_loaders import DATA_LOADERS
+from forward_utils import execute_node
 
 
 def simulate_backprop(graph_data: dict, batch_size: int = 4) -> dict:
@@ -73,26 +72,14 @@ def simulate_backprop(graph_data: dict, batch_size: int = 4) -> dict:
         if mod is None:
             continue
         inputs = gather_inputs(nid, edges, batch_results)
-        if ntype in LOSS_NODES:
-            if "predictions" in inputs and "labels" in inputs:
-                try:
-                    loss = mod(inputs["predictions"], inputs["labels"])
-                    batch_results[nid] = {"out": loss}
-                except Exception as e:
-                    return {"error": f"Loss computation failed: {e}"}
-            continue
-        if ntype == SUBGRAPH_TYPE:
-            sg = mod(**inputs)
-            fk = next(iter(sg), None)
-            if fk:
-                batch_results[nid] = {"out": sg[fk]}
-            continue
-        if ntype in MULTI_INPUT_NODES:
-            batch_results[nid] = {"out": mod(**inputs)}
-            continue
-        if "in" in inputs:
-            raw = mod(inputs["in"])
-            batch_results[nid] = raw if isinstance(raw, dict) else {"out": raw}
+        try:
+            out = execute_node(ntype, mod, inputs)
+        except Exception as e:
+            if ntype in LOSS_NODES:
+                return {"error": f"Loss computation failed: {e}"}
+            raise
+        if out is not None:
+            batch_results[nid] = out
 
     # Backward
     loss_tensor = batch_results.get(loss_nid, {}).get("out")

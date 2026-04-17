@@ -4,9 +4,9 @@
 import './PropertyInspector.css';
 
 import { useContext, useRef, useEffect, useState } from 'react';
-import type { NodeInstance } from '../core/graph';
-import type { PropertyDefinition } from '../core/nodedef';
-import { DomainCtx } from './EngineNode';
+import type { NodeInstance } from '../../core/graph';
+import type { PropertyDefinition } from '../../core/nodedef';
+import { DomainCtx } from '../EngineNode';
 import { DatasetDetail } from './DatasetDetail';
 import { LayerDetail } from './LayerDetail';
 

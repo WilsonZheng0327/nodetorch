@@ -30,12 +30,12 @@ from graph_builder import (
     _safe_float,
     LOSS_NODES,
     OPTIMIZER_NODES,
-    MULTI_INPUT_NODES,
     SUBGRAPH_TYPE,
     SENTINEL_INPUT,
     SENTINEL_OUTPUT,
     SubGraphModule,
 )
+from forward_utils import execute_node
 from data_loaders import DATA_LOADERS, DENORMALIZERS
 
 
@@ -206,31 +206,9 @@ def _rerun_from_data(modules: dict, results: dict, nodes: dict, edges: list) -> 
                 continue
 
             inputs = gather_inputs(node_id, edges, results)
-
-            if node_type in LOSS_NODES:
-                if "predictions" in inputs and "labels" in inputs:
-                    loss = module(inputs["predictions"], inputs["labels"])
-                    results[node_id] = {"out": loss}
-                continue
-
-            if node_type == SUBGRAPH_TYPE:
-                sg_outputs = module(**inputs)
-                first_key = next(iter(sg_outputs), None)
-                if first_key:
-                    results[node_id] = {"out": sg_outputs[first_key]}
-                continue
-
-            if node_type in MULTI_INPUT_NODES:
-                output = module(**inputs)
-                results[node_id] = {"out": output}
-                continue
-
-            if "in" in inputs:
-                raw = module(inputs["in"])
-                if isinstance(raw, dict):
-                    results[node_id] = raw
-                else:
-                    results[node_id] = {"out": raw}
+            out = execute_node(node_type, module, inputs)
+            if out is not None:
+                results[node_id] = out
 
 
 # --- Forward pass using trained modules ---
@@ -279,31 +257,9 @@ def _forward_with_trained(graph_data: dict, mask: list | None = None) -> tuple:
                 raise RuntimeError(f"Trained model missing module for node {node_id}")
 
             inputs = gather_inputs(node_id, edges, results)
-
-            if node_type in LOSS_NODES:
-                if "predictions" in inputs and "labels" in inputs:
-                    loss = module(inputs["predictions"], inputs["labels"])
-                    results[node_id] = {"out": loss}
-                continue
-
-            if node_type == SUBGRAPH_TYPE:
-                sg_outputs = module(**inputs)
-                first_key = next(iter(sg_outputs), None)
-                if first_key:
-                    results[node_id] = {"out": sg_outputs[first_key]}
-                continue
-
-            if node_type in MULTI_INPUT_NODES:
-                output = module(**{k: v for k, v in inputs.items()})
-                results[node_id] = {"out": output}
-                continue
-
-            if "in" in inputs:
-                raw = module(inputs["in"])
-                if isinstance(raw, dict):
-                    results[node_id] = raw
-                else:
-                    results[node_id] = {"out": raw}
+            out = execute_node(node_type, module, inputs)
+            if out is not None:
+                results[node_id] = out
 
     return trained, results, nodes, edges
 
@@ -432,21 +388,12 @@ def _compute_saliency(modules: dict, nodes: dict, edges: list) -> dict | None:
             if mod is None:
                 continue
             mod.eval()
-            inputs = gather_inputs(node_id, edges, results)
             if ntype in LOSS_NODES:
                 continue  # skip loss — we want raw logits
-            if ntype == SUBGRAPH_TYPE:
-                sg = mod(**inputs)
-                fk = next(iter(sg), None)
-                if fk:
-                    results[node_id] = {"out": sg[fk]}
-                continue
-            if ntype in MULTI_INPUT_NODES:
-                results[node_id] = {"out": mod(**inputs)}
-                continue
-            if "in" in inputs:
-                raw = mod(inputs["in"])
-                results[node_id] = raw if isinstance(raw, dict) else {"out": raw}
+            inputs = gather_inputs(node_id, edges, results)
+            out = execute_node(ntype, mod, inputs)
+            if out is not None:
+                results[node_id] = out
     except Exception:
         return None
 
