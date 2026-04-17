@@ -9,6 +9,9 @@ export const cifar10Node: NodeDefinition = {
 
   getProperties: () => [
     { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 32, affects: 'execution' },
+    { id: 'augHFlip', name: 'Random H-Flip', type: { kind: 'boolean' }, defaultValue: false, affects: 'execution' },
+    { id: 'augRandomCrop', name: 'Random Crop (4px pad)', type: { kind: 'boolean' }, defaultValue: false, affects: 'execution' },
+    { id: 'augColorJitter', name: 'Color Jitter', type: { kind: 'boolean' }, defaultValue: false, affects: 'execution' },
   ],
 
   getPorts: () => [

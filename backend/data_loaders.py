@@ -70,9 +70,17 @@ def load_cifar100(props: dict) -> dict[str, torch.Tensor]:
     return {"out": images, "labels": labels if isinstance(labels, torch.Tensor) else torch.tensor(labels)}
 
 
-def train_dataset_cifar100() -> torch.utils.data.Dataset:
-    """Return the full CIFAR-100 training dataset."""
+def train_dataset_cifar100(augHFlip: bool = False, augRandomCrop: bool = False, augColorJitter: bool = False) -> torch.utils.data.Dataset:
+    """Return the full CIFAR-100 training dataset, with optional augmentations."""
+    aug_list: list = []
+    if augRandomCrop:
+        aug_list.append(transforms.RandomCrop(32, padding=4))
+    if augHFlip:
+        aug_list.append(transforms.RandomHorizontalFlip())
+    if augColorJitter:
+        aug_list.append(transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2))
     transform = transforms.Compose([
+        *aug_list,
         transforms.ToTensor(),
         transforms.Normalize(
             (0.5071, 0.4867, 0.4408),
@@ -107,8 +115,16 @@ def load_cifar10(props: dict) -> dict[str, torch.Tensor]:
     return {"out": images, "labels": labels if isinstance(labels, torch.Tensor) else torch.tensor(labels)}
 
 
-def train_dataset_cifar10() -> torch.utils.data.Dataset:
+def train_dataset_cifar10(augHFlip: bool = False, augRandomCrop: bool = False, augColorJitter: bool = False) -> torch.utils.data.Dataset:
+    aug_list: list = []
+    if augRandomCrop:
+        aug_list.append(transforms.RandomCrop(32, padding=4))
+    if augHFlip:
+        aug_list.append(transforms.RandomHorizontalFlip())
+    if augColorJitter:
+        aug_list.append(transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2))
     transform = transforms.Compose([
+        *aug_list,
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     ])

@@ -26,6 +26,27 @@ export const cifar100Node: NodeDefinition = {
       defaultValue: false,
       affects: 'execution',
     },
+    {
+      id: 'augHFlip',
+      name: 'Random H-Flip',
+      type: { kind: 'boolean' },
+      defaultValue: false,
+      affects: 'execution',
+    },
+    {
+      id: 'augRandomCrop',
+      name: 'Random Crop (4px pad)',
+      type: { kind: 'boolean' },
+      defaultValue: false,
+      affects: 'execution',
+    },
+    {
+      id: 'augColorJitter',
+      name: 'Color Jitter',
+      type: { kind: 'boolean' },
+      defaultValue: false,
+      affects: 'execution',
+    },
   ],
 
   getPorts: () => [
