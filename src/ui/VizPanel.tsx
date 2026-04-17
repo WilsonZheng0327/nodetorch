@@ -170,6 +170,16 @@ function WeightDeltaSection({ value }: { value: number }) {
   );
 }
 
+/** Format a number compactly for axis labels */
+function formatAxis(v: number): string {
+  const abs = Math.abs(v);
+  if (abs === 0) return '0';
+  if (abs >= 100) return v.toFixed(0);
+  if (abs >= 1) return v.toFixed(1);
+  if (abs >= 0.01) return v.toFixed(2);
+  return v.toExponential(0);
+}
+
 // --- Canvas-rendered histogram ---
 
 function MiniHistogram({ bins, counts, color }: { bins: number[]; counts: number[]; color: string }) {
@@ -190,18 +200,52 @@ function MiniHistogram({ bins, counts, color }: { bins: number[]; counts: number
 
     const w = rect.width;
     const h = rect.height;
+    const labelH = 10; // space for axis labels at bottom
+    const plotH = h - labelH;
     const maxCount = Math.max(...counts);
     if (maxCount === 0) return;
     const barWidth = w / counts.length;
 
+    const vmin = bins[0];
+    const vmax = bins[bins.length - 1] + (bins.length > 1 ? bins[1] - bins[0] : 1);
+    const vrange = vmax - vmin || 1;
+
     ctx.clearRect(0, 0, w, h);
+
+    // Bars
     ctx.fillStyle = color;
     ctx.globalAlpha = 0.6;
     for (let i = 0; i < counts.length; i++) {
-      const barH = (counts[i] / maxCount) * (h - 1);
-      ctx.fillRect(i * barWidth, h - barH, barWidth - 0.5, barH);
+      const barH = (counts[i] / maxCount) * (plotH - 1);
+      ctx.fillRect(i * barWidth, plotH - barH, barWidth - 0.5, barH);
     }
     ctx.globalAlpha = 1;
+
+    // Zero line (if 0 is within range)
+    if (vmin < 0 && vmax > 0) {
+      const zeroX = ((0 - vmin) / vrange) * w;
+      ctx.strokeStyle = '#cdd6f4';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(zeroX, 0);
+      ctx.lineTo(zeroX, plotH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // "0" label
+      ctx.fillStyle = '#cdd6f4';
+      ctx.font = '7px JetBrains Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('0', zeroX, h - 1);
+    }
+
+    // Min/max labels
+    ctx.fillStyle = '#585b70';
+    ctx.font = '7px JetBrains Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(formatAxis(vmin), 1, h - 1);
+    ctx.textAlign = 'right';
+    ctx.fillText(formatAxis(vmax), w - 1, h - 1);
   }, [bins, counts, color]);
 
   return (
