@@ -411,6 +411,39 @@ def build_rnn(props: dict, input_shapes: dict) -> nn.Module:
     ))
 
 
+# --- Pretrained models ---
+
+# Why wrapper: torchvision's ResNet expects 224×224 input; we auto-resize. Also,
+# "features" mode swaps the final FC for Identity so output is [B, 512] pre-classifier.
+class PretrainedResNet18Wrapper(nn.Module):
+    def __init__(self, mode: str = "features", freeze: bool = True):
+        super().__init__()
+        import torchvision.models as _models
+        self.mode = mode
+        self.model = _models.resnet18(weights=_models.ResNet18_Weights.DEFAULT)
+        if freeze:
+            for p in self.model.parameters():
+                p.requires_grad = False
+        if mode == "features":
+            # Replace final FC with identity — output becomes [B, 512]
+            self.model.fc = nn.Identity()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Auto-resize to 224×224 (bilinear)
+        if x.shape[-2] != 224 or x.shape[-1] != 224:
+            x = torch.nn.functional.interpolate(
+                x, size=(224, 224), mode="bilinear", align_corners=False,
+            )
+        return self.model(x)
+
+
+def build_pretrained_resnet18(props: dict, input_shapes: dict) -> nn.Module:
+    return PretrainedResNet18Wrapper(
+        mode=props.get("mode", "features"),
+        freeze=props.get("freeze", True),
+    )
+
+
 # --- Registry ---
 
 NODE_BUILDERS: dict[str, callable] = {
@@ -433,6 +466,7 @@ NODE_BUILDERS: dict[str, callable] = {
     "ml.layers.layernorm": build_layernorm,
     "ml.layers.embedding": build_embedding,
     "ml.layers.upsample": build_upsample,
+    "ml.layers.pretrained_resnet18": build_pretrained_resnet18,
     # Layers (with wrapper)
     "ml.layers.lstm": build_lstm,
     "ml.layers.gru": build_gru,

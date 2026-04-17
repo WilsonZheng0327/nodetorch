@@ -22,6 +22,7 @@ import { lstmNode } from './lstm';
 import { gruNode } from './gru';
 import { rnnNode } from './rnn';
 import { upsampleNode } from './upsample';
+import { pretrainedResnet18Node } from './pretrained-resnet18';
 
 export const layerNodes: NodeDefinition[] = [
   conv2dNode,
@@ -47,4 +48,5 @@ export const layerNodes: NodeDefinition[] = [
   gruNode,
   rnnNode,
   upsampleNode,
+  pretrainedResnet18Node,
 ];
