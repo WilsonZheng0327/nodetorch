@@ -73,6 +73,20 @@ export const adamwNode: NodeDefinition = {
       defaultValue: 'none',
       affects: 'execution',
     },
+    {
+      id: 'earlyStopPatience',
+      name: 'Early Stop Patience',
+      type: { kind: 'number', min: 0, integer: true },
+      defaultValue: 0,
+      affects: 'execution',
+    },
+    {
+      id: 'gradClip',
+      name: 'Grad Clip Norm',
+      type: { kind: 'number', min: 0, step: 0.1 },
+      defaultValue: 0,
+      affects: 'execution',
+    },
   ],
 
   getPorts: () => [

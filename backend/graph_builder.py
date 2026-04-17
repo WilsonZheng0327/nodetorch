@@ -799,6 +799,8 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
     lr = props.get("lr", 0.01)
     momentum = props.get("momentum", 0.9)
     weight_decay = props.get("weightDecay", 0)
+    grad_clip_norm = float(props.get("gradClip", 0) or 0)
+    early_stop_patience = int(props.get("earlyStopPatience", 0) or 0)
 
     # Reproducibility: seed all random number generators before any model building
     seed = props.get("seed", 42)
@@ -938,6 +940,11 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
         if params:
             prev_weight_norms[nid] = float(torch.cat([p.detach().flatten() for p in params]).float().norm())
 
+    # Early stopping state
+    best_val_loss = float('inf')
+    epochs_since_improvement = 0
+    early_stopped = False
+
     for epoch in range(epochs):
         # Check for cancellation
         if cancel_event and cancel_event.is_set():
@@ -1024,6 +1031,9 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
             loss_tensor = batch_results.get(loss_node_id, {}).get("out")
             if loss_tensor is not None:
                 loss_tensor.backward()
+                # Optional gradient clipping (0 = disabled)
+                if grad_clip_norm and grad_clip_norm > 0:
+                    torch.nn.utils.clip_grad_norm_(all_params, grad_clip_norm)
                 optimizer.step()
                 total_loss += loss_tensor.item()
 
@@ -1119,6 +1129,16 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
                 val_loss = val_total_loss / len(val_loader)
             if val_total > 0:
                 val_accuracy = val_correct / val_total
+
+        # Early stopping check (only if val_loss available and patience > 0)
+        if early_stop_patience > 0 and val_loss is not None:
+            if val_loss < best_val_loss - 1e-6:
+                best_val_loss = val_loss
+                epochs_since_improvement = 0
+            else:
+                epochs_since_improvement += 1
+                if epochs_since_improvement >= early_stop_patience:
+                    early_stopped = True
 
         # Per-node visualization snapshots (weights, gradients, activations)
         node_snapshots = {}
@@ -1248,6 +1268,11 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
 
         if on_epoch:
             on_epoch(epoch_result)
+
+        # Break after sending epoch result (so the last val loss is visible)
+        if early_stopped:
+            print(f"Early stopping at epoch {epoch + 1} (patience={early_stop_patience}, best val loss={best_val_loss:.4f})")
+            break
 
     # Final forward pass to get updated node results
     with torch.no_grad():
