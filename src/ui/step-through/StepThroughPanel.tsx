@@ -15,13 +15,14 @@ interface Props {
 
 export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const [result, setResult] = useState<StepThroughResult | null>(null);
+  const [resultB, setResultB] = useState<StepThroughResult | null>(null);  // second sample for compare
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Load a new sample
-  const loadSample = () => {
+  // Load a new sample (either replacing A, or loading B for compare)
+  const loadSample = (asCompare = false) => {
     setLoading(true);
     setError(null);
     fetch('http://localhost:8000/step-through', {
@@ -32,8 +33,13 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
       .then((r) => r.json())
       .then((data) => {
         if (data.status === 'ok') {
-          setResult(data.result);
-          setCurrentIdx(0);
+          if (asCompare) {
+            setResultB(data.result);
+          } else {
+            setResult(data.result);
+            setResultB(null);  // exit compare mode when loading fresh A
+            setCurrentIdx(0);
+          }
         } else {
           setError(data.error ?? 'Failed to load step-through');
         }
@@ -42,9 +48,12 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
       .finally(() => setLoading(false));
   };
 
+  const exitCompare = () => setResultB(null);
+  const compareMode = resultB !== null;
+
   // Initial load when opened
   useEffect(() => {
-    if (open && !result && !loading) loadSample();
+    if (open && !result && !loading) loadSample(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -85,9 +94,19 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
           )}
         </span>
         <div className="step-through-header-actions">
-          <button className="step-through-btn" onClick={loadSample} disabled={loading}>
+          <button className="step-through-btn" onClick={() => loadSample(false)} disabled={loading}>
             Load Random Sample
           </button>
+          {result && !compareMode && (
+            <button className="step-through-btn" onClick={() => loadSample(true)} disabled={loading}>
+              + Compare
+            </button>
+          )}
+          {compareMode && (
+            <button className="step-through-btn" onClick={exitCompare}>
+              Exit Compare
+            </button>
+          )}
           <button className="step-through-close" onClick={onClose}>&times;</button>
         </div>
       </div>
@@ -99,7 +118,14 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
 
       {result && !loading && (
         <>
-          <SampleHeader sample={result.sample} />
+          {compareMode && resultB ? (
+            <div className="step-through-compare-samples">
+              <SampleHeader sample={result.sample} label="A" />
+              <SampleHeader sample={resultB.sample} label="B" />
+            </div>
+          ) : (
+            <SampleHeader sample={result.sample} />
+          )}
 
           <div className="step-through-controls">
             <button
@@ -141,7 +167,22 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
             onSelect={setCurrentIdx}
           />
 
-          {stage && <StageDetail stage={stage} />}
+          {stage && (
+            compareMode && resultB ? (
+              <div className="step-through-compare-details">
+                <div className="step-through-compare-pane">
+                  <div className="step-through-compare-label">A</div>
+                  <StageDetail stage={stage} />
+                </div>
+                <div className="step-through-compare-pane">
+                  <div className="step-through-compare-label">B</div>
+                  {resultB.stages[currentIdx] && <StageDetail stage={resultB.stages[currentIdx]} />}
+                </div>
+              </div>
+            ) : (
+              <StageDetail stage={stage} />
+            )
+          )}
         </>
       )}
     </div>
@@ -150,9 +191,10 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
 
 // --- Sample preview header ---
 
-function SampleHeader({ sample }: { sample: StepThroughResult['sample'] }) {
+function SampleHeader({ sample, label }: { sample: StepThroughResult['sample']; label?: string }) {
   return (
     <div className="step-through-sample">
+      {label && <div className="step-through-sample-tag">{label}</div>}
       {sample.imagePixels && (
         <SampleImage pixels={sample.imagePixels} channels={sample.imageChannels ?? 1} />
       )}
