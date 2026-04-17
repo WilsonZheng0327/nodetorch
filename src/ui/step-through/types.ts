@@ -79,7 +79,13 @@ export interface SampleInfo {
   tokenIds?: number[];
 }
 
+export interface ModelState {
+  usingTrainedWeights: boolean;
+  note: string;
+}
+
 export interface StepThroughResult {
   stages: Stage[];
   sample: SampleInfo;
+  modelState?: ModelState;
 }

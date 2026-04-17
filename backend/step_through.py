@@ -23,9 +23,14 @@ import torch
 from graph_builder import (
     build_and_run_graph,
     gather_inputs,
+    topological_sort,
+    has_trained_model,
+    get_trained_modules,
+    get_device,
     _safe_float,
     LOSS_NODES,
     OPTIMIZER_NODES,
+    MULTI_INPUT_NODES,
     SUBGRAPH_TYPE,
     SENTINEL_INPUT,
     SENTINEL_OUTPUT,
@@ -69,12 +74,25 @@ def run_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
         if n["type"] in DATA_LOADERS:
             n["properties"] = {**n.get("properties", {}), "batchSize": 1}
 
-    # Run the graph — build modules and collect per-node outputs in `results`
-    with torch.no_grad():
-        modules, results, _, nodes, edges = build_and_run_graph(graph_data)
+    # Use trained modules if available (much more educational than random weights)
+    use_trained = has_trained_model()
+    trained_note = None
 
-    # Topological order for stage sequencing
-    from graph_builder import topological_sort
+    if use_trained:
+        try:
+            modules, results, nodes, edges = _forward_with_trained(graph_data)
+            trained_note = "using trained weights"
+        except Exception:
+            # Fall back to fresh build if trained modules don't match graph
+            use_trained = False
+            trained_note = "trained model incompatible — using random weights (retrain after graph changes)"
+
+    if not use_trained:
+        with torch.no_grad():
+            modules, results, _, nodes, edges = build_and_run_graph(graph_data)
+        if trained_note is None:
+            trained_note = "using random weights (no trained model)"
+
     order = topological_sort(nodes, edges)
 
     # Build stages
@@ -116,7 +134,87 @@ def run_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
         if stage:
             stages.append(stage)
 
-    return {"stages": stages, "sample": sample_info}
+    return {
+        "stages": stages,
+        "sample": sample_info,
+        "modelState": {
+            "usingTrainedWeights": use_trained,
+            "note": trained_note,
+        },
+    }
+
+
+# --- Forward pass using trained modules ---
+
+def _forward_with_trained(graph_data: dict) -> tuple:
+    """Run a forward pass using modules from _model_store (trained weights).
+
+    Returns (modules, results, nodes, edges) — same shape as the first 4 elements
+    of build_and_run_graph's return value, but with trained weights instead of random.
+
+    Raises if trained modules don't match the current graph (missing node IDs).
+    """
+    trained = get_trained_modules()
+    graph = graph_data["graph"]
+    nodes = {n["id"]: n for n in graph["nodes"]}
+    edges = graph["edges"]
+    order = topological_sort(nodes, edges)
+
+    results: dict[str, dict] = {}
+    dev = get_device()
+
+    with torch.no_grad():
+        for node_id in order:
+            node = nodes[node_id]
+            node_type = node["type"]
+            props = node.get("properties", {})
+
+            # Data nodes: load a fresh sample
+            loader = DATA_LOADERS.get(node_type)
+            if loader:
+                infer_props = {**props, "batchSize": 1}
+                tensors = loader(infer_props)
+                tensors = {k: v.to(dev) for k, v in tensors.items()}
+                results[node_id] = tensors
+                continue
+
+            # Skip optimizers
+            if node_type in OPTIMIZER_NODES:
+                continue
+
+            module = trained.get(node_id)
+            if module is None:
+                # Trained model doesn't cover this node (graph has changed) — abort
+                raise RuntimeError(f"Trained model missing module for node {node_id}")
+
+            inputs = gather_inputs(node_id, edges, results)
+
+            if node_type in LOSS_NODES:
+                if "predictions" in inputs and "labels" in inputs:
+                    loss = module(inputs["predictions"], inputs["labels"])
+                    results[node_id] = {"out": loss}
+                continue
+
+            if node_type == SUBGRAPH_TYPE:
+                sg_outputs = module(**inputs)
+                first_key = next(iter(sg_outputs), None)
+                if first_key:
+                    results[node_id] = {"out": sg_outputs[first_key]}
+                continue
+
+            if node_type in MULTI_INPUT_NODES:
+                output = module(**{k: v for k, v in inputs.items()})
+                results[node_id] = {"out": output}
+                continue
+
+            if "in" in inputs:
+                raw = module(inputs["in"])
+                if isinstance(raw, dict):
+                    results[node_id] = raw
+                else:
+                    results[node_id] = {"out": raw}
+
+    return trained, results, nodes, edges
 
 
 # --- Subgraph recursion ---

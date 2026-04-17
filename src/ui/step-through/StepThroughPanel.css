@@ -31,6 +31,26 @@
 .step-through-title {
   font-weight: 600;
   font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.step-through-model-state {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  background: rgba(249, 226, 175, 0.15);
+  color: #f9e2af;
+  border-radius: 10px;
+  cursor: help;
+}
+
+.step-through-model-state-trained {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
 }
 
 .step-through-header-actions {

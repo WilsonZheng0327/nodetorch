@@ -73,7 +73,17 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   return (
     <div className="step-through-panel">
       <div className="step-through-header">
-        <span className="step-through-title">Step-Through</span>
+        <span className="step-through-title">
+          Step-Through
+          {result?.modelState && (
+            <span
+              className={`step-through-model-state ${result.modelState.usingTrainedWeights ? 'step-through-model-state-trained' : ''}`}
+              title={result.modelState.note}
+            >
+              {result.modelState.usingTrainedWeights ? 'Trained' : 'Random weights'}
+            </span>
+          )}
+        </span>
         <div className="step-through-header-actions">
           <button className="step-through-btn" onClick={loadSample} disabled={loading}>
             Load Random Sample
