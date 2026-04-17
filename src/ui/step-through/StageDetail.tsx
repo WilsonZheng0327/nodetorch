@@ -4,6 +4,7 @@
 import { useRef, useEffect } from 'react';
 import type { Stage, Stats } from './types';
 import { formatShape } from './insights';
+import { ExtraPanels } from './ExtraPanels';
 
 interface Props {
   stage: Stage;
@@ -45,6 +46,8 @@ export function StageDetail({ stage }: Props) {
       </div>
 
       {stats && <StatsBar stats={stats} />}
+
+      {stage.extras && stage.extras.length > 0 && <ExtraPanels extras={stage.extras} />}
     </div>
   );
 }

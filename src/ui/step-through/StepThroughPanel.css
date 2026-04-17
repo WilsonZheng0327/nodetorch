@@ -563,3 +563,132 @@
   font-size: 11px;
   color: #a6adc8;
 }
+
+/* --- Extras (rich type-specific panels) --- */
+
+.stage-extras {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.extra-panel {
+  background: #181825;
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.extra-panel-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a6adc8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.extra-panel-note {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #6c7086;
+  font-style: italic;
+}
+
+/* Before/after histograms */
+
+.extra-histograms-pair {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.extra-histograms-arrow {
+  color: #89b4fa;
+  font-size: 18px;
+}
+
+.extra-histogram-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.extra-histogram-label {
+  font-size: 10px;
+  color: #6c7086;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.extra-histogram-canvas {
+  width: 100%;
+  height: 60px;
+  background: #313244;
+  border-radius: 3px;
+}
+
+.extra-histogram-stats {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #6c7086;
+}
+
+/* Conv kernels */
+
+.extra-kernel-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.extra-kernel-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.extra-kernel-canvas {
+  width: 40px;
+  height: 40px;
+  image-rendering: pixelated;
+  border-radius: 3px;
+  border: 1px solid #45475a;
+}
+
+.extra-kernel-label {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #6c7086;
+}
+
+/* Linear weight matrix */
+
+.extra-weight-matrix {
+  display: block;
+  border-radius: 3px;
+  border: 1px solid #45475a;
+  image-rendering: pixelated;
+  max-width: 100%;
+}
+
+.extra-weight-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #6c7086;
+}
+
+.extra-weight-legend-bar {
+  flex: 1;
+  max-width: 200px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #003264, #00c8c8, #64ff00, #ffff00);
+}

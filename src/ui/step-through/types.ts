@@ -46,6 +46,13 @@ export interface Viz {
   image?: { pixels: number[][] | number[][][]; channels: number };
 }
 
+/** Extra visualizations for a stage — discriminated union.
+ *  Forward-compatible: new kinds can be added without changing existing renderers. */
+export type Extra =
+  | { kind: 'before_after_histograms'; input: Stats; output: Stats }
+  | { kind: 'conv_kernels'; kernels: number[][][]; showing: number; totalFilters: number; inChannels: number; kernelHeight: number; kernelWidth: number }
+  | { kind: 'weight_matrix'; data: number[][]; rows: number; cols: number; actualRows: number; actualCols: number; min: number; max: number };
+
 export interface Stage {
   stageId: string;        // unique — used as React key, derived from path
   path: string[];         // hierarchical location, e.g. ["conv1"] at root, ["resblock1", "conv1"] inside
@@ -58,6 +65,7 @@ export interface Stage {
   outputShape?: number[];
   stats?: Stats;
   viz?: Viz;
+  extras?: Extra[];       // additional type-specific visualizations (kernels, weight matrix, etc.)
   insight?: string;       // plain-English sentence about what this layer did
 }
 

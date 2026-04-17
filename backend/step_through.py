@@ -111,6 +111,7 @@ def run_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
             edges=edges,
             results=results,
             nodes=nodes,
+            module=modules.get(node_id),
         )
         if stage:
             stages.append(stage)
@@ -172,6 +173,7 @@ def _build_subgraph_stages(
             edges=inner_edges,
             results=inner_results,
             nodes=inner_nodes,
+            module=inner_mod,
         )
         if stage:
             stage["blockName"] = block_name
@@ -226,6 +228,7 @@ def _build_stage(
     edges: list,
     results: dict,
     nodes: dict,
+    module=None,  # nn.Module for this node (optional, used for weight extras)
 ) -> dict | None:
     """Build a stage record from a single node's input/output."""
     node_type = node["type"]
@@ -270,6 +273,11 @@ def _build_stage(
     insight = _build_insight(node_type, input_tensor, output)
     if insight:
         stage["insight"] = insight
+
+    # Extras — additional type-specific visualizations
+    extras = _build_extras(node_type, input_tensor, output, module)
+    if extras:
+        stage["extras"] = extras
 
     return stage
 
@@ -404,6 +412,123 @@ def _viz_probabilities(probs: torch.Tensor) -> dict:
     return {
         "kind": VIZ_PROBABILITIES,
         "probabilities": {"values": values, "topK": top_k},
+    }
+
+
+# --- Extras: additional type-specific visualizations ---
+#
+# Extras are optional per-stage extensions that render as additional panels in the
+# detail view. Each extra has a "kind" discriminator so new ones can be added without
+# breaking existing frontend code.
+
+def _build_extras(node_type: str, input_tensor, output, module) -> list | None:
+    """Return a list of extras for this node, or None."""
+    extras: list = []
+
+    # Before/after histograms: most informative for normalization/activation layers
+    if node_type in (
+        "ml.activations.relu",
+        "ml.activations.sigmoid",
+        "ml.activations.tanh",
+        "ml.activations.gelu",
+        "ml.activations.leaky_relu",
+        "ml.activations.softmax",
+        "ml.layers.batchnorm2d",
+        "ml.layers.batchnorm1d",
+        "ml.layers.layernorm",
+        "ml.layers.groupnorm",
+        "ml.layers.instancenorm2d",
+    ):
+        if (input_tensor is not None and isinstance(input_tensor, torch.Tensor)
+                and output is not None and isinstance(output, torch.Tensor)):
+            extras.append({
+                "kind": "before_after_histograms",
+                "input": _compact_stats(input_tensor),
+                "output": _compact_stats(output),
+            })
+
+    # Conv2d learned kernels
+    if node_type == "ml.layers.conv2d" and module is not None:
+        kernel_data = _extract_conv_kernels(module)
+        if kernel_data:
+            extras.append(kernel_data)
+
+    # Linear weight matrix
+    if node_type == "ml.layers.linear" and module is not None:
+        wm_data = _extract_weight_matrix(module)
+        if wm_data:
+            extras.append(wm_data)
+
+    return extras if extras else None
+
+
+def _extract_conv_kernels(module) -> dict | None:
+    """Extract Conv2d kernels as a grid of small images (mean across input channels)."""
+    weight = None
+    for name, param in module.named_parameters():
+        if "weight" in name:
+            weight = param.detach().cpu().float()
+            break
+    if weight is None or weight.dim() != 4:
+        return None
+
+    out_c, in_c, kH, kW = weight.shape
+    n_show = min(32, out_c)
+    kernels = []
+    for f in range(n_show):
+        # Average across input channels to get one kH×kW image per filter
+        kernel = weight[f].mean(dim=0)
+        kmin, kmax = float(kernel.min()), float(kernel.max())
+        rng = kmax - kmin if kmax != kmin else 1.0
+        normalized = ((kernel - kmin) / rng * 255).clamp(0, 255).byte()
+        kernels.append(normalized.tolist())
+
+    return {
+        "kind": "conv_kernels",
+        "kernels": kernels,
+        "showing": n_show,
+        "totalFilters": out_c,
+        "inChannels": in_c,
+        "kernelHeight": kH,
+        "kernelWidth": kW,
+    }
+
+
+def _extract_weight_matrix(module) -> dict | None:
+    """Extract Linear weight matrix as a heatmap (downsampled if large)."""
+    weight = None
+    for name, param in module.named_parameters():
+        if "weight" in name:
+            weight = param.detach().cpu().float()
+            break
+    if weight is None or weight.dim() != 2:
+        return None
+
+    actual_rows, actual_cols = weight.shape[0], weight.shape[1]
+    vmin = _safe_float(float(weight.min()))
+    vmax = _safe_float(float(weight.max()))
+
+    # Downsample with area averaging if too large
+    MAX_DIM = 96
+    mat = weight
+    if mat.shape[0] > MAX_DIM or mat.shape[1] > MAX_DIM:
+        mat = torch.nn.functional.interpolate(
+            mat.unsqueeze(0).unsqueeze(0),
+            size=(min(MAX_DIM, mat.shape[0]), min(MAX_DIM, mat.shape[1])),
+            mode='area',
+        ).squeeze()
+        if mat.dim() == 1:
+            mat = mat.unsqueeze(0)
+
+    return {
+        "kind": "weight_matrix",
+        "data": mat.tolist(),
+        "rows": mat.shape[0],
+        "cols": mat.shape[1],
+        "actualRows": actual_rows,
+        "actualCols": actual_cols,
+        "min": vmin,
+        "max": vmax,
     }
 
 
