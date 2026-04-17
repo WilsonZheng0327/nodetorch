@@ -156,6 +156,46 @@
   white-space: nowrap;
 }
 
+/* --- Perturb mode --- */
+
+.step-through-sample-perturb {
+  background: rgba(243, 139, 168, 0.05);
+  border-bottom: 1px solid rgba(243, 139, 168, 0.2);
+}
+
+.perturb-canvas-wrap {
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 1px solid #45475a;
+  overflow: hidden;
+}
+
+.perturb-canvas-img,
+.perturb-canvas-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.perturb-canvas-mask {
+  touch-action: none;
+}
+
+.step-through-perturb-hint {
+  font-size: 11px;
+  color: #f38ba8;
+  margin-bottom: 6px;
+}
+
+.step-through-perturb-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 /* --- Compare mode --- */
 
 .step-through-compare-samples {

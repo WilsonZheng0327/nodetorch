@@ -154,7 +154,11 @@ async def step_through(request: dict):
     """
     logger.info("Step-through requested")
     try:
-        result = run_step_through(request["graph"], request.get("sampleIdx"))
+        result = run_step_through(
+            request["graph"],
+            request.get("sampleIdx"),
+            mask=request.get("mask"),
+        )
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Step-through failed: {e}")

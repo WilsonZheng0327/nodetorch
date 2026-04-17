@@ -56,15 +56,16 @@ TOP_K_PROBS = 5
 
 # --- Main entry point ---
 
-def run_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
+def run_step_through(graph_data: dict, sample_idx: int | None = None, mask: list | None = None) -> dict:
     """Run a forward pass and return ordered stages.
 
     Args:
         graph_data: serialized NodeTorch graph (same format as /forward)
         sample_idx: optional index into the dataset (not used in Phase 1; random batch used)
+        mask: optional 2D [H, W] binary mask (1 = zero out pixel) for input perturbation
 
     Returns:
-        { "stages": [...], "sample": { "imagePixels": ..., "imageChannels": ..., "actualLabel": ... } }
+        { "stages": [...], "sample": {...}, "modelState": {...} }
     """
     # Deep-copy so we can override batch size without mutating caller's data
     graph_data = copy.deepcopy(graph_data)
@@ -80,7 +81,7 @@ def run_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
 
     if use_trained:
         try:
-            modules, results, nodes, edges = _forward_with_trained(graph_data)
+            modules, results, nodes, edges = _forward_with_trained(graph_data, mask=mask)
             trained_note = "using trained weights"
         except Exception:
             # Fall back to fresh build if trained modules don't match graph
@@ -90,6 +91,11 @@ def run_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
     if not use_trained:
         with torch.no_grad():
             modules, results, _, nodes, edges = build_and_run_graph(graph_data)
+        # Apply mask to the data node's output if provided
+        if mask is not None:
+            _apply_mask_to_data(results, nodes, mask)
+            # Re-run downstream nodes with the masked input
+            _rerun_from_data(modules, results, nodes, edges)
         if trained_note is None:
             trained_note = "using random weights (no trained model)"
 
@@ -144,9 +150,81 @@ def run_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
     }
 
 
+# --- Input perturbation (mask) ---
+
+def _apply_mask_to_tensors(tensors: dict, mask: list) -> None:
+    """Zero out pixels in the data tensors where mask is 1.
+    Mutates tensors in place. Mask is a 2D [H, W] array of 0/1."""
+    mask_tensor = torch.tensor(mask, dtype=torch.float32)
+    for key, v in tensors.items():
+        if not isinstance(v, torch.Tensor):
+            continue
+        if v.dim() == 4 and v.shape[-2] == mask_tensor.shape[0] and v.shape[-1] == mask_tensor.shape[1]:
+            # [B, C, H, W] — broadcast mask to [1, 1, H, W]
+            m = mask_tensor.to(v.device).unsqueeze(0).unsqueeze(0)
+            tensors[key] = v * (1 - m)
+        elif v.dim() == 3 and v.shape[-2] == mask_tensor.shape[0] and v.shape[-1] == mask_tensor.shape[1]:
+            m = mask_tensor.to(v.device).unsqueeze(0)
+            tensors[key] = v * (1 - m)
+
+
+def _apply_mask_to_data(results: dict, nodes: dict, mask: list) -> None:
+    """Find the data node in results and apply mask to its tensors."""
+    for nid, node in nodes.items():
+        if node["type"] in DATA_LOADERS and nid in results:
+            _apply_mask_to_tensors(results[nid], mask)
+            return
+
+
+def _rerun_from_data(modules: dict, results: dict, nodes: dict, edges: list) -> None:
+    """After masking the data node, re-run downstream modules to refresh their outputs."""
+    order = topological_sort(nodes, edges)
+    with torch.no_grad():
+        for node_id in order:
+            node = nodes[node_id]
+            node_type = node["type"]
+
+            # Skip data (already masked) and optimizer
+            if node_type in DATA_LOADERS:
+                continue
+            if node_type in OPTIMIZER_NODES:
+                continue
+
+            module = modules.get(node_id)
+            if module is None:
+                continue
+
+            inputs = gather_inputs(node_id, edges, results)
+
+            if node_type in LOSS_NODES:
+                if "predictions" in inputs and "labels" in inputs:
+                    loss = module(inputs["predictions"], inputs["labels"])
+                    results[node_id] = {"out": loss}
+                continue
+
+            if node_type == SUBGRAPH_TYPE:
+                sg_outputs = module(**inputs)
+                first_key = next(iter(sg_outputs), None)
+                if first_key:
+                    results[node_id] = {"out": sg_outputs[first_key]}
+                continue
+
+            if node_type in MULTI_INPUT_NODES:
+                output = module(**inputs)
+                results[node_id] = {"out": output}
+                continue
+
+            if "in" in inputs:
+                raw = module(inputs["in"])
+                if isinstance(raw, dict):
+                    results[node_id] = raw
+                else:
+                    results[node_id] = {"out": raw}
+
+
 # --- Forward pass using trained modules ---
 
-def _forward_with_trained(graph_data: dict) -> tuple:
+def _forward_with_trained(graph_data: dict, mask: list | None = None) -> tuple:
     """Run a forward pass using modules from _model_store (trained weights).
 
     Returns (modules, results, nodes, edges) — same shape as the first 4 elements
@@ -169,12 +247,14 @@ def _forward_with_trained(graph_data: dict) -> tuple:
             node_type = node["type"]
             props = node.get("properties", {})
 
-            # Data nodes: load a fresh sample
+            # Data nodes: load a fresh sample (and apply mask if provided)
             loader = DATA_LOADERS.get(node_type)
             if loader:
                 infer_props = {**props, "batchSize": 1}
                 tensors = loader(infer_props)
                 tensors = {k: v.to(dev) for k, v in tensors.items()}
+                if mask is not None:
+                    _apply_mask_to_tensors(tensors, mask)
                 results[node_id] = tensors
                 continue
 

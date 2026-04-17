@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import type { StepThroughResult } from './types';
 import { StageTimeline } from './StageTimeline';
 import { StageDetail } from './StageDetail';
+import { PerturbCanvas } from './PerturbCanvas';
 import './StepThroughPanel.css';
 
 interface Props {
@@ -20,15 +21,20 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [perturbMode, setPerturbMode] = useState(false);
+  const [mask, setMask] = useState<number[][] | null>(null);
 
   // Load a new sample (either replacing A, or loading B for compare)
-  const loadSample = (asCompare = false) => {
+  // If `mask` is provided, sent as perturbation; fresh sample otherwise.
+  const loadSample = (asCompare = false, withMask: number[][] | null = null) => {
     setLoading(true);
     setError(null);
+    const body: any = { graph: JSON.parse(graphJson) };
+    if (withMask) body.mask = withMask;
     fetch('http://localhost:8000/step-through', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ graph: JSON.parse(graphJson) }),
+      body: JSON.stringify(body),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -37,8 +43,12 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
             setResultB(data.result);
           } else {
             setResult(data.result);
-            setResultB(null);  // exit compare mode when loading fresh A
+            setResultB(null);
             setCurrentIdx(0);
+            if (!withMask) {
+              setMask(null);
+              setPerturbMode(false);
+            }
           }
         } else {
           setError(data.error ?? 'Failed to load step-through');
@@ -123,8 +133,20 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
               <SampleHeader sample={result.sample} label="A" />
               <SampleHeader sample={resultB.sample} label="B" />
             </div>
+          ) : perturbMode && result.sample.imagePixels ? (
+            <PerturbHeader
+              sample={result.sample}
+              mask={mask}
+              onMaskChange={setMask}
+              onApply={() => mask && loadSample(false, mask)}
+              onClear={() => setMask(null)}
+              onExit={() => { setPerturbMode(false); setMask(null); loadSample(false); }}
+            />
           ) : (
-            <SampleHeader sample={result.sample} />
+            <SampleHeader
+              sample={result.sample}
+              onStartPerturb={result.sample.imagePixels ? () => setPerturbMode(true) : undefined}
+            />
           )}
 
           <div className="step-through-controls">
@@ -191,7 +213,11 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
 
 // --- Sample preview header ---
 
-function SampleHeader({ sample, label }: { sample: StepThroughResult['sample']; label?: string }) {
+function SampleHeader({ sample, label, onStartPerturb }: {
+  sample: StepThroughResult['sample'];
+  label?: string;
+  onStartPerturb?: () => void;
+}) {
   return (
     <div className="step-through-sample">
       {label && <div className="step-through-sample-tag">{label}</div>}
@@ -213,6 +239,58 @@ function SampleHeader({ sample, label }: { sample: StepThroughResult['sample']; 
             First tokens: {sample.tokenIds.slice(0, 16).join(', ')}…
           </div>
         )}
+      </div>
+      {onStartPerturb && (
+        <button className="step-through-btn" onClick={onStartPerturb} title="Draw a mask on the input to see how the model responds">
+          Perturb
+        </button>
+      )}
+    </div>
+  );
+}
+
+// --- Perturb mode header (drawing UI) ---
+
+function PerturbHeader({
+  sample,
+  mask,
+  onMaskChange,
+  onApply,
+  onClear,
+  onExit,
+}: {
+  sample: StepThroughResult['sample'];
+  mask: number[][] | null;
+  onMaskChange: (mask: number[][]) => void;
+  onApply: () => void;
+  onClear: () => void;
+  onExit: () => void;
+}) {
+  if (!sample.imagePixels) return null;
+  return (
+    <div className="step-through-sample step-through-sample-perturb">
+      <PerturbCanvas
+        pixels={sample.imagePixels}
+        channels={sample.imageChannels ?? 1}
+        mask={mask}
+        onMaskChange={onMaskChange}
+        displaySize={96}
+      />
+      <div className="step-through-sample-info">
+        <div className="step-through-perturb-hint">
+          Draw to mask regions. Masked pixels will be zeroed before re-running the model.
+        </div>
+        <div className="step-through-perturb-actions">
+          <button className="step-through-btn" onClick={onApply} disabled={!mask}>
+            Apply &amp; Re-run
+          </button>
+          <button className="step-through-btn" onClick={onClear}>
+            Clear
+          </button>
+          <button className="step-through-btn" onClick={onExit}>
+            Exit Perturb
+          </button>
+        </div>
       </div>
     </div>
   );
