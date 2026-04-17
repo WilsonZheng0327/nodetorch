@@ -58,6 +58,21 @@ export const adamwNode: NodeDefinition = {
       defaultValue: 42,
       affects: 'execution',
     },
+    {
+      id: 'scheduler',
+      name: 'LR Scheduler',
+      type: {
+        kind: 'select',
+        options: [
+          { label: 'None (constant)', value: 'none' },
+          { label: 'Step decay', value: 'step' },
+          { label: 'Cosine annealing', value: 'cosine' },
+          { label: 'Linear warmup', value: 'warmup' },
+        ],
+      },
+      defaultValue: 'none',
+      affects: 'execution',
+    },
   ],
 
   getPorts: () => [

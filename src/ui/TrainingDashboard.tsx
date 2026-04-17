@@ -10,6 +10,7 @@ export interface EpochData {
   accuracy: number;
   valLoss?: number | null;
   valAccuracy?: number | null;
+  learningRate?: number | null;
   time?: number;
   batches?: number;
   samples?: number;
@@ -195,6 +196,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
                     <th>Acc</th>
                     <th>Val Loss</th>
                     <th>Val Acc</th>
+                    <th>LR</th>
                     <th>Time</th>
                   </tr>
                 </thead>
@@ -206,6 +208,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
                       <td>{(d.accuracy * 100).toFixed(1)}%</td>
                       <td>{d.valLoss != null ? d.valLoss.toFixed(4) : '—'}</td>
                       <td>{d.valAccuracy != null ? `${(d.valAccuracy * 100).toFixed(1)}%` : '—'}</td>
+                      <td>{d.learningRate != null ? d.learningRate.toExponential(1) : '—'}</td>
                       <td>{d.time != null ? `${d.time}s` : ''}</td>
                     </tr>
                   ))}

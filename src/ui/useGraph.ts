@@ -753,6 +753,7 @@ export function useGraph(domain: DomainContext) {
             accuracy: msg.accuracy,
             valLoss: msg.valLoss,
             valAccuracy: msg.valAccuracy,
+            learningRate: msg.learningRate,
             time: msg.time,
             batches: msg.batches,
             samples: msg.samples,

@@ -859,6 +859,24 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
             all_params, lr=lr, momentum=momentum, weight_decay=weight_decay,
         )
 
+    # LR scheduler
+    scheduler_type = props.get("scheduler", "none")
+    scheduler = None
+    if scheduler_type == "step":
+        # Decay LR by 0.5 every 10 epochs
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+    elif scheduler_type == "cosine":
+        # Cosine annealing over the full epoch count
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    elif scheduler_type == "warmup":
+        # Linear warmup over first 10% of epochs, then constant
+        warmup_epochs = max(1, epochs // 10)
+        def _warmup_lambda(ep: int):
+            if ep < warmup_epochs:
+                return (ep + 1) / warmup_epochs
+            return 1.0
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=_warmup_lambda)
+
     # Find loss node
     loss_node_id = None
     for nid, n in nodes.items():
@@ -1200,6 +1218,13 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
                 label = short
             gradient_flow.append({"name": label, "norm": norm})
 
+        # Current learning rate (before stepping scheduler)
+        current_lr = optimizer.param_groups[0]["lr"]
+
+        # Step scheduler after this epoch's updates
+        if scheduler is not None:
+            scheduler.step()
+
         epoch_result = {
             "epoch": epoch + 1,
             "totalEpochs": epochs,
@@ -1207,6 +1232,7 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
             "accuracy": _safe_float(accuracy),
             "valLoss": _safe_float(val_loss) if val_loss is not None else None,
             "valAccuracy": _safe_float(val_accuracy) if val_accuracy is not None else None,
+            "learningRate": _safe_float(current_lr),
             "time": round(epoch_time, 2),
             "batches": total_batches,
             "samples": total,
