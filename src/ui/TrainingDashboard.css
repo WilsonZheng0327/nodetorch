@@ -311,22 +311,26 @@
   font-size: 13px;
 }
 
-/* Per-class scrollable container */
-.dashboard-perclass-scroll {
-  max-height: 300px;
+/* Per-class + gradient flow scrollable containers */
+.dashboard-perclass-scroll,
+.dashboard-gradflow-scroll {
+  max-height: 400px;
   overflow-y: auto;
   padding: 8px;
 }
 
-.dashboard-perclass-scroll::-webkit-scrollbar {
+.dashboard-perclass-scroll::-webkit-scrollbar,
+.dashboard-gradflow-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.dashboard-perclass-scroll::-webkit-scrollbar-track {
+.dashboard-perclass-scroll::-webkit-scrollbar-track,
+.dashboard-gradflow-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.dashboard-perclass-scroll::-webkit-scrollbar-thumb {
+.dashboard-perclass-scroll::-webkit-scrollbar-thumb,
+.dashboard-gradflow-scroll::-webkit-scrollbar-thumb {
   background: #45475a;
   border-radius: 3px;
 }

@@ -499,29 +499,40 @@ function GradientFlowChart({ data }: { data: { name: string; norm: number }[] })
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
+    const barH = 18;
+    const gap = 2;
+    const labelW = 160;
+    const pad = { top: 8, right: 80, bottom: 8 };
+    const totalH = pad.top + data.length * (barH + gap) + pad.bottom;
+
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    canvas.height = totalH * dpr;
+    canvas.style.height = `${totalH}px`;
     ctx.scale(dpr, dpr);
 
     const w = rect.width;
-    const h = rect.height;
-    const labelW = 80;
-    const pad = { top: 8, right: 12, bottom: 8 };
     const plotW = w - labelW - pad.right;
-    const barH = Math.min(24, (h - pad.top - pad.bottom) / data.length - 2);
     const maxNorm = Math.max(...data.map((d) => d.norm), 1e-8);
 
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, w, totalH);
 
     for (let i = 0; i < data.length; i++) {
-      const y = pad.top + i * (barH + 2);
+      const y = pad.top + i * (barH + gap);
       const barW = (data[i].norm / maxNorm) * plotW;
 
+      // Label (truncated if too long for labelW)
       ctx.fillStyle = '#a6adc8';
       ctx.font = '10px Inter, system-ui, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(data[i].name, labelW - 6, y + barH / 2 + 3);
+      let label = data[i].name;
+      if (ctx.measureText(label).width > labelW - 8) {
+        while (label.length > 3 && ctx.measureText(label + '…').width > labelW - 8) {
+          label = label.slice(0, -1);
+        }
+        label = label + '…';
+      }
+      ctx.fillText(label, labelW - 6, y + barH / 2 + 3);
 
       ctx.fillStyle = '#313244';
       ctx.fillRect(labelW, y, plotW, barH);
@@ -543,7 +554,11 @@ function GradientFlowChart({ data }: { data: { name: string; norm: number }[] })
     return <div className="dashboard-chart-placeholder">No gradient data yet</div>;
   }
 
-  return <canvas ref={canvasRef} className="dashboard-chart" />;
+  return (
+    <div className="dashboard-gradflow-scroll">
+      <canvas ref={canvasRef} className="dashboard-chart dashboard-chart-tall" />
+    </div>
+  );
 }
 
 // --- Per-class accuracy bar chart (all classes, sorted worst-first, scrollable) ---

@@ -250,13 +250,18 @@ def gather_inputs(
     For multi-output nodes (LSTM), results["lstm"] = {"out": tensor, "hidden": tensor, "cell": tensor}
     so the edge's source.portId selects which output to route."""
     inputs: dict[str, torch.Tensor] = {}
+    dev = get_device()
     for edge in edges:
         if edge["target"]["nodeId"] == node_id:
             src_id = edge["source"]["nodeId"]
             src_port = edge["source"]["portId"]
             tgt_port = edge["target"]["portId"]
             if src_id in results and src_port in results[src_id]:
-                inputs[tgt_port] = results[src_id][src_port]
+                v = results[src_id][src_port]
+                # Ensure tensor is on the current device (MPS/CUDA/CPU)
+                if isinstance(v, torch.Tensor) and v.device != dev:
+                    v = v.to(dev)
+                inputs[tgt_port] = v
     return inputs
 
 
@@ -1068,13 +1073,23 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
                 node_snapshots[node_id] = snap
 
         # Gradient flow summary: gradient norm per trainable layer (in topo order)
-        # Collect gradient norms per layer with disambiguated names
+        # Includes layers inside subgraph blocks (recurses into innerSnapshots).
         grad_entries = []
         for nid in order:
             snap = node_snapshots.get(nid)
-            if snap and "gradients" in snap:
+            if not snap:
+                continue
+            if "gradients" in snap:
                 short = nodes[nid]["type"].split(".")[-1]
                 grad_entries.append((short, snap["gradients"]["norm"]))
+            # Recurse into subgraph inner snapshots
+            inner = snap.get("innerSnapshots")
+            if inner:
+                block_prefix = nodes[nid].get("properties", {}).get("blockName") or nodes[nid]["type"].split(".")[-1]
+                for inner_nid, inner_snap in inner.items():
+                    if "gradients" in inner_snap:
+                        inner_short = inner_nid  # e.g. "conv1", "bn1"
+                        grad_entries.append((f"{block_prefix}/{inner_short}", inner_snap["gradients"]["norm"]))
         # Count occurrences to decide whether to number
         name_counts: dict[str, int] = {}
         for short, _ in grad_entries:
