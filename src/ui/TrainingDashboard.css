@@ -214,6 +214,62 @@
   border-bottom-color: #89b4fa;
 }
 
+/* Epoch slider */
+.dashboard-epoch-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-bottom: 1px solid #313244;
+  flex-shrink: 0;
+}
+
+.dashboard-epoch-slider-label {
+  font-size: 10px;
+  color: #6c7086;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.dashboard-epoch-slider-input {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #313244;
+  border-radius: 2px;
+  outline: none;
+}
+
+.dashboard-epoch-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #89b4fa;
+  cursor: pointer;
+  border: 2px solid #1e1e2e;
+}
+
+.dashboard-epoch-slider-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #89b4fa;
+  cursor: pointer;
+  border: 2px solid #1e1e2e;
+}
+
+.dashboard-epoch-slider-value {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #a6adc8;
+  min-width: 50px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
 /* Tab content area — fills remaining space */
 .dashboard-tab-content {
   flex: 1;

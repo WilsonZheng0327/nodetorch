@@ -28,9 +28,12 @@ interface Props {
   progress: EpochData[];
   isTraining: boolean;
   batchProgress?: { batch: number; totalBatches: number } | null;
+  selectedEpoch: number | null;
+  onSelectEpoch: (epoch: number | null) => void;
+  totalSnapshotEpochs: number;
 }
 
-export function TrainingDashboard({ progress, isTraining, batchProgress }: Props) {
+export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs }: Props) {
   const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'epochs' | 'system'>('loss');
   const [open, setOpen] = useState(false);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
@@ -50,6 +53,10 @@ export function TrainingDashboard({ progress, isTraining, batchProgress }: Props
 
   const latest = progress.length > 0 ? progress[progress.length - 1] : null;
   const finished = !isTraining && progress.length > 0;
+  // The epoch data currently being viewed (selected via slider, or latest)
+  const viewed = selectedEpoch != null && selectedEpoch <= progress.length
+    ? progress[selectedEpoch - 1]
+    : latest;
 
   if (!open) {
     return (
@@ -139,6 +146,27 @@ export function TrainingDashboard({ progress, isTraining, batchProgress }: Props
         ))}
       </div>
 
+      {/* Epoch slider — scrub through training history */}
+      {totalSnapshotEpochs >= 2 && activeTab !== 'system' && activeTab !== 'epochs' && (
+        <div className="dashboard-epoch-slider">
+          <span className="dashboard-epoch-slider-label">Epoch</span>
+          <input
+            type="range"
+            min={1}
+            max={totalSnapshotEpochs}
+            value={selectedEpoch ?? totalSnapshotEpochs}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              onSelectEpoch(v === totalSnapshotEpochs ? null : v);
+            }}
+            className="dashboard-epoch-slider-input"
+          />
+          <span className="dashboard-epoch-slider-value">
+            {selectedEpoch ?? totalSnapshotEpochs} / {totalSnapshotEpochs}
+          </span>
+        </div>
+      )}
+
       {/* Tab content */}
       <div className="dashboard-tab-content">
         {activeTab === 'system' ? (
@@ -172,15 +200,16 @@ export function TrainingDashboard({ progress, isTraining, batchProgress }: Props
           </div>
         ) : progress.length > 0 ? (
           activeTab === 'gradients' ? (
-            <GradientFlowChart data={latest?.gradientFlow ?? []} />
+            <GradientFlowChart data={viewed?.gradientFlow ?? []} />
           ) : activeTab === 'perclass' ? (
-            <PerClassChart data={latest?.perClassAccuracy ?? []} />
+            <PerClassChart data={viewed?.perClassAccuracy ?? []} />
           ) : (
             <Chart
               data={progress.map((d) => activeTab === 'loss' ? d.loss : d.accuracy)}
               labels={progress.map((d) => d.epoch)}
               color={activeTab === 'loss' ? '#ef4444' : '#10b981'}
               formatValue={activeTab === 'loss' ? (v) => v.toFixed(4) : (v) => (v * 100).toFixed(1) + '%'}
+              selectedIndex={selectedEpoch != null ? selectedEpoch - 1 : null}
             />
           )
         ) : (
@@ -252,9 +281,10 @@ interface ChartProps {
   labels: number[];
   color: string;
   formatValue: (v: number) => string;
+  selectedIndex?: number | null;
 }
 
-function Chart({ data: rawData, labels, color, formatValue }: ChartProps) {
+function Chart({ data: rawData, labels, color, formatValue, selectedIndex }: ChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -333,7 +363,32 @@ function Chart({ data: rawData, labels, color, formatValue }: ChartProps) {
       ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();
     }
-  }, [rawData, labels, color, formatValue]);
+
+    // Selected epoch marker (vertical line + larger dot)
+    if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < data.length) {
+      const sx = pad.left + (plotW * selectedIndex) / Math.max(data.length - 1, 1);
+      const sy = pad.top + plotH - (plotH * (data[selectedIndex] - min)) / range;
+      // Vertical line
+      ctx.strokeStyle = '#89b4fa';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(sx, pad.top);
+      ctx.lineTo(sx, pad.top + plotH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Highlight dot
+      ctx.fillStyle = '#89b4fa';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+      ctx.fill();
+      // Value label
+      ctx.fillStyle = '#cdd6f4';
+      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(formatValue(data[selectedIndex]), sx, sy - 10);
+    }
+  }, [rawData, labels, color, formatValue, selectedIndex]);
 
   return <canvas ref={canvasRef} className="dashboard-chart" />;
 }

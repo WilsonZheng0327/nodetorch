@@ -646,8 +646,20 @@ export function useGraph(domain: DomainContext) {
 
   const [trainingProgress, setTrainingProgress] = useState<{ epoch: number; loss: number; accuracy: number }[]>([]);
 
-  // Live visualization snapshots (updated per epoch during training)
-  const [liveSnapshots, setLiveSnapshots] = useState<Record<string, any>>({});
+  // Full history of per-epoch visualization snapshots (indexed by epoch number)
+  const [snapshotHistory, setSnapshotHistory] = useState<Record<string, any>[]>([]);
+
+  // Which epoch's snapshots to display (null = latest)
+  const [selectedEpoch, setSelectedEpoch] = useState<number | null>(null);
+
+  // Derived: the snapshot for the currently selected (or latest) epoch
+  const liveSnapshots = (() => {
+    if (snapshotHistory.length === 0) return {};
+    const idx = selectedEpoch != null
+      ? Math.min(selectedEpoch - 1, snapshotHistory.length - 1)
+      : snapshotHistory.length - 1;
+    return snapshotHistory[Math.max(0, idx)] ?? {};
+  })();
 
   // Which nodes have their viz panel pinned open
   const [pinnedVizNodes, setPinnedVizNodes] = useState<Set<string>>(new Set());
@@ -692,7 +704,8 @@ export function useGraph(domain: DomainContext) {
 
     setStatus({ type: 'running', message: 'Training...' });
     setTrainingProgress([]);
-    setLiveSnapshots({});
+    setSnapshotHistory([]);
+    setSelectedEpoch(null);
     setBatchProgress(null);
     const graphData = serializeGraph(graphRef.current);
 
@@ -744,9 +757,9 @@ export function useGraph(domain: DomainContext) {
             gradientFlow: msg.gradientFlow,
             perClassAccuracy: msg.perClassAccuracy,
           }]);
-          // Update live visualization snapshots
+          // Accumulate visualization snapshots per epoch
           if (msg.nodeSnapshots) {
-            setLiveSnapshots(msg.nodeSnapshots);
+            setSnapshotHistory((prev) => [...prev, msg.nodeSnapshots]);
           }
           const progressStr = msg.totalEpochs ? ` [${msg.epoch}/${msg.totalEpochs}]` : '';
           const timeStr = msg.time != null ? ` (${msg.time}s)` : '';
@@ -1058,6 +1071,9 @@ export function useGraph(domain: DomainContext) {
     addBlockFromTemplate,
     organizeGraph,
     liveSnapshots: resolvedSnapshots,
+    snapshotHistory,
+    selectedEpoch,
+    setSelectedEpoch,
     pinnedVizNodes,
     toggleVizPin,
     showAllViz,

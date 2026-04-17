@@ -371,7 +371,14 @@ export default function App() {
           onDeleteBlock={graph.deleteBlock}
         />
         <PropertyInspector node={selectedNode} onPropertyChange={graph.updateProperty} onSaveBlock={graph.saveBlock} graphJson={graph.saveGraph()} />
-        <TrainingDashboard progress={graph.trainingProgress} isTraining={graph.status.type === 'running'} batchProgress={graph.batchProgress} />
+        <TrainingDashboard
+          progress={graph.trainingProgress}
+          isTraining={graph.status.type === 'running'}
+          batchProgress={graph.batchProgress}
+          selectedEpoch={graph.selectedEpoch}
+          onSelectEpoch={graph.setSelectedEpoch}
+          totalSnapshotEpochs={graph.snapshotHistory.length}
+        />
       </div>
     </VizCtx.Provider>
     </GraphActionsCtx.Provider>
