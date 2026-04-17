@@ -12,21 +12,27 @@ import { LayerDetail } from './LayerDetail';
 
 interface Props {
   node: NodeInstance | null;
+  selectedCount?: number;
   onPropertyChange: (nodeId: string, key: string, value: any) => void;
   onSaveBlock?: (nodeId: string) => void;
   graphJson?: string;
 }
 
-export function PropertyInspector({ node, onPropertyChange, onSaveBlock, graphJson }: Props) {
+export function PropertyInspector({ node, selectedCount, onPropertyChange, onSaveBlock, graphJson }: Props) {
   const domain = useContext(DomainCtx);
   const [datasetDetailType, setDatasetDetailType] = useState<string | null>(null);
   const [layerDetailNode, setLayerDetailNode] = useState<{ id: string; type: string } | null>(null);
 
   if (!node || !domain) {
+    const isMulti = selectedCount !== undefined && selectedCount > 1;
     return (
       <>
         <div className="inspector">
-          <div className="inspector-empty">Select a node to edit properties</div>
+          <div className="inspector-empty">
+            {isMulti
+              ? `${selectedCount} nodes selected — delete, copy/paste, or drag together`
+              : 'Select a node to edit properties'}
+          </div>
         </div>
         {datasetDetailType && (
           <DatasetDetail

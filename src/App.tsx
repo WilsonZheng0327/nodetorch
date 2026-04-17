@@ -76,14 +76,16 @@ export default function App() {
     return layers;
   }, [graph.rfNodes, domain]);
 
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [stepThroughOpen, setStepThroughOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const selectedNode = selectedNodeId ? graph.currentGraph.nodes.get(selectedNodeId) ?? null : null;
+  const selectedNode = selectedNodeIds.length === 1
+    ? graph.currentGraph.nodes.get(selectedNodeIds[0]) ?? null
+    : null;
 
-  // Track which node is selected
+  // Track selected node IDs (supports multi-select)
   const onSelectionChange = useCallback(({ nodes }: { nodes: RF.Node[] }) => {
-    setSelectedNodeId(nodes.length === 1 ? nodes[0].id : null);
+    setSelectedNodeIds(nodes.map((n) => n.id));
   }, []);
 
   // Right-click an edge to delete it
@@ -369,6 +371,8 @@ export default function App() {
           onDrop={onDrop}
           nodeTypes={nodeTypes}
           edgesFocusable={false}
+          selectionKeyCode="Control"
+          multiSelectionKeyCode="Shift"
           fitView
           defaultEdgeOptions={{ animated: true }}
         >
@@ -399,7 +403,13 @@ export default function App() {
           savedBlocks={graph.savedBlocks}
           onDeleteBlock={graph.deleteBlock}
         />
-        <PropertyInspector node={selectedNode} onPropertyChange={graph.updateProperty} onSaveBlock={graph.saveBlock} graphJson={graph.saveGraph()} />
+        <PropertyInspector
+          node={selectedNode}
+          selectedCount={selectedNodeIds.length}
+          onPropertyChange={graph.updateProperty}
+          onSaveBlock={graph.saveBlock}
+          graphJson={graph.saveGraph()}
+        />
         <TrainingDashboard
           progress={graph.trainingProgress}
           isTraining={graph.status.type === 'running'}
