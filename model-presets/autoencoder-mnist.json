@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "Autoencoder — MNIST",
+    "nodes": [
+      { "id": "mnist", "type": "data.mnist", "position": { "x": 0, "y": 200 }, "properties": { "batchSize": 32 } },
+
+      { "id": "enc_conv1", "type": "ml.layers.conv2d", "position": { "x": 250, "y": 200 }, "properties": { "outChannels": 16, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "enc_relu1", "type": "ml.activations.relu", "position": { "x": 450, "y": 200 }, "properties": {} },
+      { "id": "enc_pool1", "type": "ml.layers.maxpool2d", "position": { "x": 600, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+      { "id": "enc_conv2", "type": "ml.layers.conv2d", "position": { "x": 780, "y": 200 }, "properties": { "outChannels": 8, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "enc_relu2", "type": "ml.activations.relu", "position": { "x": 960, "y": 200 }, "properties": {} },
+      { "id": "enc_pool2", "type": "ml.layers.maxpool2d", "position": { "x": 1100, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+
+      { "id": "flatten", "type": "ml.layers.flatten", "position": { "x": 1280, "y": 200 }, "properties": {} },
+      { "id": "latent", "type": "ml.layers.linear", "position": { "x": 1440, "y": 200 }, "properties": { "outFeatures": 32 } },
+      { "id": "latent_relu", "type": "ml.activations.relu", "position": { "x": 1620, "y": 200 }, "properties": {} },
+      { "id": "unlatent", "type": "ml.layers.linear", "position": { "x": 1760, "y": 200 }, "properties": { "outFeatures": 392 } },
+
+      { "id": "reshape", "type": "ml.structural.reshape", "position": { "x": 1940, "y": 200 }, "properties": { "dims": "-1, 8, 7, 7" } },
+
+      { "id": "dec_convt1", "type": "ml.layers.conv_transpose2d", "position": { "x": 2120, "y": 200 }, "properties": { "outChannels": 16, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 } },
+      { "id": "dec_relu", "type": "ml.activations.relu", "position": { "x": 2320, "y": 200 }, "properties": {} },
+      { "id": "dec_convt2", "type": "ml.layers.conv_transpose2d", "position": { "x": 2460, "y": 200 }, "properties": { "outChannels": 1, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 } },
+      { "id": "sigmoid", "type": "ml.activations.sigmoid", "position": { "x": 2660, "y": 200 }, "properties": {} },
+
+      { "id": "loss", "type": "ml.loss.mse", "position": { "x": 2820, "y": 250 }, "properties": {} },
+      { "id": "adam", "type": "ml.optimizers.adam", "position": { "x": 3040, "y": 300 }, "properties": { "lr": 0.001, "epochs": 10, "valSplit": 0.1, "seed": 42 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "mnist", "portId": "out" }, "target": { "nodeId": "enc_conv1", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "enc_conv1", "portId": "out" }, "target": { "nodeId": "enc_relu1", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "enc_relu1", "portId": "out" }, "target": { "nodeId": "enc_pool1", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "enc_pool1", "portId": "out" }, "target": { "nodeId": "enc_conv2", "portId": "in" } },
+      { "id": "e5", "source": { "nodeId": "enc_conv2", "portId": "out" }, "target": { "nodeId": "enc_relu2", "portId": "in" } },
+      { "id": "e6", "source": { "nodeId": "enc_relu2", "portId": "out" }, "target": { "nodeId": "enc_pool2", "portId": "in" } },
+      { "id": "e7", "source": { "nodeId": "enc_pool2", "portId": "out" }, "target": { "nodeId": "flatten", "portId": "in" } },
+      { "id": "e8", "source": { "nodeId": "flatten", "portId": "out" }, "target": { "nodeId": "latent", "portId": "in" } },
+      { "id": "e9", "source": { "nodeId": "latent", "portId": "out" }, "target": { "nodeId": "latent_relu", "portId": "in" } },
+      { "id": "e10", "source": { "nodeId": "latent_relu", "portId": "out" }, "target": { "nodeId": "unlatent", "portId": "in" } },
+      { "id": "e11", "source": { "nodeId": "unlatent", "portId": "out" }, "target": { "nodeId": "reshape", "portId": "in" } },
+      { "id": "e12", "source": { "nodeId": "reshape", "portId": "out" }, "target": { "nodeId": "dec_convt1", "portId": "in" } },
+      { "id": "e13", "source": { "nodeId": "dec_convt1", "portId": "out" }, "target": { "nodeId": "dec_relu", "portId": "in" } },
+      { "id": "e14", "source": { "nodeId": "dec_relu", "portId": "out" }, "target": { "nodeId": "dec_convt2", "portId": "in" } },
+      { "id": "e15", "source": { "nodeId": "dec_convt2", "portId": "out" }, "target": { "nodeId": "sigmoid", "portId": "in" } },
+      { "id": "e16", "source": { "nodeId": "sigmoid", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e17", "source": { "nodeId": "mnist", "portId": "out" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e18", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}
