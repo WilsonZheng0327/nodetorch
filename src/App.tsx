@@ -200,65 +200,109 @@ export default function App() {
     [reactFlowInstance, graph],
   );
 
-  // Build a CIFAR-100 demo with a custom conv block
+  // Helper: build a ResBlock subgraph inside a block node
+  // Input → Conv → BN → ReLU → Conv → BN → Add(skip) → ReLU → Output
+  function buildResBlock(block: { subgraph: any }, channels: number) {
+    const inner = block.subgraph;
+    const innerOutput = inner.nodes.get('output')!;
+    innerOutput.position = { x: 1100, y: 100 };
+
+    // Main path
+    const conv1 = cn('conv1', 'ml.layers.conv2d', { x: 150, y: 100 }, { outChannels: channels, kernelSize: 3, stride: 1, padding: 1 });
+    const bn1 = cn('bn1', 'ml.layers.batchnorm2d', { x: 300, y: 100 }, {});
+    const relu1 = cn('relu1', 'ml.activations.relu', { x: 440, y: 100 }, {});
+    const conv2 = cn('conv2', 'ml.layers.conv2d', { x: 580, y: 100 }, { outChannels: channels, kernelSize: 3, stride: 1, padding: 1 });
+    const bn2 = cn('bn2', 'ml.layers.batchnorm2d', { x: 730, y: 100 }, {});
+
+    // Skip connection + merge
+    const add = cn('add', 'ml.structural.add', { x: 870, y: 100 }, {});
+    const relu2 = cn('relu2', 'ml.activations.relu', { x: 990, y: 100 }, {});
+
+    an(inner, conv1); an(inner, bn1); an(inner, relu1);
+    an(inner, conv2); an(inner, bn2);
+    an(inner, add); an(inner, relu2);
+
+    // Main path wiring
+    ae(inner, ce('r1', 'input', 'in', 'conv1', 'in'));
+    ae(inner, ce('r2', 'conv1', 'out', 'bn1', 'in'));
+    ae(inner, ce('r3', 'bn1', 'out', 'relu1', 'in'));
+    ae(inner, ce('r4', 'relu1', 'out', 'conv2', 'in'));
+    ae(inner, ce('r5', 'conv2', 'out', 'bn2', 'in'));
+    ae(inner, ce('r6', 'bn2', 'out', 'add', 'a'));
+
+    // Skip connection: input → add.b
+    ae(inner, ce('r7', 'input', 'in', 'add', 'b'));
+
+    // Merge → output
+    ae(inner, ce('r8', 'add', 'out', 'relu2', 'in'));
+    ae(inner, ce('r9', 'relu2', 'out', 'output', 'out'));
+  }
+
+  // Build a small ResNet for CIFAR-100
   const demoBuilt = useRef(false);
   useEffect(() => {
     if (demoBuilt.current) return;
     demoBuilt.current = true;
     async function buildDemo() {
-      // Outer graph: CIFAR-100 → ConvBlock → Flatten → Linear → Loss → Adam
+      // Stem: CIFAR-100 → Conv(16) → BN → ReLU
       await graph.addNode('data.cifar100', { x: 0, y: 200 });
-      await graph.addNode('subgraph.block', { x: 300, y: 180 });
-      await graph.addNode('ml.layers.flatten', { x: 560, y: 180 });
-      await graph.addNode('ml.layers.linear', { x: 760, y: 180 });
-      await graph.addNode('ml.loss.cross_entropy', { x: 1000, y: 230 });
-      await graph.addNode('ml.optimizers.adam', { x: 1260, y: 280 });
+      await graph.addNode('ml.layers.conv2d', { x: 240, y: 200 });
+      await graph.addNode('ml.layers.batchnorm2d', { x: 440, y: 200 });
+      await graph.addNode('ml.activations.relu', { x: 600, y: 200 });
+
+      // ResBlock × 2
+      await graph.addNode('subgraph.block', { x: 780, y: 200 });
+      await graph.addNode('subgraph.block', { x: 1000, y: 200 });
+
+      // Head: AdaptiveAvgPool → Flatten → Linear(100) → Loss → Adam
+      await graph.addNode('ml.layers.adaptive_avgpool2d', { x: 1220, y: 200 });
+      await graph.addNode('ml.layers.flatten', { x: 1420, y: 200 });
+      await graph.addNode('ml.layers.linear', { x: 1600, y: 200 });
+      await graph.addNode('ml.loss.cross_entropy', { x: 1820, y: 250 });
+      await graph.addNode('ml.optimizers.adam', { x: 2060, y: 300 });
 
       const nodes = Array.from(graph.graph.nodes.values());
-      const cifar = nodes.find((n) => n.type === 'data.cifar100');
-      const block = nodes.find((n) => n.type === 'subgraph.block');
-      const flatten = nodes.find((n) => n.type === 'ml.layers.flatten');
-      const linear = nodes.find((n) => n.type === 'ml.layers.linear');
-      const loss = nodes.find((n) => n.type === 'ml.loss.cross_entropy');
-      const adam = nodes.find((n) => n.type === 'ml.optimizers.adam');
+      const cifar = nodes.find((n) => n.type === 'data.cifar100')!;
+      const stemConv = nodes.find((n) => n.type === 'ml.layers.conv2d')!;
+      const stemBn = nodes.find((n) => n.type === 'ml.layers.batchnorm2d')!;
+      const stemRelu = nodes.find((n) => n.type === 'ml.activations.relu')!;
+      const resBlock1 = nodes.filter((n) => n.type === 'subgraph.block')[0]!;
+      const resBlock2 = nodes.filter((n) => n.type === 'subgraph.block')[1]!;
+      const avgpool = nodes.find((n) => n.type === 'ml.layers.adaptive_avgpool2d')!;
+      const flatten = nodes.find((n) => n.type === 'ml.layers.flatten')!;
+      const linear = nodes.find((n) => n.type === 'ml.layers.linear')!;
+      const loss = nodes.find((n) => n.type === 'ml.loss.cross_entropy')!;
+      const adam = nodes.find((n) => n.type === 'ml.optimizers.adam')!;
 
-      if (!cifar || !block || !flatten || !linear || !loss || !adam) return;
+      // Configure stem conv: 3→16, 3x3, pad=1
+      await graph.updateProperty(stemConv.id, 'outChannels', 16);
+      await graph.updateProperty(stemConv.id, 'kernelSize', 3);
+      await graph.updateProperty(stemConv.id, 'padding', 1);
 
-      // Configure nodes
-      await graph.updateProperty(block.id, 'blockName', 'Conv Block');
+      // Configure ResBlocks
+      await graph.updateProperty(resBlock1.id, 'blockName', 'ResBlock 1');
+      await graph.updateProperty(resBlock2.id, 'blockName', 'ResBlock 2');
+      buildResBlock(resBlock1 as any, 16);
+      buildResBlock(resBlock2 as any, 16);
+
+      // Configure head
       await graph.updateProperty(linear.id, 'outFeatures', 100);
 
-      // Build the inner graph: Input → Conv(32,3,pad=1) → BN → ReLU → MaxPool → Output
-      const inner = block.subgraph!;
-      const innerOutput = inner.nodes.get('output')!;
-
-      // Add inner nodes
-      const conv = cn('conv', 'ml.layers.conv2d', { x: 150, y: 80 }, { outChannels: 32, kernelSize: 3, stride: 1, padding: 1 });
-      const bn = cn('bn', 'ml.layers.batchnorm2d', { x: 350, y: 80 }, {});
-      const relu = cn('relu', 'ml.activations.relu', { x: 500, y: 80 }, {});
-      const pool = cn('pool', 'ml.layers.maxpool2d', { x: 650, y: 80 }, { kernelSize: 2, stride: 2, padding: 0 });
-      an(inner, conv);
-      an(inner, bn);
-      an(inner, relu);
-      an(inner, pool);
-
-      // Move output node further right
-      innerOutput.position = { x: 850, y: 80 };
-
-      // Wire inner graph
-      ae(inner, ce('ie1', 'input', 'in', 'conv', 'in'));
-      ae(inner, ce('ie2', 'conv', 'out', 'bn', 'in'));
-      ae(inner, ce('ie3', 'bn', 'out', 'relu', 'in'));
-      ae(inner, ce('ie4', 'relu', 'out', 'pool', 'in'));
-      ae(inner, ce('ie5', 'pool', 'out', 'output', 'out'));
-
-      // Wire outer graph
-      await graph.connect({ source: cifar.id, sourceHandle: 'out', target: block.id, targetHandle: 'in' });
-      await graph.connect({ source: block.id, sourceHandle: 'out', target: flatten.id, targetHandle: 'in' });
+      // Wire the outer graph
+      await graph.connect({ source: cifar.id, sourceHandle: 'out', target: stemConv.id, targetHandle: 'in' });
+      await graph.connect({ source: stemConv.id, sourceHandle: 'out', target: stemBn.id, targetHandle: 'in' });
+      await graph.connect({ source: stemBn.id, sourceHandle: 'out', target: stemRelu.id, targetHandle: 'in' });
+      await graph.connect({ source: stemRelu.id, sourceHandle: 'out', target: resBlock1.id, targetHandle: 'in' });
+      await graph.connect({ source: resBlock1.id, sourceHandle: 'out', target: resBlock2.id, targetHandle: 'in' });
+      await graph.connect({ source: resBlock2.id, sourceHandle: 'out', target: avgpool.id, targetHandle: 'in' });
+      await graph.connect({ source: avgpool.id, sourceHandle: 'out', target: flatten.id, targetHandle: 'in' });
       await graph.connect({ source: flatten.id, sourceHandle: 'out', target: linear.id, targetHandle: 'in' });
       await graph.connect({ source: linear.id, sourceHandle: 'out', target: loss.id, targetHandle: 'predictions' });
       await graph.connect({ source: cifar.id, sourceHandle: 'labels', target: loss.id, targetHandle: 'labels' });
       await graph.connect({ source: loss.id, sourceHandle: 'out', target: adam.id, targetHandle: 'loss' });
+
+      // Re-run shape inference now that inner subgraphs are fully built
+      await graph.runShape();
     }
     buildDemo().then(() => {
       setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 100);
@@ -320,7 +364,7 @@ export default function App() {
             />
           </RF.Panel>
         </RF.ReactFlow>
-        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
         <NodePalette
           savedBlocks={graph.savedBlocks}

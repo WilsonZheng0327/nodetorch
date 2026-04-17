@@ -363,7 +363,7 @@ export function useGraph(domain: DomainContext) {
         properties[prop.id] = prop.defaultValue;
       }
 
-      const id = `${type}-${Date.now()}`;
+      const id = `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const node = createNode(id, type, position, properties);
 
       // If this is a subgraph block, create the inner graph with default sentinels
@@ -659,6 +659,15 @@ export function useGraph(domain: DomainContext) {
       else next.add(nodeId);
       return next;
     });
+  }, []);
+
+  const showAllViz = useCallback(() => {
+    const g = getCurrentGraph();
+    setPinnedVizNodes(new Set(g.nodes.keys()));
+  }, [getCurrentGraph]);
+
+  const hideAllViz = useCallback(() => {
+    setPinnedVizNodes(new Set());
   }, []);
 
   const trainWsRef = useRef<WebSocket | null>(null);
@@ -1040,5 +1049,7 @@ export function useGraph(domain: DomainContext) {
     liveSnapshots: resolvedSnapshots,
     pinnedVizNodes,
     toggleVizPin,
+    showAllViz,
+    hideAllViz,
   };
 }

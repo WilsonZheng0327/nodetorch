@@ -59,6 +59,32 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/system-info")
+def system_info():
+    """Return system GPU/device information."""
+    import torch
+    import platform
+    info: dict = {
+        "python": platform.python_version(),
+        "pytorch": torch.__version__,
+        "cudaAvailable": torch.cuda.is_available(),
+        "gpuCount": 0,
+        "gpus": [],
+    }
+    if torch.cuda.is_available():
+        info["gpuCount"] = torch.cuda.device_count()
+        for i in range(torch.cuda.device_count()):
+            props = torch.cuda.get_device_properties(i)
+            info["gpus"].append({
+                "name": props.name,
+                "vram": round(props.total_memory / 1024**3, 1),
+                "computeCapability": f"{props.major}.{props.minor}",
+            })
+    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        info["mpsAvailable"] = True
+    return info
+
+
 @app.post("/forward")
 async def forward(graph_data: dict):
     logger.info("Forward pass requested")

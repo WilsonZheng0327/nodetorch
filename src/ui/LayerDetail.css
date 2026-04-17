@@ -119,6 +119,13 @@
   background: linear-gradient(to right, #003264, #00c8c8, #64ff00, #ffff00);
 }
 
+.heatmap-note {
+  font-size: 10px;
+  color: #6c7086;
+  margin-top: 4px;
+  font-style: italic;
+}
+
 .feature-maps-grid {
   display: flex;
   flex-wrap: wrap;

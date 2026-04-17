@@ -12,12 +12,14 @@ interface Props {
   onCancel: () => void;
   onClear: () => void;
   onOrganize: () => void;
+  onShowAllViz: () => void;
+  onHideAllViz: () => void;
   status: { type: 'idle' | 'running' | 'success' | 'error'; message?: string };
   modelTrained: boolean;
   modelStale: boolean;
 }
 
-export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onClear, onOrganize, status, modelTrained, modelStale }: Props) {
+export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, status, modelTrained, modelStale }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -129,6 +131,12 @@ export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onC
         </button>
         <button className="toolbar-btn" onClick={onOrganize} disabled={busy} title="Auto-organize node layout">
           Organize
+        </button>
+        <button className="toolbar-btn" onClick={onShowAllViz} title="Show all viz panels">
+          Show Viz
+        </button>
+        <button className="toolbar-btn" onClick={onHideAllViz} title="Hide all viz panels">
+          Hide Viz
         </button>
         <input
           ref={fileInputRef}

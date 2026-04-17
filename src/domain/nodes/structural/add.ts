@@ -1,5 +1,19 @@
 import type { NodeDefinition } from '../../../core/nodedef';
 
+/** Check if two shapes are broadcast-compatible (PyTorch rules).
+ *  Returns the broadcast output shape, or null if incompatible. */
+function broadcastShapes(a: number[], b: number[]): number[] | null {
+  const rank = Math.max(a.length, b.length);
+  const out: number[] = [];
+  for (let i = 0; i < rank; i++) {
+    const da = i < a.length ? a[a.length - 1 - i] : 1;
+    const db = i < b.length ? b[b.length - 1 - i] : 1;
+    if (da !== db && da !== 1 && db !== 1) return null;
+    out.unshift(Math.max(da, db));
+  }
+  return out;
+}
+
 export const addNode: NodeDefinition = {
   type: 'ml.structural.add',
   version: 1,
@@ -22,23 +36,22 @@ export const addNode: NodeDefinition = {
         const b = inputs.b;
 
         if (!a && !b) return { outputs: {} };
-        // If only one is connected, pass through its shape
         if (!a) return { outputs: { out: b }, metadata: { outputShape: b } };
         if (!b) return { outputs: { out: a }, metadata: { outputShape: a } };
 
-        // Both connected — shapes must match for element-wise add
-        if (JSON.stringify(a) !== JSON.stringify(b)) {
+        const result = broadcastShapes(a, b);
+        if (!result) {
           return {
             outputs: {},
-            metadata: { error: `Shape mismatch: [${a.join(', ')}] + [${b.join(', ')}]` },
+            metadata: { error: `Shapes not broadcast-compatible: [${a.join(', ')}] + [${b.join(', ')}]` },
           };
         }
 
         return {
-          outputs: { out: a },
+          outputs: { out: result },
           metadata: {
-            outputShape: a,
-            shapes: [{ label: 'Output', value: a }],
+            outputShape: result,
+            shapes: [{ label: 'Output', value: result }],
           },
         };
       },

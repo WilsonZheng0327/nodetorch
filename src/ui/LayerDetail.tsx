@@ -14,7 +14,8 @@ interface Props {
 
 interface DetailData {
   nodeType: string;
-  weightMatrix?: { data: number[][]; rows: number; cols: number; min: number; max: number };
+  weightMatrix?: { data: number[][]; rows: number; cols: number; actualRows: number; actualCols: number; min: number; max: number };
+  convKernels?: { kernels: number[][][]; count: number; totalFilters: number; height: number; width: number; inChannels: number };
   featureMaps?: { maps: number[][][]; channels: number; height: number; width: number };
   attentionMap?: { data: number[][]; rows: number; cols: number };
   hiddenState?: { data: number[][]; rows: number; cols: number; label: string };
@@ -59,7 +60,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
           {detail && (
             <>
               {detail.weightMatrix && (
-                <DetailSection title="Weight Matrix">
+                <DetailSection title={`Weight Matrix (${detail.weightMatrix.actualRows} x ${detail.weightMatrix.actualCols})`}>
                   <Heatmap
                     data={detail.weightMatrix.data}
                     rows={detail.weightMatrix.rows}
@@ -71,6 +72,22 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
                     <span>{detail.weightMatrix.min.toFixed(4)}</span>
                     <div className="heatmap-legend-bar" />
                     <span>{detail.weightMatrix.max.toFixed(4)}</span>
+                  </div>
+                  {(detail.weightMatrix.rows < detail.weightMatrix.actualRows ||
+                    detail.weightMatrix.cols < detail.weightMatrix.actualCols) && (
+                    <div className="heatmap-note">
+                      Downsampled from {detail.weightMatrix.actualRows}x{detail.weightMatrix.actualCols} for display
+                    </div>
+                  )}
+                </DetailSection>
+              )}
+
+              {detail.convKernels && (
+                <DetailSection title={`Conv Kernels (${detail.convKernels.count}/${detail.convKernels.totalFilters} filters, ${detail.convKernels.height}x${detail.convKernels.width}, ${detail.convKernels.inChannels}ch avg)`}>
+                  <div className="feature-maps-grid">
+                    {detail.convKernels.kernels.map((kernel, i) => (
+                      <FeatureMapCanvas key={i} pixels={kernel} label={`f${i}`} />
+                    ))}
                   </div>
                 </DetailSection>
               )}
@@ -220,7 +237,7 @@ function FeatureMapCanvas({ pixels, label }: { pixels: number[][]; label: string
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || pixels.length === 0) return;
+    if (!canvas || pixels.length === 0 || !pixels[0]) return;
 
     const h = pixels.length;
     const w = pixels[0].length;

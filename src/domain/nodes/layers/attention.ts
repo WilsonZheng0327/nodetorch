@@ -44,7 +44,16 @@ export const attentionNode: NodeDefinition = {
         }
 
         if (key && key[key.length - 1] !== query[query.length - 1]) {
-          return { outputs: {}, metadata: { error: `Key dim ${key[key.length - 1]} != Query dim ${query[query.length - 1]}` } };
+          return { outputs: {}, metadata: { error: `Key embed dim ${key[key.length - 1]} != Query embed dim ${query[query.length - 1]}` } };
+        }
+
+        // Value seq_len must match Key seq_len (V is attended over same positions as K)
+        if (key && value && key.length >= 2 && value.length >= 2) {
+          const keySeq = key[key.length - 2];
+          const valSeq = value[value.length - 2];
+          if (keySeq !== valSeq) {
+            return { outputs: {}, metadata: { error: `Value seq_len ${valSeq} != Key seq_len ${keySeq}` } };
+          }
         }
 
         // Output: [...batch, seq_q, d_v]

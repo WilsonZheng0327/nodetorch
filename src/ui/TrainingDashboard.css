@@ -1,3 +1,4 @@
+/* Dashboard toggle button */
 .dashboard-toggle {
   position: absolute;
   bottom: 12px;
@@ -31,13 +32,14 @@
   border-color: #10b981;
 }
 
+/* Main dashboard panel — bottom of screen, wide */
 .dashboard {
   position: absolute;
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  width: 480px;
-  max-height: 420px;
+  width: 720px;
+  max-height: 520px;
   background: #1e1e2e;
   border: 1px solid #45475a;
   border-radius: 8px;
@@ -57,6 +59,7 @@
   align-items: center;
   padding: 10px 14px;
   border-bottom: 1px solid #313244;
+  flex-shrink: 0;
 }
 
 .dashboard-title {
@@ -88,12 +91,20 @@
   margin-left: 8px;
 }
 
+.dashboard-training-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: #a78bfa;
+  margin-left: 8px;
+}
+
 .dashboard-progress {
   position: relative;
   height: 24px;
   background: #313244;
   border-bottom: 1px solid #313244;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .dashboard-progress-bar {
@@ -121,6 +132,7 @@
   gap: 12px;
   padding: 10px 14px;
   border-bottom: 1px solid #313244;
+  flex-shrink: 0;
 }
 
 .dashboard-metric {
@@ -148,10 +160,12 @@
   display: flex;
   padding: 0 14px;
   border-bottom: 1px solid #313244;
+  flex-shrink: 0;
+  overflow-x: auto;
 }
 
 .dashboard-tab {
-  padding: 8px 16px;
+  padding: 8px 12px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -159,6 +173,7 @@
   font-family: inherit;
   font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .dashboard-tab:hover {
@@ -170,14 +185,40 @@
   border-bottom-color: #89b4fa;
 }
 
+/* Tab content area — fills remaining space */
+.dashboard-tab-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.dashboard-tab-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dashboard-tab-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dashboard-tab-content::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 3px;
+}
+
 .dashboard-chart {
   width: 100%;
-  height: 160px;
+  height: 240px;
   padding: 8px;
+  box-sizing: border-box;
+}
+
+.dashboard-chart-tall {
+  height: auto;
+  padding: 0;
 }
 
 .dashboard-chart-placeholder {
-  height: 160px;
+  height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -185,10 +226,30 @@
   font-size: 13px;
 }
 
+/* Per-class scrollable container */
+.dashboard-perclass-scroll {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.dashboard-perclass-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dashboard-perclass-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dashboard-perclass-scroll::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 3px;
+}
+
+/* Epoch table */
 .dashboard-table-wrap {
   overflow-y: auto;
-  max-height: 120px;
-  border-top: 1px solid #313244;
+  max-height: 300px;
 }
 
 .dashboard-table-wrap::-webkit-scrollbar {
@@ -235,4 +296,60 @@
 
 .dashboard-table tbody tr:hover {
   background: #313244;
+}
+
+/* System info panel */
+.system-info {
+  padding: 12px 16px;
+}
+
+.system-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #313244;
+}
+
+.system-info-label {
+  color: #6c7086;
+}
+
+.system-info-value {
+  font-family: 'JetBrains Mono', monospace;
+  color: #cdd6f4;
+}
+
+.system-info-ok {
+  color: #10b981;
+}
+
+.system-info-warn {
+  color: #f9e2af;
+}
+
+.system-info-gpu {
+  padding: 8px 0;
+  border-bottom: 1px solid #313244;
+}
+
+.system-info-gpu-name {
+  font-weight: 600;
+  color: #89b4fa;
+  margin-bottom: 2px;
+}
+
+.system-info-gpu-detail {
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #a6adc8;
+}
+
+.system-info-note {
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: rgba(249, 226, 175, 0.1);
+  border: 1px solid rgba(249, 226, 175, 0.2);
+  border-radius: 4px;
+  color: #f9e2af;
+  font-size: 12px;
 }

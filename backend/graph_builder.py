@@ -40,6 +40,10 @@ SENTINEL_OUTPUT = "subgraph.output"
 # Key: "current" (single session for now), Value: dict of node_id → nn.Module
 _model_store: dict[str, dict[str, nn.Module]] = {}
 
+# Cache of the last forward/train/infer pass for layer detail queries.
+# Avoids re-running the graph when the user opens the detail modal.
+_last_run: dict = {}
+
 def has_trained_model() -> bool:
     return "current" in _model_store
 
@@ -184,6 +188,20 @@ def build_subgraph_module(subgraph_data: dict, parent_input_shapes: dict) -> Sub
                 if src_id in shape_results and src_port in shape_results[src_id]:
                     input_shapes[tgt_port] = shape_results[src_id][src_port]
 
+        # Nested subgraph: recurse
+        if node_type == SUBGRAPH_TYPE:
+            sub_data = node.get("subgraph")
+            if sub_data and "in" in input_shapes:
+                sg_mod = build_subgraph_module(sub_data, {"in": input_shapes["in"]})
+                inner_modules[node_id] = sg_mod
+                dummy = torch.zeros(input_shapes["in"])
+                with torch.no_grad():
+                    sg_out = sg_mod(**{"in": dummy})
+                first_key = next(iter(sg_out), None)
+                if first_key:
+                    shape_results[node_id] = {"out": list(sg_out[first_key].shape)}
+            continue
+
         builder = NODE_BUILDERS.get(node_type)
         if not builder:
             continue
@@ -194,11 +212,13 @@ def build_subgraph_module(subgraph_data: dict, parent_input_shapes: dict) -> Sub
         # Compute output shape for downstream
         if "in" in input_shapes:
             in_shape = input_shapes["in"]
-            # Run a dummy tensor to get output shape
             dummy = torch.zeros(in_shape)
             with torch.no_grad():
                 out = module(dummy)
-            shape_results[node_id] = {"out": list(out.shape)}
+            if isinstance(out, dict):
+                shape_results[node_id] = {k: list(v.shape) for k, v in out.items()}
+            else:
+                shape_results[node_id] = {"out": list(out.shape)}
 
     return SubGraphModule(inner_modules, nodes, edges, order)
 
@@ -490,6 +510,13 @@ def build_and_run_graph(graph_data: dict) -> tuple[
                 "metadata": {"error": str(e)},
             }
 
+    # Cache for layer detail queries
+    _last_run.clear()
+    _last_run["modules"] = modules
+    _last_run["results"] = results
+    _last_run["nodes"] = nodes
+    _last_run["edges"] = edges
+
     return modules, results, node_results, nodes, edges
 
 
@@ -503,15 +530,25 @@ def execute_graph(graph_data: dict) -> dict:
 def get_layer_detail(graph_data: dict, node_id: str) -> dict:
     """Return detailed visualization data for a specific node.
 
-    Runs a forward pass, then extracts:
+    Uses cached results from the last forward/train/infer pass.
+    Falls back to running a forward pass if no cache exists.
+
+    Returns:
     - weightMatrix: 2D weight data for heatmap (Linear, Conv2d)
     - featureMaps: per-channel activation grids (Conv2d)
     - attentionMap: attention weight matrix (MHA, Attention)
     - hiddenState: hidden/cell state matrix (LSTM, GRU)
     - confusionData: predictions vs labels (loss nodes)
     """
-    with torch.no_grad():
-        modules, results, _, nodes, edges = build_and_run_graph(graph_data)
+    # Use cached results if available, otherwise run a forward pass
+    if _last_run:
+        modules = _last_run["modules"]
+        results = _last_run["results"]
+        nodes = _last_run["nodes"]
+        edges = _last_run["edges"]
+    else:
+        with torch.no_grad():
+            modules, results, _, nodes, edges = build_and_run_graph(graph_data)
 
     # Resolve module — might be inside a subgraph
     module = modules.get(node_id)
@@ -536,7 +573,7 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
     node_type = node["type"]
     detail: dict = {"nodeType": node_type}
 
-    # --- Weight matrix heatmap ---
+    # --- Weight visualization ---
     if module is not None:
         weight = None
         for name, param in module.named_parameters():
@@ -544,28 +581,58 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
                 weight = param.detach().cpu().float()
                 break
         if weight is not None:
-            # Flatten to 2D for visualization
-            if weight.dim() == 1:
-                mat = weight.unsqueeze(0)
-            elif weight.dim() == 2:
-                mat = weight
-            elif weight.dim() == 4:
-                # Conv2d: [out_ch, in_ch, kH, kW] → [out_ch, in_ch * kH * kW]
-                mat = weight.reshape(weight.shape[0], -1)
+            if weight.dim() == 4:
+                # Conv2d: [out_ch, in_ch, kH, kW] — show as kernel grid
+                out_ch, in_ch, kH, kW = weight.shape
+                n_filters = min(32, out_ch)
+                kernels = []
+                for f in range(n_filters):
+                    # Average across input channels to get one kH x kW image per filter
+                    kernel = weight[f].mean(dim=0)  # [kH, kW]
+                    # Normalize to 0-255
+                    kmin, kmax = float(kernel.min()), float(kernel.max())
+                    rng = kmax - kmin if kmax != kmin else 1.0
+                    normalized = ((kernel - kmin) / rng * 255).clamp(0, 255).byte()
+                    kernels.append(normalized.tolist())
+                detail["convKernels"] = {
+                    "kernels": kernels,
+                    "count": n_filters,
+                    "totalFilters": out_ch,
+                    "height": kH,
+                    "width": kW,
+                    "inChannels": in_ch,
+                }
             else:
-                mat = weight.reshape(weight.shape[0], -1)
-            # Downsample if too large (max 64x64 for display)
-            if mat.shape[0] > 64:
-                mat = mat[:64]
-            if mat.shape[1] > 64:
-                mat = mat[:, :64]
-            detail["weightMatrix"] = {
-                "data": mat.tolist(),
-                "rows": mat.shape[0],
-                "cols": mat.shape[1],
-                "min": _safe_float(float(mat.min())),
-                "max": _safe_float(float(mat.max())),
-            }
+                # Linear or other: 2D weight matrix heatmap
+                if weight.dim() == 1:
+                    mat = weight.unsqueeze(0)
+                elif weight.dim() == 2:
+                    mat = weight
+                else:
+                    mat = weight.reshape(weight.shape[0], -1)
+
+                actual_rows, actual_cols = mat.shape[0], mat.shape[1]
+                vmin = _safe_float(float(mat.min()))
+                vmax = _safe_float(float(mat.max()))
+
+                # Downsample by block-averaging if too large (max 128x128 for display)
+                MAX_DIM = 128
+                if mat.shape[0] > MAX_DIM or mat.shape[1] > MAX_DIM:
+                    mat = torch.nn.functional.interpolate(
+                        mat.unsqueeze(0).unsqueeze(0),
+                        size=(min(MAX_DIM, mat.shape[0]), min(MAX_DIM, mat.shape[1])),
+                        mode='area',
+                    ).squeeze()
+
+                detail["weightMatrix"] = {
+                    "data": mat.tolist(),
+                    "rows": mat.shape[0],
+                    "cols": mat.shape[1],
+                    "actualRows": actual_rows,
+                    "actualCols": actual_cols,
+                    "min": vmin,
+                    "max": vmax,
+                }
 
     # --- Feature maps (Conv output channels) ---
     if output is not None and isinstance(output, torch.Tensor) and output.dim() == 4:
@@ -954,12 +1021,27 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
                 node_snapshots[node_id] = snap
 
         # Gradient flow summary: gradient norm per trainable layer (in topo order)
-        gradient_flow = []
+        # Collect gradient norms per layer with disambiguated names
+        grad_entries = []
         for nid in order:
             snap = node_snapshots.get(nid)
             if snap and "gradients" in snap:
-                label = nodes[nid]["type"].split(".")[-1]
-                gradient_flow.append({"name": label, "norm": snap["gradients"]["norm"]})
+                short = nodes[nid]["type"].split(".")[-1]
+                grad_entries.append((short, snap["gradients"]["norm"]))
+        # Count occurrences to decide whether to number
+        name_counts: dict[str, int] = {}
+        for short, _ in grad_entries:
+            name_counts[short] = name_counts.get(short, 0) + 1
+        # Build labels: number duplicates (conv2d_1, conv2d_2, ...), leave unique ones as-is
+        name_idx: dict[str, int] = {}
+        gradient_flow = []
+        for short, norm in grad_entries:
+            if name_counts[short] > 1:
+                name_idx[short] = name_idx.get(short, 0) + 1
+                label = f"{short}_{name_idx[short]}"
+            else:
+                label = short
+            gradient_flow.append({"name": label, "norm": norm})
 
         epoch_result = {
             "epoch": epoch + 1,
@@ -970,10 +1052,10 @@ def train_graph(graph_data: dict, on_epoch=None, cancel_event=None) -> dict:
             "batches": total_batches,
             "samples": total,
             "gradientFlow": gradient_flow,
-            "perClassAccuracy": [
+            "perClassAccuracy": sorted([
                 {"cls": cls, "accuracy": _safe_float(per_class_correct.get(cls, 0) / per_class_total[cls]) if per_class_total.get(cls, 0) > 0 else 0.0}
-                for cls in sorted(per_class_total.keys())[:20]  # Limit to top 20 classes
-            ] if per_class_total else [],
+                for cls in per_class_total.keys()
+            ], key=lambda x: x["accuracy"]) if per_class_total else [],
             "nodeSnapshots": node_snapshots,
         }
         epoch_results.append(epoch_result)
@@ -1326,6 +1408,13 @@ def infer_graph(graph_data: dict) -> dict:
                     "outputs": {},
                     "metadata": {"error": str(e)},
                 }
+
+    # Cache for layer detail queries
+    _last_run.clear()
+    _last_run["modules"] = trained_modules
+    _last_run["results"] = results
+    _last_run["nodes"] = nodes
+    _last_run["edges"] = edges
 
     return {
         "nodeResults": node_results,

@@ -53,21 +53,21 @@ export function VizPanel({ snapshot, onClose }: Props) {
         ) : (
           <>
             {hasWeights && (
-              <VizSection title="Weights" color="#89b4fa" data={snapshot.weights!} stats={[
+              <VizSection title="Weights" color="#89b4fa" data={snapshot.weights!} tip="Distribution of all parameter values. Should be centered near 0. Collapse to 0 or explosion means trouble." stats={[
                 { label: 'mean', value: snapshot.weights!.mean },
                 { label: 'std', value: snapshot.weights!.std },
               ]} />
             )}
 
             {hasGradients && (
-              <VizSection title="Gradients" color="#f9e2af" data={snapshot.gradients!} stats={[
+              <VizSection title="Gradients" color="#f9e2af" data={snapshot.gradients!} tip="Gradient magnitudes from backward pass. Tiny = vanishing gradients. Huge = exploding gradients." stats={[
                 { label: 'mean', value: snapshot.gradients!.mean },
                 { label: 'norm', value: snapshot.gradients!.norm },
               ]} />
             )}
 
             {hasActivations && (
-              <VizSection title="Activations" color="#10b981" data={snapshot.activations!} stats={[
+              <VizSection title="Activations" color="#10b981" data={snapshot.activations!} tip="Distribution of this layer's output values. High sparsity may mean dead neurons." stats={[
                 { label: 'mean', value: snapshot.activations!.mean },
                 { label: 'sparsity', value: snapshot.activations!.sparsity, pct: true },
               ]} />
@@ -75,12 +75,12 @@ export function VizPanel({ snapshot, onClose }: Props) {
 
             {hasBatchNorm && (
               <>
-                <VizSection title="Running Mean" color="#cba6f7" data={snapshot.batchnorm!.runningMean!} stats={[
+                <VizSection title="Running Mean" color="#cba6f7" data={snapshot.batchnorm!.runningMean!} tip="BatchNorm's learned per-channel mean of inputs." stats={[
                   { label: 'mean', value: snapshot.batchnorm!.runningMean!.mean },
                   { label: 'std', value: snapshot.batchnorm!.runningMean!.std },
                 ]} />
                 {snapshot.batchnorm!.runningVar?.histBins && (
-                  <VizSection title="Running Var" color="#f5c2e7" data={snapshot.batchnorm!.runningVar!} stats={[
+                  <VizSection title="Running Var" color="#f5c2e7" data={snapshot.batchnorm!.runningVar!} tip="BatchNorm's learned per-channel variance of inputs." stats={[
                     { label: 'mean', value: snapshot.batchnorm!.runningVar!.mean },
                     { label: 'std', value: snapshot.batchnorm!.runningVar!.std },
                   ]} />
@@ -90,7 +90,10 @@ export function VizPanel({ snapshot, onClose }: Props) {
 
             {hasWeightDelta && (
               <div className="viz-section">
-                <div className="viz-section-title" style={{ color: '#fab387' }}>Weight Delta</div>
+                <div className="viz-section-title" style={{ color: '#fab387' }}>
+                  Weight Delta
+                  <span className="viz-tip" title="How much weights changed this epoch. Near-zero = converged or not learning.">?</span>
+                </div>
                 <div className="viz-stats">
                   <span>norm: {snapshot.weightDelta!.toFixed(6)}</span>
                 </div>
@@ -105,15 +108,19 @@ export function VizPanel({ snapshot, onClose }: Props) {
 
 // --- Section with stats + histogram ---
 
-function VizSection({ title, color, data, stats }: {
+function VizSection({ title, color, data, stats, tip }: {
   title: string;
   color: string;
   data: HistogramData;
   stats: { label: string; value?: number; pct?: boolean }[];
+  tip?: string;
 }) {
   return (
     <div className="viz-section">
-      <div className="viz-section-title" style={{ color }}>{title}</div>
+      <div className="viz-section-title" style={{ color }}>
+        {title}
+        {tip && <span className="viz-tip" title={tip}>?</span>}
+      </div>
       <div className="viz-stats">
         {stats.map((s) => (
           <span key={s.label}>

@@ -27,7 +27,7 @@
   padding: 0 4px;
 }
 
-/* Delete button — hidden until node is hovered */
+/* Delete button — invisible until node is hovered */
 .node-delete-btn {
   border: none;
   background: none;
@@ -36,9 +36,9 @@
   font-weight: 800;
   line-height: 1;
   cursor: pointer;
-  display: none;
   padding: 0 2px;
   flex-shrink: 0;
+  visibility: hidden;
 }
 
 .node-delete-btn:hover {
@@ -46,7 +46,7 @@
 }
 
 .layer-node:hover .node-delete-btn {
-  display: flex;
+  visibility: visible;
 }
 
 .layer-node-body {
@@ -215,10 +215,10 @@
   background: none;
   color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
-  display: none;
   padding: 0 2px;
   line-height: 1;
   flex-shrink: 0;
+  visibility: hidden;
 }
 
 .node-viz-btn:hover {
@@ -226,10 +226,10 @@
 }
 
 .node-viz-btn-active {
-  display: flex;
+  visibility: visible;
   color: rgba(255, 255, 255, 0.9);
 }
 
 .layer-node:hover .node-viz-btn {
-  display: flex;
+  visibility: visible;
 }

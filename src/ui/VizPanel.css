@@ -79,6 +79,26 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.viz-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #313244;
+  color: #6c7086;
+  font-size: 8px;
+  font-weight: 700;
+  cursor: help;
+  flex-shrink: 0;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .viz-stats {

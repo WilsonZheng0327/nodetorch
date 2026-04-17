@@ -321,25 +321,102 @@ def build_permute(props: dict, input_shapes: dict) -> nn.Module:
     return PermuteModule(dims)
 
 
+# --- New layer builders ---
+
+def build_conv_transpose2d(props: dict, input_shapes: dict) -> nn.Module:
+    in_shape = input_shapes.get("in")
+    in_channels = in_shape[1] if in_shape else 1
+    return nn.ConvTranspose2d(
+        in_channels=in_channels,
+        out_channels=props["outChannels"],
+        kernel_size=props["kernelSize"],
+        stride=props["stride"],
+        padding=props["padding"],
+        output_padding=props.get("outputPadding", 0),
+    )
+
+
+def build_upsample(props: dict, input_shapes: dict) -> nn.Module:
+    return nn.Upsample(
+        scale_factor=props["scaleFactor"],
+        mode=props.get("mode", "nearest"),
+    )
+
+
+def build_dropout2d(props: dict, input_shapes: dict) -> nn.Module:
+    return nn.Dropout2d(p=props["p"])
+
+
+def build_groupnorm(props: dict, input_shapes: dict) -> nn.Module:
+    in_shape = input_shapes.get("in")
+    num_channels = in_shape[1] if in_shape else 1
+    return nn.GroupNorm(num_groups=props["numGroups"], num_channels=num_channels)
+
+
+def build_instancenorm2d(props: dict, input_shapes: dict) -> nn.Module:
+    in_shape = input_shapes.get("in")
+    num_features = in_shape[1] if in_shape else 1
+    return nn.InstanceNorm2d(num_features=num_features, affine=True)
+
+
+def build_maxpool1d(props: dict, input_shapes: dict) -> nn.Module:
+    return nn.MaxPool1d(
+        kernel_size=props["kernelSize"],
+        stride=props["stride"],
+        padding=props["padding"],
+    )
+
+
+# Why wrapper: nn.RNN returns (output, hidden) tuple. We need a dict for multi-output.
+class RNNWrapper(nn.Module):
+    def __init__(self, rnn):
+        super().__init__()
+        self.rnn = rnn
+
+    def forward(self, x):
+        out, hidden = self.rnn(x)
+        return {"out": out, "hidden": hidden}
+
+
+def build_rnn(props: dict, input_shapes: dict) -> nn.Module:
+    in_shape = input_shapes.get("in")
+    input_size = in_shape[-1] if in_shape else 1
+    return RNNWrapper(nn.RNN(
+        input_size=input_size,
+        hidden_size=props["hiddenSize"],
+        num_layers=props["numLayers"],
+        batch_first=True,
+        bidirectional=props.get("bidirectional", False),
+        nonlinearity=props.get("nonlinearity", "tanh"),
+    ))
+
+
 # --- Registry ---
 
 NODE_BUILDERS: dict[str, callable] = {
     # Layers (no wrapper)
     "ml.layers.conv2d": build_conv2d,
     "ml.layers.conv1d": build_conv1d,
+    "ml.layers.conv_transpose2d": build_conv_transpose2d,
     "ml.layers.linear": build_linear,
     "ml.layers.flatten": build_flatten,
     "ml.layers.maxpool2d": build_maxpool2d,
+    "ml.layers.maxpool1d": build_maxpool1d,
     "ml.layers.avgpool2d": build_avgpool2d,
     "ml.layers.adaptive_avgpool2d": build_adaptive_avgpool2d,
     "ml.layers.batchnorm2d": build_batchnorm2d,
     "ml.layers.batchnorm1d": build_batchnorm1d,
+    "ml.layers.groupnorm": build_groupnorm,
+    "ml.layers.instancenorm2d": build_instancenorm2d,
     "ml.layers.dropout": build_dropout,
+    "ml.layers.dropout2d": build_dropout2d,
     "ml.layers.layernorm": build_layernorm,
     "ml.layers.embedding": build_embedding,
+    "ml.layers.upsample": build_upsample,
     # Layers (with wrapper)
     "ml.layers.lstm": build_lstm,
     "ml.layers.gru": build_gru,
+    "ml.layers.rnn": build_rnn,
     "ml.layers.multihead_attention": build_multihead_attention,
     "ml.layers.attention": build_attention,
     # Activations (no wrapper)
