@@ -23,10 +23,35 @@ interface DetailData {
   confusionMatrix?: { data: number[][]; size: number };
 }
 
+interface ActMaxData {
+  dreams: { pixels: number[] | number[][]; channels: number; filterIndex: number }[];
+  totalFilters: number;
+  iterations: number;
+  usingTrainedWeights: boolean;
+}
+
 export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [actMax, setActMax] = useState<ActMaxData | null>(null);
+  const [actMaxLoading, setActMaxLoading] = useState(false);
+
+  const runActivationMax = () => {
+    setActMaxLoading(true);
+    fetch('http://localhost:8000/activation-max', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ graph: JSON.parse(graphJson), nodeId, numFilters: 8, iterations: 25 }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok') setActMax(data.result);
+        else setError(data.error ?? 'Failed to run activation max');
+      })
+      .catch(() => setError('Cannot connect to backend'))
+      .finally(() => setActMaxLoading(false));
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -89,6 +114,36 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
                       <FeatureMapCanvas key={i} pixels={kernel} label={`f${i}`} />
                     ))}
                   </div>
+                </DetailSection>
+              )}
+
+              {/* Activation maximization — only available for conv-like layers */}
+              {detail.convKernels && (
+                <DetailSection title="Activation Maximization (what each filter 'wants to see')">
+                  {!actMax && !actMaxLoading && (
+                    <button className="layer-detail-action-btn" onClick={runActivationMax}>
+                      Generate Dream Images
+                    </button>
+                  )}
+                  {actMaxLoading && (
+                    <div className="layer-detail-loading">
+                      Running gradient ascent (25 steps × 8 filters)...
+                    </div>
+                  )}
+                  {actMax && (
+                    <>
+                      <div className="heatmap-note">
+                        {actMax.usingTrainedWeights
+                          ? 'Dreams from trained filters — each image maximizes one filter\'s activation'
+                          : 'Dreams from random (untrained) filters — will look like noise'}
+                      </div>
+                      <div className="feature-maps-grid">
+                        {actMax.dreams.map((d, i) => (
+                          <DreamCanvas key={i} pixels={d.pixels} channels={d.channels} label={`f${d.filterIndex}`} />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </DetailSection>
               )}
 
@@ -264,6 +319,51 @@ function FeatureMapCanvas({ pixels, label }: { pixels: number[][]; label: string
   return (
     <div className="feature-map-item">
       <canvas ref={canvasRef} className="feature-map-canvas" />
+      <span className="feature-map-label">{label}</span>
+    </div>
+  );
+}
+
+// --- Dream canvas (for activation maximization — supports grayscale and RGB) ---
+
+function DreamCanvas({ pixels, channels, label }: { pixels: number[] | number[][]; channels: number; label: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || pixels.length === 0) return;
+
+    const isRGB = channels >= 3;
+    const h = (pixels as number[][]).length;
+    const w = isRGB ? (pixels as any)[0].length : (pixels as number[][])[0].length;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const img = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        if (isRGB) {
+          const px = (pixels as any)[y][x];
+          img.data[idx] = px[0];
+          img.data[idx + 1] = px[1];
+          img.data[idx + 2] = px[2];
+        } else {
+          const v = (pixels as number[][])[y][x];
+          img.data[idx] = v;
+          img.data[idx + 1] = v;
+          img.data[idx + 2] = v;
+        }
+        img.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }, [pixels, channels]);
+
+  return (
+    <div className="feature-map-item">
+      <canvas ref={canvasRef} className="feature-map-canvas" style={{ width: 64, height: 64 }} />
       <span className="feature-map-label">{label}</span>
     </div>
   );

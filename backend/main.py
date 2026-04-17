@@ -33,6 +33,7 @@ import logging
 
 from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail, get_device_name, set_device
 from step_through import run_step_through
+from activation_max import activation_maximization
 from data_loaders import DATASET_DETAILS
 import os
 from pathlib import Path
@@ -162,6 +163,25 @@ async def step_through(request: dict):
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Step-through failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/activation-max")
+async def activation_max(request: dict):
+    """Run activation maximization on a Conv2d node — find input images that maximize each filter."""
+    logger.info(f"Activation max for node {request.get('nodeId')}")
+    try:
+        result = activation_maximization(
+            request["graph"],
+            request["nodeId"],
+            num_filters=request.get("numFilters", 8),
+            iterations=request.get("iterations", 25),
+        )
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Activation max failed: {e}")
         return {"status": "error", "error": str(e)}
 
 

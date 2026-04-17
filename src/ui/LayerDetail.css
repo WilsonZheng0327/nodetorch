@@ -126,6 +126,22 @@
   font-style: italic;
 }
 
+.layer-detail-action-btn {
+  padding: 6px 14px;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  color: #cdd6f4;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.layer-detail-action-btn:hover {
+  background: #45475a;
+  border-color: #89b4fa;
+}
+
 .feature-maps-grid {
   display: flex;
   flex-wrap: wrap;
