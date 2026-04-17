@@ -35,6 +35,7 @@ from graph_builder import execute_graph, train_graph, infer_graph, get_layer_det
 from step_through import run_step_through
 from activation_max import activation_maximization
 from backprop_sim import simulate_backprop
+from loss_landscape import compute_loss_landscape
 from runs_store import list_runs, load_run, delete_run
 from data_loaders import DATASET_DETAILS, augmentation_preview
 import os
@@ -205,6 +206,24 @@ async def get_run(run_id: str):
 async def remove_run(run_id: str):
     ok = delete_run(run_id)
     return {"status": "ok" if ok else "error"}
+
+
+@app.post("/loss-landscape")
+async def loss_landscape(request: dict):
+    """Compute 2D loss surface around current weights."""
+    logger.info("Loss landscape requested")
+    try:
+        result = compute_loss_landscape(
+            request["graph"],
+            grid_size=request.get("gridSize", 11),
+            alpha_range=request.get("alphaRange", 1.0),
+        )
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Loss landscape failed: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 @app.post("/simulate-backprop")

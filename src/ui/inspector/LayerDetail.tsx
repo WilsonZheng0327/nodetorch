@@ -30,6 +30,16 @@ interface DetailData {
   }[];
 }
 
+interface LandscapeData {
+  grid: number[][];
+  alphaRange: number;
+  gridSize: number;
+  centerLoss: number;
+  minLoss: number;
+  maxLoss: number;
+  usedTrainedWeights: boolean;
+}
+
 interface ActMaxData {
   dreams: { pixels: number[] | number[][]; channels: number; filterIndex: number }[];
   totalFilters: number;
@@ -44,6 +54,24 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
   const [actMax, setActMax] = useState<ActMaxData | null>(null);
   const [actMaxLoading, setActMaxLoading] = useState(false);
   const [misclassFilter, setMisclassFilter] = useState<{ actual: number; predicted: number } | null>(null);
+  const [landscape, setLandscape] = useState<LandscapeData | null>(null);
+  const [landscapeLoading, setLandscapeLoading] = useState(false);
+
+  const runLandscape = () => {
+    setLandscapeLoading(true);
+    fetch('http://localhost:8000/loss-landscape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ graph: JSON.parse(graphJson), gridSize: 11, alphaRange: 1.0 }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok') setLandscape(data.result);
+        else setError(data.error ?? 'Failed to compute loss landscape');
+      })
+      .catch(() => setError('Cannot connect to backend'))
+      .finally(() => setLandscapeLoading(false));
+  };
 
   const runActivationMax = () => {
     setActMaxLoading(true);
@@ -251,6 +279,30 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
                 </DetailSection>
               )}
 
+              {nodeType.startsWith('ml.loss.') && (
+                <DetailSection title="Loss Landscape (2D slice around current weights)">
+                  {!landscape && !landscapeLoading && (
+                    <>
+                      <div className="heatmap-note">
+                        Projects loss onto two random directions in weight space.
+                        Bowl shape = converged. Chaotic = under-trained.
+                      </div>
+                      <button className="layer-detail-action-btn" onClick={runLandscape}>
+                        Compute Loss Landscape (11×11 grid)
+                      </button>
+                    </>
+                  )}
+                  {landscapeLoading && (
+                    <div className="layer-detail-loading">
+                      Computing 121 loss evaluations...
+                    </div>
+                  )}
+                  {landscape && (
+                    <LossLandscapeView data={landscape} />
+                  )}
+                </DetailSection>
+              )}
+
               {!detail.weightMatrix && !detail.featureMaps && !detail.attentionMap && !detail.hiddenState && !detail.confusionMatrix && (
                 <div className="layer-detail-loading">No detailed visualization available for this node type</div>
               )}
@@ -373,6 +425,81 @@ function FeatureMapCanvas({ pixels, label }: { pixels: number[][]; label: string
     <div className="feature-map-item">
       <canvas ref={canvasRef} className="feature-map-canvas" />
       <span className="feature-map-label">{label}</span>
+    </div>
+  );
+}
+
+// --- Loss landscape heatmap ---
+
+function LossLandscapeView({ data }: { data: LandscapeData }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const cellSize = 20;
+    const padding = 24;
+    const w = data.gridSize * cellSize + padding * 2;
+    const h = data.gridSize * cellSize + padding * 2;
+    canvas.width = w;
+    canvas.height = h;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const range = data.maxLoss - data.minLoss || 1;
+
+    // Draw heatmap
+    for (let r = 0; r < data.gridSize; r++) {
+      for (let c = 0; c < data.gridSize; c++) {
+        const v = data.grid[r][c];
+        const t = (v - data.minLoss) / range;
+        // Warm-to-cool: low loss (good) = cool blue, high loss = warm red
+        // Invert: low t = cool, high t = warm
+        const r255 = Math.round(Math.min(255, t * 255));
+        const g255 = Math.round(Math.min(255, Math.abs(t - 0.5) * 2 * 255));
+        const b255 = Math.round(Math.min(255, (1 - t) * 255));
+        ctx.fillStyle = `rgb(${r255}, ${g255}, ${b255})`;
+        ctx.fillRect(padding + c * cellSize, padding + r * cellSize, cellSize, cellSize);
+      }
+    }
+
+    // Center marker (current weights)
+    const cx = padding + (data.gridSize / 2) * cellSize;
+    const cy = padding + (data.gridSize / 2) * cellSize;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Axes labels
+    ctx.fillStyle = '#cdd6f4';
+    ctx.font = '10px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`α = -${data.alphaRange}`, padding + cellSize / 2, padding - 4);
+    ctx.fillText(`α = +${data.alphaRange}`, padding + (data.gridSize - 0.5) * cellSize, padding - 4);
+    ctx.textAlign = 'right';
+    ctx.fillText(`β = -${data.alphaRange}`, padding - 4, padding + cellSize);
+    ctx.fillText(`β = +${data.alphaRange}`, padding - 4, padding + (data.gridSize - 0.5) * cellSize + 4);
+  }, [data]);
+
+  return (
+    <div>
+      <canvas ref={canvasRef} style={{ borderRadius: 4, border: '1px solid #45475a', imageRendering: 'pixelated' }} />
+      <div className="heatmap-legend">
+        <span>min: {data.minLoss.toFixed(4)} (blue)</span>
+        <span style={{ flex: 1 }}></span>
+        <span>center: {data.centerLoss.toFixed(4)}</span>
+        <span style={{ flex: 1 }}></span>
+        <span>max: {data.maxLoss.toFixed(4)} (red)</span>
+      </div>
+      <div className="heatmap-note">
+        {data.usedTrainedWeights
+          ? 'Computed around trained weights. Smooth valley = well-converged. Sharp ravines = unstable minimum.'
+          : 'Computed around random init (loss is high everywhere). Train first for a meaningful landscape.'}
+      </div>
     </div>
   );
 }
