@@ -400,6 +400,28 @@
   border: 1px solid #45475a;
 }
 
+.dataset-detail-texts {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dataset-detail-text-sample {
+  font-size: 11px;
+  color: #a6adc8;
+  line-height: 1.4;
+  padding: 4px 6px;
+  background: #313244;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .dataset-detail-empty {
   text-align: center;
   color: #6c7086;

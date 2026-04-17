@@ -63,7 +63,7 @@ export function validateForward(graph: Graph, registry: NodeRegistry): Validatio
 
 const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse'];
 const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam', 'ml.optimizers.adamw'];
-const DATA_TYPES = ['data.mnist', 'data.cifar100'];
+const DATA_TYPES = ['data.mnist', 'data.cifar10', 'data.cifar100', 'data.fashion_mnist', 'data.imdb', 'data.ag_news'];
 
 export function validateTraining(graph: Graph, registry: NodeRegistry): ValidationError[] {
   // Start with forward validation

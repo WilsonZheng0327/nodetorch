@@ -1,5 +1,6 @@
-// Dataset detail panel — shows labels, sample images, and stats.
+// Dataset detail panel — shows labels, sample images/texts, and stats.
 // Opened from the inspector when a data node is selected.
+// Handles both image datasets (MNIST, CIFAR) and text datasets (IMDb, AG News).
 
 import { useState, useEffect, useRef } from 'react';
 
@@ -8,12 +9,14 @@ interface DatasetInfo {
   description: string;
   labels: string[];
   coarseLabels?: string[];
-  channels: number;
-  imageSize: number[];
+  channels?: number;
+  imageSize?: number[];
   trainSamples: number;
-  testSamples: number;
+  testSamples?: number;
   diskSize: string;
-  sampleImages: Record<string, number[][][]>;
+  sampleImages?: Record<string, number[][][]>;
+  isText?: boolean;
+  sampleTexts?: Record<string, string[]>;
 }
 
 interface Props {
@@ -97,13 +100,24 @@ export function DatasetDetail({ datasetType, onClose }: Props) {
       <div className="dataset-detail-body">
         {/* Stats */}
         <div className="dataset-detail-stats">
+          {info.imageSize && info.channels != null && (
+            <div className="dataset-detail-stat">
+              <span className="dataset-detail-stat-label">Image Size</span>
+              <span>{info.imageSize.join('x')}, {info.channels === 1 ? 'grayscale' : 'RGB'}</span>
+            </div>
+          )}
+          {info.isText && (
+            <div className="dataset-detail-stat">
+              <span className="dataset-detail-stat-label">Type</span>
+              <span>Text</span>
+            </div>
+          )}
           <div className="dataset-detail-stat">
-            <span className="dataset-detail-stat-label">Image Size</span>
-            <span>{info.imageSize.join('x')}, {info.channels === 1 ? 'grayscale' : 'RGB'}</span>
-          </div>
-          <div className="dataset-detail-stat">
-            <span className="dataset-detail-stat-label">Train / Test</span>
-            <span>{info.trainSamples.toLocaleString()} / {info.testSamples.toLocaleString()}</span>
+            <span className="dataset-detail-stat-label">{info.testSamples != null ? 'Train / Test' : 'Train Samples'}</span>
+            <span>
+              {info.trainSamples.toLocaleString()}
+              {info.testSamples != null && ` / ${info.testSamples.toLocaleString()}`}
+            </span>
           </div>
           <div className="dataset-detail-stat">
             <span className="dataset-detail-stat-label">Classes</span>
@@ -124,16 +138,25 @@ export function DatasetDetail({ datasetType, onClose }: Props) {
           onChange={(e) => setSearch(e.target.value)}
         />
 
-        {/* Labels + sample images */}
+        {/* Labels + samples */}
         <div className="dataset-detail-labels">
           {pagedLabels.map((label) => (
             <div key={label} className="dataset-detail-label-row">
               <span className="dataset-detail-label-name">{label}</span>
-              <div className="dataset-detail-samples">
-                {(info.sampleImages[label] ?? []).map((pixels, i) => (
-                  <MiniImage key={i} pixels={pixels} channels={info.channels} />
-                ))}
-              </div>
+              {info.sampleImages && (
+                <div className="dataset-detail-samples">
+                  {(info.sampleImages[label] ?? []).map((pixels, i) => (
+                    <MiniImage key={i} pixels={pixels} channels={info.channels ?? 1} />
+                  ))}
+                </div>
+              )}
+              {info.sampleTexts && (
+                <div className="dataset-detail-texts">
+                  {(info.sampleTexts[label] ?? []).map((text, i) => (
+                    <div key={i} className="dataset-detail-text-sample">{text}</div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {filteredLabels.length === 0 && (
