@@ -21,6 +21,13 @@ interface DetailData {
   hiddenState?: { data: number[][]; rows: number; cols: number; label: string };
   cellState?: { data: number[][]; rows: number; cols: number; label: string };
   confusionMatrix?: { data: number[][]; size: number };
+  misclassifications?: {
+    actual: number;
+    predicted: number;
+    confidence: number;
+    imagePixels: number[][] | number[][][];
+    imageChannels: number;
+  }[];
 }
 
 interface ActMaxData {
@@ -36,6 +43,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [actMax, setActMax] = useState<ActMaxData | null>(null);
   const [actMaxLoading, setActMaxLoading] = useState(false);
+  const [misclassFilter, setMisclassFilter] = useState<{ actual: number; predicted: number } | null>(null);
 
   const runActivationMax = () => {
     setActMaxLoading(true);
@@ -194,7 +202,52 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
 
               {detail.confusionMatrix && (
                 <DetailSection title={`Confusion Matrix (${detail.confusionMatrix.size} classes)`}>
-                  <ConfusionMatrixView data={detail.confusionMatrix.data} size={detail.confusionMatrix.size} />
+                  <ConfusionMatrixView
+                    data={detail.confusionMatrix.data}
+                    size={detail.confusionMatrix.size}
+                    onCellClick={(actual, predicted) => {
+                      if (actual === predicted) {
+                        setMisclassFilter(null);
+                      } else {
+                        setMisclassFilter({ actual, predicted });
+                      }
+                    }}
+                    highlightCell={misclassFilter}
+                  />
+                </DetailSection>
+              )}
+
+              {detail.misclassifications && detail.misclassifications.length > 0 && (
+                <DetailSection title={
+                  misclassFilter
+                    ? `Misclassifications — actual ${misclassFilter.actual} predicted as ${misclassFilter.predicted}`
+                    : `Misclassified Samples (${detail.misclassifications.length})`
+                }>
+                  {misclassFilter && (
+                    <button
+                      className="layer-detail-action-btn"
+                      onClick={() => setMisclassFilter(null)}
+                      style={{ marginBottom: 8 }}
+                    >
+                      ← Show all
+                    </button>
+                  )}
+                  <div className="misclass-grid">
+                    {detail.misclassifications
+                      .filter((m) =>
+                        !misclassFilter ||
+                        (m.actual === misclassFilter.actual && m.predicted === misclassFilter.predicted)
+                      )
+                      .slice(0, 32)
+                      .map((m, i) => (
+                        <MisclassCard key={i} sample={m} />
+                      ))}
+                  </div>
+                  {misclassFilter && detail.misclassifications.filter((m) =>
+                    m.actual === misclassFilter.actual && m.predicted === misclassFilter.predicted
+                  ).length === 0 && (
+                    <div className="layer-detail-loading">No samples stored for this pair</div>
+                  )}
                 </DetailSection>
               )}
 
@@ -371,8 +424,15 @@ function DreamCanvas({ pixels, channels, label }: { pixels: number[] | number[][
 
 // --- Confusion matrix grid ---
 
-function ConfusionMatrixView({ data, size }: { data: number[][]; size: number }) {
+function ConfusionMatrixView({ data, size, onCellClick, highlightCell }: {
+  data: number[][];
+  size: number;
+  onCellClick?: (actual: number, predicted: number) => void;
+  highlightCell?: { actual: number; predicted: number } | null;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cellSizeRef = useRef(16);
+  const labelSpaceRef = useRef(30);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -380,6 +440,8 @@ function ConfusionMatrixView({ data, size }: { data: number[][]; size: number })
 
     const cellSize = Math.max(16, Math.min(28, Math.floor(400 / size)));
     const labelSpace = 30;
+    cellSizeRef.current = cellSize;
+    labelSpaceRef.current = labelSpace;
     canvas.width = size * cellSize + labelSpace;
     canvas.height = size * cellSize + labelSpace;
 
@@ -388,7 +450,6 @@ function ConfusionMatrixView({ data, size }: { data: number[][]; size: number })
 
     const maxVal = Math.max(...data.flat(), 1);
 
-    // Column headers (predicted)
     ctx.fillStyle = '#6c7086';
     ctx.font = '9px JetBrains Mono, monospace';
     ctx.textAlign = 'center';
@@ -396,7 +457,6 @@ function ConfusionMatrixView({ data, size }: { data: number[][]; size: number })
       ctx.fillText(String(c), labelSpace + c * cellSize + cellSize / 2, 10);
     }
 
-    // Row labels (actual) + cells
     for (let r = 0; r < size; r++) {
       ctx.textAlign = 'right';
       ctx.fillStyle = '#6c7086';
@@ -408,7 +468,6 @@ function ConfusionMatrixView({ data, size }: { data: number[][]; size: number })
         const x = labelSpace + c * cellSize;
         const y = labelSpace + r * cellSize;
 
-        // Diagonal = correct (green), off-diagonal = errors (red)
         if (r === c) {
           ctx.fillStyle = `rgba(16, 185, 129, ${0.1 + t * 0.8})`;
         } else {
@@ -416,7 +475,14 @@ function ConfusionMatrixView({ data, size }: { data: number[][]; size: number })
         }
         ctx.fillRect(x, y, cellSize - 1, cellSize - 1);
 
-        // Value text
+        // Highlighted cell gets a border
+        if (highlightCell && highlightCell.actual === r && highlightCell.predicted === c) {
+          ctx.strokeStyle = '#89b4fa';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, cellSize - 1, cellSize - 1);
+          ctx.lineWidth = 1;
+        }
+
         if (v > 0) {
           ctx.fillStyle = t > 0.5 ? '#fff' : '#a6adc8';
           ctx.font = '9px JetBrains Mono, monospace';
@@ -426,18 +492,85 @@ function ConfusionMatrixView({ data, size }: { data: number[][]; size: number })
       }
     }
 
-    // Axis labels
     ctx.fillStyle = '#6c7086';
     ctx.font = '9px Inter, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Predicted', labelSpace + (size * cellSize) / 2, size * cellSize + labelSpace + 12);
-  }, [data, size]);
+  }, [data, size, highlightCell]);
+
+  function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (!onCellClick) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const c = Math.floor((x - labelSpaceRef.current) / cellSizeRef.current);
+    const r = Math.floor((y - labelSpaceRef.current) / cellSizeRef.current);
+    if (r >= 0 && r < size && c >= 0 && c < size) {
+      onCellClick(r, c);
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <canvas ref={canvasRef} style={{ borderRadius: 4 }} />
+      <canvas
+        ref={canvasRef}
+        style={{ borderRadius: 4, cursor: onCellClick ? 'pointer' : 'default' }}
+        onClick={handleClick}
+      />
       <div style={{ fontSize: 9, color: '#6c7086', marginTop: 4 }}>
-        Rows = Actual, Columns = Predicted
+        Rows = Actual, Columns = Predicted{onCellClick ? ' — click a cell to filter misclassifications' : ''}
+      </div>
+    </div>
+  );
+}
+
+// --- Misclassification card (shown in gallery) ---
+
+function MisclassCard({ sample }: { sample: {
+  actual: number; predicted: number; confidence: number;
+  imagePixels: number[][] | number[][][]; imageChannels: number;
+} }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const pixels = sample.imagePixels;
+    if (pixels.length === 0) return;
+    const h = pixels.length;
+    const isRGB = sample.imageChannels >= 3;
+    const w = isRGB ? (pixels as number[][][])[0].length : (pixels as number[][])[0].length;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const data = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        if (isRGB) {
+          const px = (pixels as number[][][])[y][x];
+          data.data[idx] = px[0];
+          data.data[idx + 1] = px[1];
+          data.data[idx + 2] = px[2];
+        } else {
+          const v = (pixels as number[][])[y][x];
+          data.data[idx] = v;
+          data.data[idx + 1] = v;
+          data.data[idx + 2] = v;
+        }
+        data.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(data, 0, 0);
+  }, [sample]);
+  return (
+    <div className="misclass-card">
+      <canvas ref={canvasRef} className="misclass-canvas" />
+      <div className="misclass-labels">
+        <div className="misclass-actual">actual {sample.actual}</div>
+        <div className="misclass-predicted">pred {sample.predicted} ({(sample.confidence * 100).toFixed(0)}%)</div>
       </div>
     </div>
   );

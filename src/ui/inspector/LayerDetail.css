@@ -143,6 +143,45 @@
   border-color: #89b4fa;
 }
 
+.misclass-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.misclass-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: #181825;
+  border-radius: 4px;
+  border: 1px solid #45475a;
+}
+
+.misclass-canvas {
+  width: 56px;
+  height: 56px;
+  image-rendering: pixelated;
+  border-radius: 3px;
+}
+
+.misclass-labels {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.misclass-actual {
+  color: #a6adc8;
+}
+
+.misclass-predicted {
+  color: #f38ba8;
+}
+
 .feature-maps-grid {
   display: flex;
   flex-wrap: wrap;

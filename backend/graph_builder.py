@@ -737,12 +737,15 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
                 "label": "Cell State",
             }
 
-    # --- Confusion matrix (loss nodes) ---
+    # --- Confusion matrix + misclassifications (loss nodes) ---
     if node_type in LOSS_NODES:
         # Use full confusion matrix accumulated during training if available
         cached_cm = _last_run.get("confusionMatrix")
         if cached_cm:
             detail["confusionMatrix"] = cached_cm
+        misclass = _last_run.get("misclassifications")
+        if misclass:
+            detail["misclassifications"] = misclass
         else:
             # Fallback: compute from current batch in results
             pred_tensor = None
@@ -956,10 +959,14 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
         total = 0
         per_class_correct: dict[int, int] = {}
         per_class_total: dict[int, int] = {}
-        # Accumulate confusion matrix on last epoch
-        is_last_epoch = (epoch == epochs - 1)
+        # Accumulate confusion matrix + misclassifications — reset each epoch so final
+        # iteration's state ends up cached (supports early stopping, where we don't
+        # know which epoch is actually "last")
         confusion_preds: list[int] = []
         confusion_labels: list[int] = []
+        misclass_samples: list[dict] = []
+        misclass_counts: dict[tuple, int] = {}  # (actual, predicted) → count kept
+        is_last_epoch = (epoch == epochs - 1)
 
         last_batch_results: dict[str, dict[str, torch.Tensor]] = {}
 
@@ -1054,10 +1061,14 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
                                 mask = labels == cls
                                 per_class_total[cls] = per_class_total.get(cls, 0) + mask.sum().item()
                                 per_class_correct[cls] = per_class_correct.get(cls, 0) + (predicted[mask] == cls).sum().item()
-                            # Accumulate confusion matrix on last epoch
-                            if is_last_epoch:
-                                confusion_preds.extend(predicted.cpu().tolist())
-                                confusion_labels.extend(labels.cpu().tolist())
+                            # Accumulate confusion matrix (reset each epoch)
+                            confusion_preds.extend(predicted.cpu().tolist())
+                            confusion_labels.extend(labels.cpu().tolist())
+                            # Track misclassified samples with their images
+                            _collect_misclassifications(
+                                images, predicted, labels, preds,
+                                data_node["type"], misclass_samples, misclass_counts,
+                            )
                         break
 
             last_batch_results = batch_results
@@ -1380,6 +1391,8 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
             "data": matrix,
             "size": n_classes,
         }
+    if misclass_samples:
+        _last_run["misclassifications"] = misclass_samples
 
     # Persist this run to disk for the history tab
     try:
@@ -1668,6 +1681,63 @@ def infer_graph(graph_data: dict) -> dict:
         "nodeResults": node_results,
         "prediction": prediction,
     }
+
+
+def _collect_misclassifications(
+    images: torch.Tensor,
+    predicted: torch.Tensor,
+    labels: torch.Tensor,
+    logits: torch.Tensor,
+    dataset_type: str,
+    samples: list,
+    counts: dict,
+    max_per_pair: int = 4,
+    max_total: int = 50,
+) -> None:
+    """Collect a cap of misclassified samples from the current batch.
+
+    Each sample includes displayable pixels (denormalized), predicted/actual labels,
+    and softmax confidence for the predicted class. Caps storage so response stays small.
+    """
+    if len(samples) >= max_total or images.dim() != 4:
+        return
+
+    wrong = predicted != labels
+    if not wrong.any():
+        return
+
+    denorm = DENORMALIZERS.get(dataset_type)
+    probs_batch = torch.softmax(logits, dim=1)
+
+    for i in range(labels.size(0)):
+        if not bool(wrong[i]):
+            continue
+        actual = int(labels[i])
+        pred = int(predicted[i])
+        key = (actual, pred)
+        if counts.get(key, 0) >= max_per_pair:
+            continue
+        if len(samples) >= max_total:
+            break
+        counts[key] = counts.get(key, 0) + 1
+
+        img = images[i].detach().cpu()
+        if denorm:
+            img = denorm(img)
+        img = (img.clamp(0, 1) * 255).byte()
+        C = img.shape[0]
+        if C == 1:
+            pixels = img[0].tolist()
+        else:
+            pixels = img.permute(1, 2, 0).tolist()
+
+        samples.append({
+            "actual": actual,
+            "predicted": pred,
+            "confidence": _safe_float(float(probs_batch[i, pred])),
+            "imagePixels": pixels,
+            "imageChannels": int(C),
+        })
 
 
 def _safe_float(v: float) -> float | None:
