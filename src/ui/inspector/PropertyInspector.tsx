@@ -29,7 +29,11 @@ export function PropertyInspector({ node, onPropertyChange, onSaveBlock, graphJs
           <div className="inspector-empty">Select a node to edit properties</div>
         </div>
         {datasetDetailType && (
-          <DatasetDetail datasetType={datasetDetailType} onClose={() => setDatasetDetailType(null)} />
+          <DatasetDetail
+            datasetType={datasetDetailType}
+            augOptions={node?.properties as any}
+            onClose={() => setDatasetDetailType(null)}
+          />
         )}
       </>
     );
@@ -45,7 +49,11 @@ export function PropertyInspector({ node, onPropertyChange, onSaveBlock, graphJs
   return (
     <>
     {datasetDetailType && (
-      <DatasetDetail datasetType={datasetDetailType} onClose={() => setDatasetDetailType(null)} />
+      <DatasetDetail
+        datasetType={datasetDetailType}
+        augOptions={node.properties as any}
+        onClose={() => setDatasetDetailType(null)}
+      />
     )}
     {layerDetailNode && graphJson && (
       <LayerDetail

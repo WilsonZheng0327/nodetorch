@@ -549,3 +549,78 @@ DATASET_DETAILS: dict[str, callable] = {
     "data.imdb": detail_imdb,
     "data.ag_news": detail_ag_news,
 }
+
+
+# --- Augmentation preview ---
+
+def _get_raw_image(dataset_type: str):
+    """Get the first raw sample (PIL image) from a dataset, no transforms."""
+    if dataset_type == "data.cifar10":
+        ds = torchvision.datasets.CIFAR10(root="./data", train=True, download=True)
+        return ds[0][0]  # PIL image
+    if dataset_type == "data.cifar100":
+        ds = torchvision.datasets.CIFAR100(root="./data", train=True, download=True)
+        return ds[0][0]
+    if dataset_type == "data.mnist":
+        ds = torchvision.datasets.MNIST(root="./data", train=True, download=True)
+        return ds[0][0]
+    if dataset_type == "data.fashion_mnist":
+        ds = torchvision.datasets.FashionMNIST(root="./data", train=True, download=True)
+        return ds[0][0]
+    return None
+
+
+def _pil_to_pixels(img) -> tuple[list, int]:
+    """Convert a PIL image (or tensor) to a (pixels, channels) tuple for display."""
+    if not isinstance(img, torch.Tensor):
+        img = transforms.ToTensor()(img)  # [C, H, W] in [0, 1]
+    img = (img.clamp(0, 1) * 255).byte()
+    C = img.shape[0]
+    if C == 1:
+        return img[0].tolist(), 1
+    return img.permute(1, 2, 0).tolist(), int(C)
+
+
+def augmentation_preview(
+    dataset_type: str,
+    augHFlip: bool = False,
+    augRandomCrop: bool = False,
+    augColorJitter: bool = False,
+    num_variants: int = 8,
+) -> dict | None:
+    """Generate augmented variants of a sample with the given augmentation settings.
+
+    Returns the original sample + num_variants augmented versions (different random seeds).
+    """
+    pil_img = _get_raw_image(dataset_type)
+    if pil_img is None:
+        return {"error": f"Augmentation preview not supported for {dataset_type}"}
+
+    # Build augmentation pipeline (same as training, but in PIL space + ToTensor at end)
+    pil_aug_list = []
+    if augRandomCrop:
+        pil_aug_list.append(transforms.RandomCrop(pil_img.size[0], padding=4))
+    if augHFlip:
+        pil_aug_list.append(transforms.RandomHorizontalFlip())
+    if augColorJitter:
+        pil_aug_list.append(transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2))
+
+    original_pixels, channels = _pil_to_pixels(pil_img)
+    original = {"pixels": original_pixels, "channels": channels}
+
+    if not pil_aug_list:
+        return {"original": original, "variants": [], "anyEnabled": False}
+
+    variants = []
+    for i in range(num_variants):
+        # Seed per variant so they differ visibly
+        torch.manual_seed(i + 1)
+        import random as _random
+        _random.seed(i + 1)
+        augmented = pil_img
+        for t in pil_aug_list:
+            augmented = t(augmented)
+        pixels, c = _pil_to_pixels(augmented)
+        variants.append({"pixels": pixels, "channels": c})
+
+    return {"original": original, "variants": variants, "anyEnabled": True}

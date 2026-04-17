@@ -428,6 +428,62 @@
   padding: 16px;
 }
 
+/* Augmentation preview */
+
+.dataset-detail-aug {
+  margin-bottom: 16px;
+  padding: 10px;
+  background: rgba(137, 180, 250, 0.05);
+  border: 1px solid rgba(137, 180, 250, 0.2);
+  border-radius: 4px;
+}
+
+.dataset-detail-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #89b4fa;
+  margin-bottom: 8px;
+}
+
+.dataset-detail-aug-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dataset-detail-aug-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.dataset-detail-aug-item canvas {
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+  border-radius: 3px;
+  border: 1px solid #45475a;
+}
+
+.dataset-detail-aug-label {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #6c7086;
+}
+
+.dataset-detail-aug-empty {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: rgba(108, 112, 134, 0.1);
+  border-radius: 4px;
+  font-size: 11px;
+  color: #6c7086;
+  text-align: center;
+}
+
 .dataset-detail-pagination {
   display: flex;
   align-items: center;

@@ -36,7 +36,7 @@ from step_through import run_step_through
 from activation_max import activation_maximization
 from backprop_sim import simulate_backprop
 from runs_store import list_runs, load_run, delete_run
-from data_loaders import DATASET_DETAILS
+from data_loaders import DATASET_DETAILS, augmentation_preview
 import os
 from pathlib import Path
 
@@ -165,6 +165,24 @@ async def step_through(request: dict):
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Step-through failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/augmentation-preview")
+async def aug_preview(request: dict):
+    """Preview augmentation effects on a sample."""
+    try:
+        result = augmentation_preview(
+            request["datasetType"],
+            augHFlip=request.get("augHFlip", False),
+            augRandomCrop=request.get("augRandomCrop", False),
+            augColorJitter=request.get("augColorJitter", False),
+        )
+        if result and "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Augmentation preview failed: {e}")
         return {"status": "error", "error": str(e)}
 
 

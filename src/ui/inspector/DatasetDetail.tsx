@@ -19,17 +19,31 @@ interface DatasetInfo {
   sampleTexts?: Record<string, string[]>;
 }
 
+interface AugOptions {
+  augHFlip?: boolean;
+  augRandomCrop?: boolean;
+  augColorJitter?: boolean;
+}
+
+interface AugPreview {
+  original: { pixels: number[][] | number[][][]; channels: number };
+  variants: { pixels: number[][] | number[][][]; channels: number }[];
+  anyEnabled: boolean;
+}
+
 interface Props {
   datasetType: string;
+  augOptions?: AugOptions;
   onClose: () => void;
 }
 
-export function DatasetDetail({ datasetType, onClose }: Props) {
+export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
   const [info, setInfo] = useState<DatasetInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+  const [augPreview, setAugPreview] = useState<AugPreview | null>(null);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -57,6 +71,29 @@ export function DatasetDetail({ datasetType, onClose }: Props) {
 
   // Reset page when search changes
   useEffect(() => { setPage(0); }, [search]);
+
+  // Fetch augmentation preview when datasetType or augOptions change
+  useEffect(() => {
+    if (!augOptions) {
+      setAugPreview(null);
+      return;
+    }
+    fetch('http://localhost:8000/augmentation-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        datasetType,
+        augHFlip: augOptions.augHFlip ?? false,
+        augRandomCrop: augOptions.augRandomCrop ?? false,
+        augColorJitter: augOptions.augColorJitter ?? false,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok' && data.result) setAugPreview(data.result);
+      })
+      .catch(() => {});
+  }, [datasetType, augOptions?.augHFlip, augOptions?.augRandomCrop, augOptions?.augColorJitter]);
 
   if (loading) {
     return (
@@ -128,6 +165,30 @@ export function DatasetDetail({ datasetType, onClose }: Props) {
             <span>{info.diskSize}</span>
           </div>
         </div>
+
+        {/* Augmentation preview */}
+        {augPreview && augPreview.anyEnabled && (
+          <div className="dataset-detail-aug">
+            <div className="dataset-detail-section-label">Augmentation Preview</div>
+            <div className="dataset-detail-aug-grid">
+              <div className="dataset-detail-aug-item">
+                <MiniImage pixels={augPreview.original.pixels} channels={augPreview.original.channels} />
+                <span className="dataset-detail-aug-label">original</span>
+              </div>
+              {augPreview.variants.map((v, i) => (
+                <div key={i} className="dataset-detail-aug-item">
+                  <MiniImage pixels={v.pixels} channels={v.channels} />
+                  <span className="dataset-detail-aug-label">aug {i + 1}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {augPreview && !augPreview.anyEnabled && (
+          <div className="dataset-detail-aug-empty">
+            No augmentations enabled — toggle on the data node to preview
+          </div>
+        )}
 
         {/* Search */}
         <input
