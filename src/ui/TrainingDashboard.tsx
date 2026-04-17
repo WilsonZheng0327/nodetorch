@@ -8,6 +8,8 @@ export interface EpochData {
   totalEpochs?: number;
   loss: number;
   accuracy: number;
+  valLoss?: number | null;
+  valAccuracy?: number | null;
   time?: number;
   batches?: number;
   samples?: number;
@@ -190,7 +192,9 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
                   <tr>
                     <th>Epoch</th>
                     <th>Loss</th>
-                    <th>Accuracy</th>
+                    <th>Acc</th>
+                    <th>Val Loss</th>
+                    <th>Val Acc</th>
                     <th>Time</th>
                   </tr>
                 </thead>
@@ -200,6 +204,8 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
                       <td>{d.epoch}</td>
                       <td>{d.loss?.toFixed(4)}</td>
                       <td>{(d.accuracy * 100).toFixed(1)}%</td>
+                      <td>{d.valLoss != null ? d.valLoss.toFixed(4) : '—'}</td>
+                      <td>{d.valAccuracy != null ? `${(d.valAccuracy * 100).toFixed(1)}%` : '—'}</td>
                       <td>{d.time != null ? `${d.time}s` : ''}</td>
                     </tr>
                   ))}
@@ -217,8 +223,10 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
           ) : (
             <Chart
               data={progress.map((d) => activeTab === 'loss' ? d.loss : d.accuracy)}
+              valData={progress.map((d) => activeTab === 'loss' ? d.valLoss : d.valAccuracy)}
               labels={progress.map((d) => d.epoch)}
               color={activeTab === 'loss' ? '#ef4444' : '#10b981'}
+              valColor="#fab387"
               formatValue={activeTab === 'loss' ? (v) => v.toFixed(4) : (v) => (v * 100).toFixed(1) + '%'}
               selectedIndex={selectedEpoch != null ? selectedEpoch - 1 : null}
             />
@@ -375,9 +383,11 @@ interface ChartProps {
   color: string;
   formatValue: (v: number) => string;
   selectedIndex?: number | null;
+  valData?: (number | null | undefined)[];
+  valColor?: string;
 }
 
-function Chart({ data: rawData, labels, color, formatValue, selectedIndex }: ChartProps) {
+function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valData, valColor }: ChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -386,6 +396,8 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex }: Cha
 
     // Guard against NaN/null/Infinity
     const data = rawData.map((v) => (v == null || !isFinite(v)) ? 0 : v);
+    // Sanitize valData (preserve null = "no val for this epoch")
+    const valClean = valData?.map((v) => (v != null && isFinite(v) ? v : null));
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -404,8 +416,11 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex }: Cha
 
     ctx.clearRect(0, 0, w, h);
 
-    const min = Math.min(...data);
-    const max = Math.max(...data);
+    // Compute min/max across both series
+    const valValuesForRange = (valClean?.filter((v): v is number => v != null)) ?? [];
+    const allValues = [...data, ...valValuesForRange];
+    const min = Math.min(...allValues);
+    const max = Math.max(...allValues);
     const range = max - min || 1;
 
     // Y axis labels
@@ -457,6 +472,65 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex }: Cha
       ctx.fill();
     }
 
+    // Validation line (dashed) if provided
+    if (valClean) {
+      const vColor = valColor ?? '#fab387';
+      ctx.strokeStyle = vColor;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < valClean.length; i++) {
+        const v = valClean[i];
+        if (v == null) {
+          started = false;
+          continue;
+        }
+        const x = pad.left + (plotW * i) / Math.max(valClean.length - 1, 1);
+        const y = pad.top + plotH - (plotH * (v - min)) / range;
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Val points
+      ctx.fillStyle = vColor;
+      for (let i = 0; i < valClean.length; i++) {
+        const v = valClean[i];
+        if (v == null) continue;
+        const x = pad.left + (plotW * i) / Math.max(valClean.length - 1, 1);
+        const y = pad.top + plotH - (plotH * (v - min)) / range;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Legend (if val line present)
+    if (valClean) {
+      ctx.font = '10px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      // Train legend
+      ctx.fillStyle = color;
+      ctx.fillRect(pad.left + 4, 4, 10, 2);
+      ctx.fillStyle = '#a6adc8';
+      ctx.fillText('train', pad.left + 18, 10);
+      // Val legend
+      ctx.strokeStyle = valColor ?? '#fab387';
+      ctx.setLineDash([3, 2]);
+      ctx.beginPath();
+      ctx.moveTo(pad.left + 60, 5);
+      ctx.lineTo(pad.left + 70, 5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#a6adc8';
+      ctx.fillText('val', pad.left + 74, 10);
+    }
+
     // Selected epoch marker (vertical line + larger dot)
     if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < data.length) {
       const sx = pad.left + (plotW * selectedIndex) / Math.max(data.length - 1, 1);
@@ -481,7 +555,7 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex }: Cha
       ctx.textAlign = 'center';
       ctx.fillText(formatValue(data[selectedIndex]), sx, sy - 10);
     }
-  }, [rawData, labels, color, formatValue, selectedIndex]);
+  }, [rawData, labels, color, formatValue, selectedIndex, valData, valColor]);
 
   return <canvas ref={canvasRef} className="dashboard-chart" />;
 }

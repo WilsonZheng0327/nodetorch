@@ -871,9 +871,26 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
     else:
         train_dataset = dataset_builder()
 
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True,
-    )
+    # Split into train/val
+    val_split = props.get("valSplit", 0.1)
+    val_loader = None
+    if val_split > 0 and len(train_dataset) > 10:
+        n_val = max(1, int(len(train_dataset) * val_split))
+        n_train = len(train_dataset) - n_val
+        train_subset, val_subset = torch.utils.data.random_split(
+            train_dataset, [n_train, n_val],
+            generator=torch.Generator().manual_seed(42),  # deterministic split
+        )
+        train_loader = torch.utils.data.DataLoader(
+            train_subset, batch_size=batch_size, shuffle=True,
+        )
+        val_loader = torch.utils.data.DataLoader(
+            val_subset, batch_size=batch_size, shuffle=False,
+        )
+    else:
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=batch_size, shuffle=True,
+        )
 
     # Training loop
     import time
@@ -1006,6 +1023,70 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
         avg_loss = total_loss / len(train_loader)
         accuracy = correct / total if total > 0 else 0.0
 
+        # --- Validation pass ---
+        val_loss = None
+        val_accuracy = None
+        if val_loader is not None:
+            val_total_loss = 0.0
+            val_correct = 0
+            val_total = 0
+            with torch.no_grad():
+                for images, labels in val_loader:
+                    if cancel_event and cancel_event.is_set():
+                        break
+                    dev = get_device()
+                    images, labels = images.to(dev), labels.to(dev)
+                    batch_results_v: dict[str, dict[str, torch.Tensor]] = {}
+                    for node_id in order:
+                        n = nodes[node_id]
+                        ntype = n["type"]
+                        if DATA_LOADERS.get(ntype):
+                            batch_results_v[node_id] = {"out": images, "labels": labels}
+                            continue
+                        if ntype in OPTIMIZER_NODES:
+                            continue
+                        mod = modules.get(node_id)
+                        if mod is None:
+                            continue
+                        v_inputs = gather_inputs(node_id, edges, batch_results_v)
+                        if ntype in LOSS_NODES:
+                            if "predictions" in v_inputs and "labels" in v_inputs:
+                                loss_v = mod(v_inputs["predictions"], v_inputs["labels"])
+                                batch_results_v[node_id] = {"out": loss_v}
+                            continue
+                        if ntype in MULTI_INPUT_NODES:
+                            out_v = mod(**v_inputs)
+                            batch_results_v[node_id] = {"out": out_v}
+                            continue
+                        if ntype == SUBGRAPH_TYPE:
+                            sg = mod(**v_inputs)
+                            fk = next(iter(sg), None)
+                            if fk:
+                                batch_results_v[node_id] = {"out": sg[fk]}
+                            continue
+                        if "in" in v_inputs:
+                            raw = mod(v_inputs["in"])
+                            batch_results_v[node_id] = raw if isinstance(raw, dict) else {"out": raw}
+
+                    v_loss_tensor = batch_results_v.get(loss_node_id, {}).get("out")
+                    if v_loss_tensor is not None:
+                        val_total_loss += float(v_loss_tensor.item())
+                        for edge in edges:
+                            if (edge["target"]["nodeId"] == loss_node_id
+                                    and edge["target"]["portId"] == "predictions"):
+                                pnid = edge["source"]["nodeId"]
+                                preds_v = batch_results_v.get(pnid, {}).get("out")
+                                if preds_v is not None:
+                                    pred_v = preds_v.argmax(dim=1)
+                                    val_correct += int((pred_v == labels).sum().item())
+                                    val_total += int(labels.size(0))
+                                break
+
+            if len(val_loader) > 0:
+                val_loss = val_total_loss / len(val_loader)
+            if val_total > 0:
+                val_accuracy = val_correct / val_total
+
         # Per-node visualization snapshots (weights, gradients, activations)
         node_snapshots = {}
         for node_id, module in modules.items():
@@ -1110,6 +1191,8 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
             "totalEpochs": epochs,
             "loss": _safe_float(avg_loss),
             "accuracy": _safe_float(accuracy),
+            "valLoss": _safe_float(val_loss) if val_loss is not None else None,
+            "valAccuracy": _safe_float(val_accuracy) if val_accuracy is not None else None,
             "time": round(epoch_time, 2),
             "batches": total_batches,
             "samples": total,

@@ -44,6 +44,13 @@ export const adamNode: NodeDefinition = {
       defaultValue: 2,
       affects: 'execution',
     },
+    {
+      id: 'valSplit',
+      name: 'Val Split',
+      type: { kind: 'number', min: 0, max: 0.5, step: 0.05 },
+      defaultValue: 0.1,
+      affects: 'execution',
+    },
   ],
 
   getPorts: () => [

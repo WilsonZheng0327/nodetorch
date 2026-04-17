@@ -751,6 +751,8 @@ export function useGraph(domain: DomainContext) {
             totalEpochs: msg.totalEpochs,
             loss: msg.loss,
             accuracy: msg.accuracy,
+            valLoss: msg.valLoss,
+            valAccuracy: msg.valAccuracy,
             time: msg.time,
             batches: msg.batches,
             samples: msg.samples,
