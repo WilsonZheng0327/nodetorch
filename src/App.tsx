@@ -11,6 +11,7 @@ import { NodePalette } from './ui/NodePalette';
 import { Toolbar } from './ui/Toolbar';
 import { TrainingDashboard, type ModelLayerInfo } from './ui/dashboard/TrainingDashboard';
 import { StepThroughPanel } from './ui/step-through/StepThroughPanel';
+import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
 import { createNode as cn, addNode as an, createEdge as ce, addEdge as ae } from './core/graph';
 
@@ -77,6 +78,7 @@ export default function App() {
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [stepThroughOpen, setStepThroughOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const selectedNode = selectedNodeId ? graph.currentGraph.nodes.get(selectedNodeId) ?? null : null;
 
   // Track which node is selected
@@ -143,6 +145,13 @@ export default function App() {
     function onDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      // Shortcuts help
+      if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
+        return;
+      }
 
       // Undo/Redo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -405,6 +414,7 @@ export default function App() {
           graphJson={graph.saveGraph()}
           onClose={() => setStepThroughOpen(false)}
         />
+        <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       </div>
     </BackpropCtx.Provider>
     </VizCtx.Provider>
