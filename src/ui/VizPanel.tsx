@@ -109,6 +109,8 @@ function detectGradientIssue(g: HistogramData): string | null {
 }
 
 function detectActivationIssue(a: HistogramData): string | null {
+  // Skip checks for scalar outputs (e.g., loss nodes)
+  if (a.histCounts && a.histCounts.reduce((s, v) => s + v, 0) <= 1) return null;
   if (a.sparsity != null && a.sparsity > 0.9) return 'Dead neurons';
   if (a.std != null && a.std < 0.01) return 'Saturated';
   return null;

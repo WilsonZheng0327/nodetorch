@@ -36,6 +36,19 @@ SUBGRAPH_TYPE = "subgraph.block"
 SENTINEL_INPUT = "subgraph.input"
 SENTINEL_OUTPUT = "subgraph.output"
 
+# --- Device management ---
+_device: str = "cpu"
+
+def get_device() -> torch.device:
+    return torch.device(_device)
+
+def set_device(device: str):
+    global _device
+    _device = device
+
+def get_device_name() -> str:
+    return _device
+
 # Stores trained modules in memory so inference can reuse them.
 # Key: "current" (single session for now), Value: dict of node_id → nn.Module
 _model_store: dict[str, dict[str, nn.Module]] = {}
@@ -277,6 +290,8 @@ def build_and_run_graph(graph_data: dict) -> tuple[
         if loader:
             try:
                 tensors = loader(props)
+                dev = get_device()
+                tensors = {k: v.to(dev) for k, v in tensors.items()}
                 results[node_id] = tensors
                 outputs = {k: tensor_info(v) for k, v in tensors.items()}
                 first_tensor = next(iter(tensors.values()))
@@ -323,7 +338,7 @@ def build_and_run_graph(graph_data: dict) -> tuple[
             input_shapes = {k: list(v.shape) for k, v in inputs.items()}
             try:
                 module = builder(props, input_shapes)
-                modules[node_id] = module
+                modules[node_id] = module.to(get_device())
                 loss = module(inputs["predictions"], inputs["labels"])
                 results[node_id] = {"out": loss}
                 node_results[node_id] = {
@@ -354,7 +369,7 @@ def build_and_run_graph(graph_data: dict) -> tuple[
             input_shapes = {k: list(v.shape) for k, v in inputs.items()}
             try:
                 module = builder(props, input_shapes)
-                modules[node_id] = module
+                modules[node_id] = module.to(get_device())
 
                 # Pass all inputs as keyword arguments
                 output = module(**{k: v for k, v in inputs.items()})
@@ -384,7 +399,7 @@ def build_and_run_graph(graph_data: dict) -> tuple[
             input_shapes = {k: list(v.shape) for k, v in inputs.items()}
             try:
                 sg_module = build_subgraph_module(subgraph_data, input_shapes)
-                modules[node_id] = sg_module
+                modules[node_id] = sg_module.to(get_device())
 
                 with torch.no_grad():
                     sg_outputs = sg_module(**inputs)
@@ -465,7 +480,7 @@ def build_and_run_graph(graph_data: dict) -> tuple[
         input_shapes = {k: list(v.shape) for k, v in inputs.items()}
         try:
             module = builder(props, input_shapes)
-            modules[node_id] = module
+            modules[node_id] = module.to(get_device())
             raw_output = module(inputs["in"])
 
             # Handle multi-output nodes (LSTM/GRU return dicts)
@@ -893,6 +908,8 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
         )):
             if cancel_event and cancel_event.is_set():
                 break
+            dev = get_device()
+            images, labels = images.to(dev), labels.to(dev)
 
             if on_batch and batch_idx % batch_report_interval == 0:
                 on_batch({"epoch": epoch + 1, "totalEpochs": epochs, "batch": batch_idx + 1, "totalBatches": total_batches})
@@ -1319,6 +1336,7 @@ def infer_graph(graph_data: dict) -> dict:
                     # Override batch size to 1 for inference
                     infer_props = {**props, "batchSize": 1}
                     tensors = loader(infer_props)
+                    tensors = {k: v.to(get_device()) for k, v in tensors.items()}
                     results[node_id] = tensors
                     outputs = {k: tensor_info(v) for k, v in tensors.items()}
                     first_tensor = next(iter(tensors.values()))

@@ -22,6 +22,7 @@ interface SystemInfo {
   gpuCount: number;
   gpus: { name: string; vram: number; computeCapability: string }[];
   mpsAvailable?: boolean;
+  currentDevice?: string;
 }
 
 export interface ModelLayerInfo {
@@ -235,12 +236,55 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
 // --- System info panel ---
 
 function SystemInfoPanel({ info }: { info: SystemInfo | null }) {
+  const [currentDevice, setCurrentDevice] = useState<string>('cpu');
+
+  useEffect(() => {
+    if (info?.currentDevice) setCurrentDevice(info.currentDevice);
+  }, [info]);
+
   if (!info) {
     return <div className="dashboard-chart-placeholder">Connecting to backend...</div>;
   }
 
+  // Build available device options
+  const deviceOptions: { value: string; label: string }[] = [
+    { value: 'cpu', label: 'CPU' },
+  ];
+  if (info.cudaAvailable) {
+    for (let i = 0; i < info.gpuCount; i++) {
+      const name = info.gpus[i]?.name ?? `GPU ${i}`;
+      deviceOptions.push({ value: i === 0 ? 'cuda' : `cuda:${i}`, label: `CUDA: ${name}` });
+    }
+  }
+  if (info.mpsAvailable) {
+    deviceOptions.push({ value: 'mps', label: 'MPS (Apple Silicon)' });
+  }
+
+  function handleDeviceChange(device: string) {
+    setCurrentDevice(device);
+    fetch('http://localhost:8000/set-device', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device }),
+    }).catch(() => {});
+  }
+
   return (
     <div className="system-info">
+      {/* Device selector */}
+      <div className="system-info-device">
+        <span className="system-info-label">Training Device</span>
+        <select
+          className="system-info-device-select"
+          value={currentDevice}
+          onChange={(e) => handleDeviceChange(e.target.value)}
+        >
+          {deviceOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="system-info-row">
         <span className="system-info-label">Python</span>
         <span className="system-info-value">{info.python}</span>
@@ -278,7 +322,7 @@ function SystemInfoPanel({ info }: { info: SystemInfo | null }) {
         </>
       )}
       {!info.cudaAvailable && !info.mpsAvailable && (
-        <div className="system-info-note">Training will use CPU (slower)</div>
+        <div className="system-info-note">No GPU available — training will use CPU</div>
       )}
     </div>
   );

@@ -31,7 +31,7 @@ import asyncio
 import threading
 import logging
 
-from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail
+from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail, get_device_name, set_device
 from data_loaders import DATASET_DETAILS
 import os
 from pathlib import Path
@@ -82,7 +82,23 @@ def system_info():
             })
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         info["mpsAvailable"] = True
+    info["currentDevice"] = get_device_name()
     return info
+
+
+@app.post("/set-device")
+async def set_device_endpoint(request: dict):
+    """Set the training device (cpu, cuda, cuda:0, mps)."""
+    device = request.get("device", "cpu")
+    logger.info(f"Device set to: {device}")
+    try:
+        import torch
+        # Validate the device exists
+        torch.device(device)
+        set_device(device)
+        return {"status": "ok", "device": device}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
 @app.post("/forward")
