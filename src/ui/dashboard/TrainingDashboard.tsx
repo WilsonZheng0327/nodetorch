@@ -515,7 +515,7 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
 
     // Y axis labels
     ctx.fillStyle = '#6c7086';
-    ctx.font = '10px Inter, system-ui, sans-serif';
+    ctx.font = '12px Inter, system-ui, sans-serif';
     ctx.textAlign = 'right';
     for (let i = 0; i <= 4; i++) {
       const val = min + (range * i) / 4;
@@ -631,7 +631,7 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
 
     // Legend (if val line present)
     if (valClean) {
-      ctx.font = '10px Inter, system-ui, sans-serif';
+      ctx.font = '11px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
       // Train legend
       ctx.fillStyle = color;
@@ -683,7 +683,7 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
       ctx.fill();
       // Value label
       ctx.fillStyle = '#cdd6f4';
-      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.font = '11px JetBrains Mono, monospace';
       ctx.textAlign = 'center';
       ctx.fillText(formatValue(data[selectedIndex]), sx, sy - 10);
     }
@@ -705,7 +705,7 @@ function GradientFlowChart({ data }: { data: { name: string; norm: number }[] })
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const barH = 18;
+    const barH = 22;
     const gap = 2;
     const labelW = 160;
     const pad = { top: 8, right: 80, bottom: 8 };
@@ -729,7 +729,7 @@ function GradientFlowChart({ data }: { data: { name: string; norm: number }[] })
 
       // Label (truncated if too long for labelW)
       ctx.fillStyle = '#a6adc8';
-      ctx.font = '10px Inter, system-ui, sans-serif';
+      ctx.font = '12px Inter, system-ui, sans-serif';
       ctx.textAlign = 'right';
       let label = data[i].name;
       if (ctx.measureText(label).width > labelW - 8) {
@@ -750,7 +750,7 @@ function GradientFlowChart({ data }: { data: { name: string; norm: number }[] })
       ctx.fillRect(labelW, y, barW, barH);
 
       ctx.fillStyle = '#6c7086';
-      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.font = '11px JetBrains Mono, monospace';
       ctx.textAlign = 'left';
       ctx.fillText(data[i].norm.toExponential(1), labelW + barW + 4, y + barH / 2 + 3);
     }

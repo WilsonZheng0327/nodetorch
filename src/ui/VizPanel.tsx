@@ -41,7 +41,7 @@ export function VizPanel({ snapshot, onClose }: Props) {
   const hasData = hasWeights || hasGradients || hasActivations || hasBatchNorm || hasWeightDelta;
 
   return (
-    <div className="viz-panel nodrag nowheel">
+    <div className="viz-panel nodrag">
       <div className="viz-panel-header">
         <span>Visualization</span>
         <button className="viz-panel-close" onClick={onClose}>&times;</button>
@@ -212,12 +212,16 @@ function MiniHistogram({ bins, counts, color }: { bins: number[]; counts: number
 
     ctx.clearRect(0, 0, w, h);
 
-    // Bars
+    // Bars — align to device pixel boundaries to avoid anti-aliasing blur.
+    // We draw on a DPR-scaled canvas; rounding in CSS pixels keeps edges crisp
+    // because CSS pixels map to integer multiples of device pixels.
     ctx.fillStyle = color;
-    ctx.globalAlpha = 0.6;
+    ctx.globalAlpha = 0.7;
     for (let i = 0; i < counts.length; i++) {
-      const barH = (counts[i] / maxCount) * (plotH - 1);
-      ctx.fillRect(i * barWidth, plotH - barH, barWidth - 0.5, barH);
+      const x = Math.round(i * barWidth);
+      const nextX = Math.round((i + 1) * barWidth);
+      const barH = Math.round((counts[i] / maxCount) * (plotH - 1));
+      ctx.fillRect(x, plotH - barH, Math.max(1, nextX - x - 1), barH);
     }
     ctx.globalAlpha = 1;
 

@@ -107,13 +107,14 @@ function MiniSparkline({ values, color = '#89b4fa' }: { values: number[]; color?
     const range = max - min || 1;
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = color;
-    ctx.globalAlpha = 0.7;
     const bw = w / values.length;
+    // Integer pixel alignment for crisp bars
     for (let i = 0; i < values.length; i++) {
-      const bh = ((values[i] - min) / range) * (h - 1);
-      ctx.fillRect(i * bw, h - bh, Math.max(1, bw - 0.5), bh);
+      const x = Math.round(i * bw);
+      const nextX = Math.round((i + 1) * bw);
+      const bh = Math.round(((values[i] - min) / range) * (h - 1));
+      ctx.fillRect(x, h - bh, Math.max(1, nextX - x - 1), bh);
     }
-    ctx.globalAlpha = 1;
   }, [values, color]);
   return <canvas ref={canvasRef} className="stage-card-canvas" />;
 }

@@ -18,13 +18,37 @@
   font-size: 13px;
   font-family: 'Inter', system-ui, sans-serif;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.palette-toggle-title {
+  font-weight: 500;
+}
+
+.palette-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  color: #89b4fa;
+  flex-shrink: 0;
 }
 
 .palette-toggle:hover {
   background: #313244;
   color: #cdd6f4;
   border-color: #89b4fa;
+}
+
+.palette-toggle:hover .palette-toggle-icon {
+  color: #cdd6f4;
 }
 
 .palette-content {

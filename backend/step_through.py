@@ -297,7 +297,7 @@ def _build_subgraph_stages(
 
         # Nested subgraph: recurse
         safe_key = sg_module._key_map.get(inner_nid)
-        inner_mod = sg_module.inner_modules.get(safe_key) if safe_key else None
+        inner_mod = sg_module.inner_modules[safe_key] if safe_key and safe_key in sg_module.inner_modules else None
         if isinstance(inner_mod, SubGraphModule):
             nested_name = inner_node.get("properties", {}).get("blockName") or inner_nid
             nested_stages = _build_subgraph_stages(

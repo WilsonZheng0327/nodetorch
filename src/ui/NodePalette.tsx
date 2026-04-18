@@ -138,7 +138,8 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
         onClick={() => setCollapsed(!collapsed)}
         title={collapsed ? 'Expand palette (Tab)' : 'Collapse palette (Tab)'}
       >
-        Nodes {collapsed ? '+' : '-'}
+        <span className="palette-toggle-title">Node Palette</span>
+        <span className="palette-toggle-icon">{collapsed ? '+' : '−'}</span>
       </button>
 
       {!collapsed && (

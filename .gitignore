@@ -31,3 +31,6 @@ __pycache__/
 # Dataset files
 backend/data/
 backend/blocks/
+
+# Training run records
+backend/runs/
