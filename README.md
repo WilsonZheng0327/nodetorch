@@ -1,6 +1,8 @@
-# NodeTorch
-
-Node-based visual tool for building, inspecting, and understanding ML models. Educational and open-source.
+<p align="center">
+  <img src="nodetorch.png" alt="NodeTorch" width="120" />
+</p>
+<h1 align="center">NodeTorch</h1>
+<p align="center">Node-based visual tool for building, inspecting, and understanding ML models. Educational and open-source.</p>
 
 Build neural networks by dragging nodes onto a canvas and connecting them. Shape inference runs instantly as you edit. Click "Run" to execute a real forward pass with PyTorch.
 

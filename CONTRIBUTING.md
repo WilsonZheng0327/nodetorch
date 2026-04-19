@@ -8,11 +8,13 @@ Create a file in the appropriate category folder under `src/domain/nodes/`:
 
 ```
 src/domain/nodes/
-  data/          — dataset nodes (MNIST, CIFAR-10)
-  layers/        — neural network layers (Conv2d, Linear, Flatten)
-  activations/   — activation functions (ReLU, Sigmoid, Softmax)
-  loss/          — loss functions (CrossEntropyLoss, MSELoss)
-  optimizers/    — optimizers (SGD, Adam)
+  data/          — dataset nodes (MNIST, Fashion-MNIST, CIFAR-10, CIFAR-100, IMDb, AG News)
+  layers/        — neural network layers (Conv2d, Linear, LSTM, Embedding, etc.)
+  activations/   — activation functions (ReLU, Sigmoid, Softmax, GELU, etc.)
+  loss/          — loss functions (CrossEntropy, MSE)
+  optimizers/    — optimizers (SGD, Adam, AdamW)
+  structural/    — graph ops (Add, Concat, Reshape, Permute, SequencePool)
+  subgraph/      — reusable block nodes (SubGraph, Input/Output sentinels)
 ```
 
 The file exports a `NodeDefinition` object:
@@ -237,8 +239,8 @@ When adding new node categories (like loss or optimizer), update the type lists 
 
 ```typescript
 const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse'];
-const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam'];
-const DATA_TYPES = ['data.mnist', 'data.cifar10'];
+const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam', 'ml.optimizers.adamw'];
+const DATA_TYPES = ['data.mnist', 'data.fashion_mnist', 'data.cifar10', 'data.cifar100', 'data.imdb', 'data.ag_news'];
 ```
 
 ## Property Types
@@ -280,14 +282,34 @@ src/
   ui/
     useGraph.ts      — bridge between engine and React Flow
     EngineNode.tsx   — generic node renderer
-    PropertyInspector.tsx
-    NodePalette.tsx
-    Toolbar.tsx
+    Toolbar.tsx      — top bar with actions (train, infer, step-through, etc.)
+    NodePalette.tsx  — draggable node list
+    VizPanel.tsx     — floating per-node visualization (weights, gradients, activations)
+    step-through/    — forward + backward step-through panel
+      StepThroughPanel.tsx — main panel with Forward/Backward tabs
+      StageDetail.tsx      — detail view for selected stage
+      ExtraPanels.tsx      — extra viz renderers (kernels, heatmaps, bars, etc.)
+      StageTimeline.tsx    — horizontal scrolling timeline
+      StageCard.tsx        — individual stage card in timeline
+      types.ts             — TypeScript types for step-through data
+    dashboard/
+      TrainingDashboard.tsx — training progress, charts, system info
+    inspector/
+      LayerDetail.tsx       — modal with confusion matrix, loss landscape, etc.
+      PropertyInspector.tsx — node property editor
+      DatasetDetail.tsx     — dataset sample browser
 
 backend/
   main.py            — FastAPI server, endpoints
-  graph_builder.py   — graph → PyTorch execution
-  node_builders.py   — per-node-type module builders
-  node_viz.py        — per-node-type visualization (forward + backward step-through)
+  graph_builder.py   — graph → PyTorch execution, training loop, inference
+  node_builders.py   — per-node-type nn.Module builder functions
+  node_viz.py        — per-node-type visualization registry (forward + backward)
   data_loaders.py    — per-dataset loader functions
+  step_through.py    — forward step-through orchestration
+  backprop_sim.py    — backward step-through + backprop animation
+  forward_utils.py   — shared forward-pass node execution
+  loss_landscape.py  — loss landscape computation
+  runs_store.py      — training run history persistence
+
+model-presets/       — loadable model preset JSON files
 ```

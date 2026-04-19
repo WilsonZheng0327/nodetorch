@@ -45,9 +45,14 @@ Backend mirrors the engine: `backend/graph_builder.py` does the same topological
 - `src/domain/index.ts` — bootstraps all registrations via `initDomain()`
 - `src/ui/useGraph.ts` — bridge between engine and React Flow (the main state hook)
 - `src/ui/EngineNode.tsx` — generic node renderer (reads NodeDefinition + lastResult.metadata)
+- `src/ui/step-through/` — forward + backward step-through UI (StepThroughPanel, StageDetail, ExtraPanels)
+- `src/ui/dashboard/TrainingDashboard.tsx` — training dashboard with charts, metrics, system info
 - `backend/graph_builder.py` — graph→PyTorch execution, training loop, inference, model store
 - `backend/node_builders.py` — per-node-type `nn.Module` builder functions
+- `backend/node_viz.py` — per-node-type visualization registry (forward + backward step-through)
 - `backend/data_loaders.py` — per-dataset loader functions
+- `backend/step_through.py` — forward step-through orchestration (uses node_viz.py for viz)
+- `backend/backprop_sim.py` — backward step-through + simple backprop animation
 
 ### Execution modes
 
@@ -58,11 +63,11 @@ Backend mirrors the engine: `backend/graph_builder.py` does the same topological
 
 ### Adding a new node type
 
-Frontend: create file in `src/domain/nodes/<category>/`, export a `NodeDefinition`, add to that folder's `index.ts` array. The domain `index.ts` doesn't change.
+1. **Frontend**: create file in `src/domain/nodes/<category>/`, export a `NodeDefinition`, add to that folder's `index.ts` array. The domain `index.ts` doesn't change.
+2. **Backend builder**: add builder function to `backend/node_builders.py` (layers) or `backend/data_loaders.py` (datasets). Loss nodes also need `LOSS_NODES` in `graph_builder.py`.
+3. **Backend viz**: add forward/backward viz functions to `backend/node_viz.py` registries (`FORWARD_VIZ`, `BACKWARD_VIZ`). Optional — default fallback provides basic shape-based viz.
 
-Backend: add builder function to `backend/node_builders.py` (layers) or `backend/data_loaders.py` (datasets). Loss nodes also need to be added to `LOSS_NODES` set in `graph_builder.py`.
-
-See `CONTRIBUTING.md` for full details with code examples.
+See `CONTRIBUTING.md` for full details with code examples and a per-node-type file change table.
 
 ### Node metadata convention
 
