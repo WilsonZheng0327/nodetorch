@@ -684,6 +684,8 @@ export function useGraph(domain: DomainContext) {
 
   // Batch-level progress within current epoch
   const [batchProgress, setBatchProgress] = useState<{ batch: number; totalBatches: number } | null>(null);
+  // True from the moment training starts until it finishes/errors/cancels
+  const [trainingActive, setTrainingActive] = useState(false);
 
   // Backprop animation: map of nodeId -> { delayMs, intensity }
   const [backpropAnim, setBackpropAnim] = useState<Record<string, { delayMs: number; intensity: number }> | null>(null);
@@ -743,6 +745,7 @@ export function useGraph(domain: DomainContext) {
     }
 
     setStatus({ type: 'running', message: 'Training...' });
+    setTrainingActive(true);
     setTrainingProgress([]);
     setSnapshotHistory([]);
     setSelectedEpoch(null);
@@ -773,6 +776,7 @@ export function useGraph(domain: DomainContext) {
 
       function cleanup() {
         trainWsRef.current = null;
+        setTrainingActive(false);
         resolve();
       }
 
@@ -1104,6 +1108,7 @@ export function useGraph(domain: DomainContext) {
     modelStale,
     trainingProgress,
     batchProgress,
+    trainingActive,
     undo,
     redo,
     copySelected,

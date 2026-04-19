@@ -94,8 +94,8 @@ def train_dataset_cifar100(augHFlip: bool = False, augRandomCrop: bool = False, 
 
 def denormalize_cifar100(img: torch.Tensor) -> torch.Tensor:
     """Undo CIFAR-100 normalization. Input: [C, H, W], output: [C, H, W] in 0-1 range."""
-    mean = torch.tensor([0.5071, 0.4867, 0.4408]).view(3, 1, 1)
-    std = torch.tensor([0.2675, 0.2565, 0.2761]).view(3, 1, 1)
+    mean = torch.tensor([0.5071, 0.4867, 0.4408], device=img.device).view(3, 1, 1)
+    std = torch.tensor([0.2675, 0.2565, 0.2761], device=img.device).view(3, 1, 1)
     return img * std + mean
 
 
@@ -134,8 +134,8 @@ def train_dataset_cifar10(augHFlip: bool = False, augRandomCrop: bool = False, a
 
 
 def denormalize_cifar10(img: torch.Tensor) -> torch.Tensor:
-    mean = torch.tensor([0.4914, 0.4822, 0.4465]).view(3, 1, 1)
-    std = torch.tensor([0.2470, 0.2435, 0.2616]).view(3, 1, 1)
+    mean = torch.tensor([0.4914, 0.4822, 0.4465], device=img.device).view(3, 1, 1)
+    std = torch.tensor([0.2470, 0.2435, 0.2616], device=img.device).view(3, 1, 1)
     return img * std + mean
 
 
@@ -240,7 +240,7 @@ def load_imdb(props: dict) -> dict[str, torch.Tensor]:
     labels = torch.tensor([ds[i]["label"] for i in indices], dtype=torch.long)
     tokens = _encode_texts(texts, vocab, max_len)
 
-    return {"out": tokens, "labels": labels}
+    return {"out": tokens, "labels": labels, "_texts": texts}
 
 
 class IMDbDataset(torch.utils.data.Dataset):
@@ -290,7 +290,7 @@ def load_ag_news(props: dict) -> dict[str, torch.Tensor]:
     labels = torch.tensor([ds[i]["label"] for i in indices], dtype=torch.long)
     tokens = _encode_texts(texts, vocab, max_len)
 
-    return {"out": tokens, "labels": labels}
+    return {"out": tokens, "labels": labels, "_texts": texts}
 
 
 class AGNewsDataset(torch.utils.data.Dataset):

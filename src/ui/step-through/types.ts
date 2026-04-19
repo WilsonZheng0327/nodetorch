@@ -54,7 +54,12 @@ export type Extra =
   | { kind: 'weight_matrix'; data: number[][]; rows: number; cols: number; actualRows: number; actualCols: number; min: number; max: number }
   | { kind: 'attention_map'; data: number[][]; rows: number; cols: number; actualRows: number; actualCols: number }
   | { kind: 'recurrent_state'; label: string; values: number[]; totalLength: number }
-  | { kind: 'saliency_map'; pixels: number[][]; predictedClass: number; height: number; width: number };
+  | { kind: 'saliency_map'; pixels: number[][]; predictedClass: number; height: number; width: number }
+  // Backward-specific extras
+  | { kind: 'gradient_kernels'; kernels: number[][][]; showing: number; totalFilters: number; kernelHeight: number; kernelWidth: number }
+  | { kind: 'spatial_gradient_heatmap'; pixels: number[][]; height: number; width: number }
+  | { kind: 'per_unit_gradient_bars'; values: number[]; label: string }
+  | { kind: 'gradient_weight_matrix'; data: number[][]; rows: number; cols: number; actualRows: number; actualCols: number; min: number; max: number };
 
 export interface Stage {
   stageId: string;        // unique — used as React key, derived from path
@@ -78,6 +83,7 @@ export interface SampleInfo {
   imageChannels?: number;
   actualLabel?: number;
   tokenIds?: number[];
+  sampleText?: string;
 }
 
 export interface ModelState {
@@ -90,3 +96,28 @@ export interface StepThroughResult {
   sample: SampleInfo;
   modelState?: ModelState;
 }
+
+// --- Backward step-through types ---
+
+export type GradientHealth = 'healthy' | 'vanishing' | 'exploding';
+
+export interface ParamGradStats {
+  gradNorm: number;
+  weightNorm: number;
+  ratio: number;
+  health: GradientHealth;
+}
+
+export interface BackwardStage extends Stage {
+  gradientShape?: number[];
+  paramGradStats?: ParamGradStats;
+}
+
+export interface BackwardStepThroughResult {
+  stages: BackwardStage[];
+  loss: number;
+  sample: SampleInfo;
+  modelState?: ModelState;
+}
+
+export type StepThroughMode = 'forward' | 'backward';

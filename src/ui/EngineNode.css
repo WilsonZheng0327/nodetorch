@@ -133,6 +133,22 @@
   max-width: 100%;
 }
 
+.layer-node-sample-text {
+  font-size: 10px;
+  color: #a6adc8;
+  line-height: 1.4;
+  padding: 4px 8px;
+  background: #313244;
+  border-radius: 4px;
+  max-width: 200px;
+  max-height: 48px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  margin: 4px 0;
+}
+
 .layer-node-shape-success {
   color: #10b981 !important;
   background: rgba(16, 185, 129, 0.1) !important;

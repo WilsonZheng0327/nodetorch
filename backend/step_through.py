@@ -241,7 +241,7 @@ def _forward_with_trained(graph_data: dict, mask: list | None = None) -> tuple:
             if loader:
                 infer_props = {**props, "batchSize": 1}
                 tensors = loader(infer_props)
-                tensors = {k: v.to(dev) for k, v in tensors.items()}
+                tensors = {k: (v.to(dev) if isinstance(v, torch.Tensor) else v) for k, v in tensors.items()}
                 if mask is not None:
                     _apply_mask_to_tensors(tensors, mask)
                 results[node_id] = tensors
@@ -438,14 +438,16 @@ def _extract_sample_info(nodes: dict, results: dict) -> dict:
             labels = tensors.get("labels")
             info: dict = {
                 "datasetType": node["type"],
-                "actualLabel": int(labels[0]) if labels is not None else None,
+                "actualLabel": int(labels[0].item()) if labels is not None and isinstance(labels, torch.Tensor) else None,
             }
             # Image datasets: provide pixel preview
             if out is not None and isinstance(out, torch.Tensor) and out.dim() == 4:
                 info.update(_tensor_to_preview_image(out[0], node["type"]))
-            # Text datasets: just return the token IDs (not very useful, but at least shape info)
+            # Text datasets: return raw text and token IDs
             elif out is not None and isinstance(out, torch.Tensor) and out.dim() == 2:
-                info["tokenIds"] = out[0].tolist()[:64]  # first 64 tokens
+                info["tokenIds"] = out[0].tolist()[:64]
+                if "_texts" in tensors:
+                    info["sampleText"] = tensors["_texts"][0][:500]
             return info
     return {}
 
@@ -855,13 +857,16 @@ def _extract_weight_matrix(module) -> dict | None:
     vmin = _safe_float(float(weight.min()))
     vmax = _safe_float(float(weight.max()))
 
-    # Downsample with area averaging if too large
+    # Downsample with area averaging if too large, preserving aspect ratio
     MAX_DIM = 96
     mat = weight
     if mat.shape[0] > MAX_DIM or mat.shape[1] > MAX_DIM:
+        scale = MAX_DIM / max(mat.shape[0], mat.shape[1])
+        target_rows = max(1, round(mat.shape[0] * scale))
+        target_cols = max(1, round(mat.shape[1] * scale))
         mat = torch.nn.functional.interpolate(
             mat.unsqueeze(0).unsqueeze(0),
-            size=(min(MAX_DIM, mat.shape[0]), min(MAX_DIM, mat.shape[1])),
+            size=(target_rows, target_cols),
             mode='area',
         ).squeeze()
         if mat.dim() == 1:

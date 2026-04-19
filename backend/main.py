@@ -34,7 +34,7 @@ import logging
 from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail, get_device_name, set_device
 from step_through import run_step_through
 from activation_max import activation_maximization
-from backprop_sim import simulate_backprop
+from backprop_sim import simulate_backprop, run_backward_step_through
 from loss_landscape import compute_loss_landscape
 from runs_store import list_runs, load_run, delete_run
 from data_loaders import DATASET_DETAILS, augmentation_preview
@@ -237,6 +237,20 @@ async def sim_backprop(request: dict):
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Backprop simulation failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/backward-step-through")
+async def backward_step_through(request: dict):
+    """Run a forward+backward pass and return rich per-node backward stages."""
+    logger.info("Backward step-through requested")
+    try:
+        result = run_backward_step_through(request["graph"])
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Backward step-through failed: {e}")
         return {"status": "error", "error": str(e)}
 
 

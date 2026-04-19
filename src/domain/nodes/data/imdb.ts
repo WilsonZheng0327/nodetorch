@@ -5,7 +5,7 @@ export const imdbNode: NodeDefinition = {
   version: 1,
   displayName: 'IMDb',
   description: 'Movie review sentiment, binary (positive/negative)',
-  category: ['Data'],
+  category: ['Data', 'Text'],
 
   getProperties: () => [
     { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 32, affects: 'execution' },

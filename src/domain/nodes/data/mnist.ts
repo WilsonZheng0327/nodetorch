@@ -8,7 +8,7 @@ export const mnistNode: NodeDefinition = {
   version: 1,
   displayName: 'MNIST',
   description: 'Handwritten digits, 28x28 grayscale',
-  category: ['Data'],
+  category: ['Data', 'Image'],
 
   getProperties: () => [
     {

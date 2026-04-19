@@ -170,7 +170,10 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
 
         {/* Inference: image preview + actual label on data nodes */}
         {metadata?.imagePixels && (
-          <ImagePreview pixels={metadata.imagePixels} size={56} channels={metadata.imageChannels} />
+          <ImagePreview pixels={metadata.imagePixels} size={96} channels={metadata.imageChannels} />
+        )}
+        {metadata?.sampleText && !metadata?.imagePixels && (
+          <div className="layer-node-sample-text">{metadata.sampleText}</div>
         )}
         {metadata?.actualLabel != null && (
           <div className="layer-node-shape">

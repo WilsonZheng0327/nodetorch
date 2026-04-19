@@ -2,7 +2,7 @@
 // Loads a sample from the dataset and walks through each layer's transformation.
 
 import { useEffect, useState, useRef } from 'react';
-import type { StepThroughResult } from './types';
+import type { StepThroughResult, BackwardStepThroughResult, StepThroughMode } from './types';
 import { StageTimeline } from './StageTimeline';
 import { StageDetail } from './StageDetail';
 import { PerturbCanvas } from './PerturbCanvas';
@@ -15,8 +15,10 @@ interface Props {
 }
 
 export function StepThroughPanel({ open, graphJson, onClose }: Props) {
+  const [mode, setMode] = useState<StepThroughMode>('forward');
   const [result, setResult] = useState<StepThroughResult | null>(null);
   const [resultB, setResultB] = useState<StepThroughResult | null>(null);  // second sample for compare
+  const [backwardResult, setBackwardResult] = useState<BackwardStepThroughResult | null>(null);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,28 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
       .finally(() => setLoading(false));
   };
 
+  // Load backward step-through
+  const loadBackward = () => {
+    setLoading(true);
+    setError(null);
+    fetch('http://localhost:8000/backward-step-through', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ graph: JSON.parse(graphJson) }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok') {
+          setBackwardResult(data.result);
+          setCurrentIdx(0);
+        } else {
+          setError(data.error ?? 'Failed to run backward step-through');
+        }
+      })
+      .catch(() => setError('Cannot connect to backend'))
+      .finally(() => setLoading(false));
+  };
+
   const exitCompare = () => setResultB(null);
   const compareMode = resultB !== null;
 
@@ -67,13 +91,27 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Escape to close
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+
+  // The active result and stages depend on the mode
+  const activeResult = mode === 'forward' ? result : backwardResult;
+  const activeStages = activeResult?.stages ?? [];
+
   // Auto-play logic
   const playTimerRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!isPlaying || !result) return;
+    if (!isPlaying || activeStages.length === 0) return;
     playTimerRef.current = window.setInterval(() => {
       setCurrentIdx((i) => {
-        if (i >= result.stages.length - 1) {
+        if (i >= activeStages.length - 1) {
           setIsPlaying(false);
           return i;
         }
@@ -83,38 +121,72 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     return () => {
       if (playTimerRef.current) window.clearInterval(playTimerRef.current);
     };
-  }, [isPlaying, result]);
+  }, [isPlaying, activeStages.length]);
+
+  // When switching to backward mode, auto-load if needed
+  const switchMode = (m: StepThroughMode) => {
+    setMode(m);
+    setCurrentIdx(0);
+    setIsPlaying(false);
+    if (m === 'backward' && !backwardResult && !loading) {
+      loadBackward();
+    }
+  };
 
   if (!open) return null;
 
-  const stage = result?.stages[currentIdx];
+  const stage = activeStages[currentIdx];
+  const modelState = activeResult?.modelState ?? result?.modelState;
 
   return (
     <div className="step-through-panel">
       <div className="step-through-header">
         <span className="step-through-title">
           Step-Through
-          {result?.modelState && (
-            <span
-              className={`step-through-model-state ${result.modelState.usingTrainedWeights ? 'step-through-model-state-trained' : ''}`}
-              title={result.modelState.note}
+          <span className="step-through-mode-tabs">
+            <button
+              className={`step-through-mode-tab ${mode === 'forward' ? 'step-through-mode-tab-active' : ''}`}
+              onClick={() => switchMode('forward')}
             >
-              {result.modelState.usingTrainedWeights ? 'Trained' : 'Random weights'}
+              Forward
+            </button>
+            <button
+              className={`step-through-mode-tab ${mode === 'backward' ? 'step-through-mode-tab-active step-through-mode-tab-backward' : ''}`}
+              onClick={() => switchMode('backward')}
+            >
+              Backward
+            </button>
+          </span>
+          {modelState && (
+            <span
+              className={`step-through-model-state ${modelState.usingTrainedWeights ? 'step-through-model-state-trained' : ''}`}
+              title={modelState.note}
+            >
+              {modelState.usingTrainedWeights ? 'Trained' : 'Random weights'}
             </span>
           )}
         </span>
         <div className="step-through-header-actions">
-          <button className="step-through-btn" onClick={() => loadSample(false)} disabled={loading}>
-            Load Random Sample
-          </button>
-          {result && !compareMode && (
-            <button className="step-through-btn" onClick={() => loadSample(true)} disabled={loading}>
-              + Compare
-            </button>
+          {mode === 'forward' && (
+            <>
+              <button className="step-through-btn" onClick={() => loadSample(false)} disabled={loading}>
+                Load Random Sample
+              </button>
+              {result && !compareMode && (
+                <button className="step-through-btn" onClick={() => loadSample(true)} disabled={loading}>
+                  + Compare
+                </button>
+              )}
+              {compareMode && (
+                <button className="step-through-btn" onClick={exitCompare}>
+                  Exit Compare
+                </button>
+              )}
+            </>
           )}
-          {compareMode && (
-            <button className="step-through-btn" onClick={exitCompare}>
-              Exit Compare
+          {mode === 'backward' && (
+            <button className="step-through-btn" onClick={loadBackward} disabled={loading}>
+              Re-run Backward
             </button>
           )}
           <button className="step-through-close" onClick={onClose}>&times;</button>
@@ -122,31 +194,66 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
       </div>
 
       {loading && (
-        <div className="step-through-empty">Loading sample and running forward pass...</div>
+        <div className="step-through-empty">
+          {mode === 'forward' ? 'Loading sample and running forward pass...' : 'Running forward + backward pass...'}
+        </div>
       )}
       {error && <div className="step-through-error">{error}</div>}
 
-      {result && !loading && (
+      {activeStages.length > 0 && !loading && (
         <>
-          {compareMode && resultB ? (
-            <div className="step-through-compare-samples">
-              <SampleHeader sample={result.sample} label="A" />
-              <SampleHeader sample={resultB.sample} label="B" />
+          {/* Sample header — forward mode only */}
+          {mode === 'forward' && result && (
+            compareMode && resultB ? (
+              <div className="step-through-compare-samples">
+                <SampleHeader sample={result.sample} label="A" />
+                <SampleHeader sample={resultB.sample} label="B" />
+              </div>
+            ) : perturbMode && result.sample.imagePixels ? (
+              <PerturbHeader
+                sample={result.sample}
+                mask={mask}
+                onMaskChange={setMask}
+                onApply={() => mask && loadSample(false, mask)}
+                onClear={() => {
+                  const h = result.sample.imagePixels!.length;
+                  const row0 = result.sample.imagePixels![0];
+                  const w = Array.isArray(row0[0]) ? (row0 as number[][]).length : (row0 as number[]).length;
+                  const empty: number[][] = Array.from({ length: h }, () => new Array(w).fill(0));
+                  setMask(empty);
+                }}
+                onExit={() => { setPerturbMode(false); setMask(null); }}
+              />
+            ) : (
+              <SampleHeader
+                sample={result.sample}
+                onStartPerturb={result.sample.imagePixels ? () => setPerturbMode(true) : undefined}
+              />
+            )
+          )}
+
+          {/* Backward mode header — show loss and sample preview */}
+          {mode === 'backward' && backwardResult && (
+            <div className="step-through-sample">
+              {backwardResult.sample?.imagePixels && (
+                <SampleImage pixels={backwardResult.sample.imagePixels} channels={backwardResult.sample.imageChannels ?? 1} />
+              )}
+              <div className="step-through-sample-info">
+                <div>
+                  <span className="step-through-sample-label">Loss: </span>
+                  <span className="step-through-sample-value">{backwardResult.loss.toFixed(4)}</span>
+                </div>
+                {backwardResult.sample?.actualLabel != null && (
+                  <div>
+                    <span className="step-through-sample-label">Label: </span>
+                    <span className="step-through-sample-value">{backwardResult.sample.actualLabel}</span>
+                  </div>
+                )}
+                {backwardResult.sample?.sampleText && (
+                  <div className="step-through-sample-text">{backwardResult.sample.sampleText}</div>
+                )}
+              </div>
             </div>
-          ) : perturbMode && result.sample.imagePixels ? (
-            <PerturbHeader
-              sample={result.sample}
-              mask={mask}
-              onMaskChange={setMask}
-              onApply={() => mask && loadSample(false, mask)}
-              onClear={() => setMask(null)}
-              onExit={() => { setPerturbMode(false); setMask(null); loadSample(false); }}
-            />
-          ) : (
-            <SampleHeader
-              sample={result.sample}
-              onStartPerturb={result.sample.imagePixels ? () => setPerturbMode(true) : undefined}
-            />
           )}
 
           <div className="step-through-controls">
@@ -154,43 +261,47 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
               className="step-through-ctrl"
               onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
               disabled={currentIdx === 0}
+              title="Previous step"
             >
-              ◀
+              ⏮
             </button>
             <button
               className={`step-through-ctrl ${isPlaying ? 'step-through-ctrl-playing' : ''}`}
               onClick={() => setIsPlaying(!isPlaying)}
+              title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? '⏸' : '▶'}
             </button>
             <button
               className="step-through-ctrl"
-              onClick={() => setCurrentIdx((i) => Math.min(result.stages.length - 1, i + 1))}
-              disabled={currentIdx >= result.stages.length - 1}
+              onClick={() => setCurrentIdx((i) => Math.min(activeStages.length - 1, i + 1))}
+              disabled={currentIdx >= activeStages.length - 1}
+              title="Next step"
             >
-              ▶
+              ⏭
             </button>
             <input
               type="range"
               min={0}
-              max={result.stages.length - 1}
+              max={activeStages.length - 1}
               value={currentIdx}
               onChange={(e) => setCurrentIdx(parseInt(e.target.value, 10))}
               className="step-through-slider"
             />
             <span className="step-through-counter">
-              {currentIdx + 1} / {result.stages.length}
+              {currentIdx + 1} / {activeStages.length}
             </span>
           </div>
 
           <StageTimeline
-            stages={result.stages}
+            stages={activeStages}
             currentIdx={currentIdx}
             onSelect={setCurrentIdx}
+            direction={mode}
           />
 
           {stage && (
-            compareMode && resultB ? (
+            mode === 'forward' && compareMode && resultB ? (
               <div className="step-through-compare-details">
                 <div className="step-through-compare-pane">
                   <div className="step-through-compare-label">A</div>
@@ -234,7 +345,10 @@ function SampleHeader({ sample, label, onStartPerturb }: {
         {sample.datasetType && (
           <div className="step-through-sample-dataset">{sample.datasetType}</div>
         )}
-        {sample.tokenIds && (
+        {sample.sampleText && (
+          <div className="step-through-sample-text">{sample.sampleText}</div>
+        )}
+        {!sample.sampleText && sample.tokenIds && (
           <div className="step-through-sample-tokens">
             First tokens: {sample.tokenIds.slice(0, 16).join(', ')}…
           </div>

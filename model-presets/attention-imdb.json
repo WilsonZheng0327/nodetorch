@@ -1,0 +1,74 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "Self-Attention — IMDb",
+    "nodes": [
+      {
+        "id": "imdb", "type": "data.imdb",
+        "position": { "x": 0, "y": 100 },
+        "properties": { "batchSize": 32, "maxLen": 256, "vocabSize": 10000 }
+      },
+      {
+        "id": "embed", "type": "ml.layers.embedding",
+        "position": { "x": 280, "y": 100 },
+        "properties": { "numEmbeddings": 10000, "embeddingDim": 128 }
+      },
+      {
+        "id": "mha", "type": "ml.layers.multihead_attention",
+        "position": { "x": 560, "y": 100 },
+        "properties": { "embedDim": 128, "numHeads": 4, "dropout": 0.1 }
+      },
+      {
+        "id": "add", "type": "ml.structural.add",
+        "position": { "x": 840, "y": 100 },
+        "properties": {}
+      },
+      {
+        "id": "norm", "type": "ml.layers.layernorm",
+        "position": { "x": 1040, "y": 100 },
+        "properties": { "numLastDims": 1 }
+      },
+      {
+        "id": "pool", "type": "ml.structural.sequence_pool",
+        "position": { "x": 1280, "y": 100 },
+        "properties": { "mode": "mean" }
+      },
+      {
+        "id": "dropout", "type": "ml.layers.dropout",
+        "position": { "x": 1500, "y": 100 },
+        "properties": { "p": 0.3 }
+      },
+      {
+        "id": "fc", "type": "ml.layers.linear",
+        "position": { "x": 1700, "y": 100 },
+        "properties": { "outFeatures": 2 }
+      },
+      {
+        "id": "loss", "type": "ml.loss.cross_entropy",
+        "position": { "x": 1940, "y": 150 },
+        "properties": {}
+      },
+      {
+        "id": "adam", "type": "ml.optimizers.adam",
+        "position": { "x": 2180, "y": 200 },
+        "properties": { "lr": 0.0005, "epochs": 5 }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "imdb", "portId": "out" }, "target": { "nodeId": "embed", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "embed", "portId": "out" }, "target": { "nodeId": "mha", "portId": "query" } },
+      { "id": "e3", "source": { "nodeId": "embed", "portId": "out" }, "target": { "nodeId": "mha", "portId": "key" } },
+      { "id": "e4", "source": { "nodeId": "embed", "portId": "out" }, "target": { "nodeId": "mha", "portId": "value" } },
+      { "id": "e5", "source": { "nodeId": "mha", "portId": "out" }, "target": { "nodeId": "add", "portId": "a" } },
+      { "id": "e6", "source": { "nodeId": "embed", "portId": "out" }, "target": { "nodeId": "add", "portId": "b" } },
+      { "id": "e7", "source": { "nodeId": "add", "portId": "out" }, "target": { "nodeId": "norm", "portId": "in" } },
+      { "id": "e8", "source": { "nodeId": "norm", "portId": "out" }, "target": { "nodeId": "pool", "portId": "in" } },
+      { "id": "e9", "source": { "nodeId": "pool", "portId": "out" }, "target": { "nodeId": "dropout", "portId": "in" } },
+      { "id": "e10", "source": { "nodeId": "dropout", "portId": "out" }, "target": { "nodeId": "fc", "portId": "in" } },
+      { "id": "e11", "source": { "nodeId": "fc", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e12", "source": { "nodeId": "imdb", "portId": "labels" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e13", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}

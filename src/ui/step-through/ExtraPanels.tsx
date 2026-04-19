@@ -28,6 +28,15 @@ function ExtraPanel({ extra }: { extra: Extra }) {
       return <RecurrentState data={extra} />;
     case 'saliency_map':
       return <SaliencyMap data={extra} />;
+    // Backward-specific extras
+    case 'gradient_kernels':
+      return <GradientKernels data={extra} />;
+    case 'spatial_gradient_heatmap':
+      return <SpatialGradientHeatmap data={extra} />;
+    case 'per_unit_gradient_bars':
+      return <PerUnitGradientBars data={extra} />;
+    case 'gradient_weight_matrix':
+      return <GradientWeightMatrix data={extra} />;
     default:
       return null;
   }
@@ -358,6 +367,135 @@ function SaliencyMap({ data }: { data: Extract<Extra, { kind: 'saliency_map' }> 
         Bright pixels = model's decision depends on them heavily.
       </div>
       <canvas ref={canvasRef} className="extra-saliency-canvas" />
+    </div>
+  );
+}
+
+// --- Backward-specific extras ---
+
+function GradientKernels({ data }: { data: Extract<Extra, { kind: 'gradient_kernels' }> }) {
+  return (
+    <div className="extra-panel">
+      <div className="extra-panel-title">
+        Gradient Kernels ({data.showing} of {data.totalFilters} filters, {data.kernelHeight}×{data.kernelWidth})
+      </div>
+      <div className="extra-kernel-grid">
+        {data.kernels.map((k, i) => (
+          <KernelCanvas key={i} pixels={k} label={`f${i}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SpatialGradientHeatmap({ data }: { data: Extract<Extra, { kind: 'spatial_gradient_heatmap' }> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || data.pixels.length === 0) return;
+    canvas.width = data.width;
+    canvas.height = data.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const img = ctx.createImageData(data.width, data.height);
+    for (let y = 0; y < data.height; y++) {
+      for (let x = 0; x < data.width; x++) {
+        const idx = (y * data.width + x) * 4;
+        const v = data.pixels[y][x] ?? 0;
+        const t = v / 255;
+        img.data[idx] = Math.round(Math.min(255, t * 2 * 255));
+        img.data[idx + 1] = Math.round(Math.max(0, (t - 0.5) * 2 * 255));
+        img.data[idx + 2] = 0;
+        img.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }, [data]);
+
+  return (
+    <div className="extra-panel">
+      <div className="extra-panel-title">
+        Spatial Gradient Heatmap — where gradient signal is strongest
+      </div>
+      <canvas ref={canvasRef} className="extra-saliency-canvas" />
+    </div>
+  );
+}
+
+function PerUnitGradientBars({ data }: { data: Extract<Extra, { kind: 'per_unit_gradient_bars' }> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || data.values.length === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    const w = rect.width;
+    const h = rect.height;
+    const max = Math.max(...data.values.map(Math.abs), 1e-8);
+    ctx.clearRect(0, 0, w, h);
+    const bw = w / data.values.length;
+    for (let i = 0; i < data.values.length; i++) {
+      const x = Math.round(i * bw);
+      const nextX = Math.round((i + 1) * bw);
+      const bh = Math.round((Math.abs(data.values[i]) / max) * (h - 1));
+      ctx.fillStyle = data.values[i] >= 0 ? '#f9e2af' : '#f38ba8';
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(x, h - bh, Math.max(1, nextX - x - 1), bh);
+    }
+    ctx.globalAlpha = 1;
+  }, [data]);
+
+  return (
+    <div className="extra-panel">
+      <div className="extra-panel-title">{data.label}</div>
+      <canvas ref={canvasRef} className="extra-recurrent-canvas" />
+    </div>
+  );
+}
+
+function GradientWeightMatrix({ data }: { data: Extract<Extra, { kind: 'gradient_weight_matrix' }> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const cellSize = Math.max(2, Math.min(6, Math.floor(400 / Math.max(data.rows, data.cols))));
+    canvas.width = data.cols * cellSize;
+    canvas.height = data.rows * cellSize;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const range = data.max - data.min || 1;
+    for (let r = 0; r < data.rows; r++) {
+      for (let c = 0; c < data.cols; c++) {
+        const v = data.data[r]?.[c] ?? 0;
+        const t = (v - data.min) / range;
+        ctx.fillStyle = heatColor(t);
+        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+      }
+    }
+  }, [data]);
+
+  const downsampled = data.rows < data.actualRows || data.cols < data.actualCols;
+
+  return (
+    <div className="extra-panel">
+      <div className="extra-panel-title">
+        Weight Gradient Matrix ({data.actualRows} × {data.actualCols})
+        {downsampled && <span className="extra-panel-note"> — downsampled to {data.rows} × {data.cols}</span>}
+      </div>
+      <canvas ref={canvasRef} className="extra-weight-matrix" />
+      <div className="extra-weight-legend">
+        <span>{data.min.toFixed(3)}</span>
+        <div className="extra-weight-legend-bar" />
+        <span>{data.max.toFixed(3)}</span>
+      </div>
     </div>
   );
 }

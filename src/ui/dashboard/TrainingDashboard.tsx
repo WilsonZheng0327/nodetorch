@@ -66,14 +66,23 @@ interface Props {
   onSelectEpoch: (epoch: number | null) => void;
   totalSnapshotEpochs: number;
   modelSummary?: ModelLayerInfo[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs, modelSummary }: Props) {
+export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs, modelSummary, open: openProp, onOpenChange }: Props) {
   const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'epochs' | 'summary' | 'runs' | 'system'>('loss');
   const [savedRuns, setSavedRuns] = useState<SavedRun[] | null>(null);
   const [runsLoading, setRunsLoading] = useState(false);
   const [compareRun, setCompareRun] = useState<FullRun | null>(null);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  // Support both controlled (via `open` prop) and uncontrolled use.
+  const open = openProp ?? internalOpen;
+  const setOpen = (v: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof v === 'function' ? v(open) : v;
+    if (onOpenChange) onOpenChange(next);
+    else setInternalOpen(next);
+  };
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
   // Fetch system info on mount
@@ -477,10 +486,22 @@ interface ChartProps {
 
 function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valData, valColor, compareData, compareColor, compareLabel }: ChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Track canvas client size so we re-render on resize (keeps bitmap crisp)
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || rawData.length === 0) return;
+    if (!canvas) return;
+    const update = () => setSize({ w: canvas.clientWidth, h: canvas.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || rawData.length === 0 || size.w === 0) return;
 
     // Guard against NaN/null/Infinity
     const data = rawData.map((v) => (v == null || !isFinite(v)) ? 0 : v);
@@ -492,14 +513,14 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    // Use clientWidth/Height (excludes padding) for accurate bitmap sizing.
+    const w = size.w;
+    const h = size.h;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const w = rect.width;
-    const h = rect.height;
-    const pad = { top: 20, right: 12, bottom: 24, left: 50 };
+    const pad = { top: 40, right: 12, bottom: 28, left: 50 };
     const plotW = w - pad.left - pad.right;
     const plotH = h - pad.top - pad.bottom;
 
@@ -629,37 +650,39 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
       ctx.globalAlpha = 1;
     }
 
-    // Legend (if val line present)
+    // Legend (if val line present). Sits in the top margin with breathing room above.
     if (valClean) {
+      const legendY = 18;       // text baseline
+      const legendRectY = 12;   // line sample top
       ctx.font = '11px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
       // Train legend
       ctx.fillStyle = color;
-      ctx.fillRect(pad.left + 4, 4, 10, 2);
+      ctx.fillRect(pad.left + 4, legendRectY, 10, 2);
       ctx.fillStyle = '#a6adc8';
-      ctx.fillText('train', pad.left + 18, 10);
+      ctx.fillText('train', pad.left + 18, legendY);
       // Val legend
       ctx.strokeStyle = valColor ?? '#fab387';
       ctx.setLineDash([3, 2]);
       ctx.beginPath();
-      ctx.moveTo(pad.left + 60, 5);
-      ctx.lineTo(pad.left + 70, 5);
+      ctx.moveTo(pad.left + 60, legendRectY + 1);
+      ctx.lineTo(pad.left + 70, legendRectY + 1);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = '#a6adc8';
-      ctx.fillText('val', pad.left + 74, 10);
+      ctx.fillText('val', pad.left + 74, legendY);
       // Compare legend
       if (compareClean && compareClean.length > 0) {
         ctx.strokeStyle = compareColor ?? '#cba6f7';
         ctx.setLineDash([1, 3]);
         ctx.beginPath();
-        ctx.moveTo(pad.left + 110, 5);
-        ctx.lineTo(pad.left + 120, 5);
+        ctx.moveTo(pad.left + 110, legendRectY + 1);
+        ctx.lineTo(pad.left + 120, legendRectY + 1);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = '#cba6f7';
         const labelText = compareLabel && compareLabel.length < 40 ? compareLabel : 'compare';
-        ctx.fillText(labelText, pad.left + 124, 10);
+        ctx.fillText(labelText, pad.left + 124, legendY);
       }
     }
 
@@ -687,7 +710,7 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
       ctx.textAlign = 'center';
       ctx.fillText(formatValue(data[selectedIndex]), sx, sy - 10);
     }
-  }, [rawData, labels, color, formatValue, selectedIndex, valData, valColor, compareData, compareColor, compareLabel]);
+  }, [rawData, labels, color, formatValue, selectedIndex, valData, valColor, compareData, compareColor, compareLabel, size]);
 
   return <canvas ref={canvasRef} className="dashboard-chart" />;
 }
@@ -762,6 +785,11 @@ function GradientFlowChart({ data }: { data: { name: string; norm: number }[] })
 
   return (
     <div className="dashboard-gradflow-scroll">
+      <div className="dashboard-explainer">
+        Gradient magnitude (L2 norm) per layer after backward pass. Bars near zero at early
+        layers can indicate vanishing gradients; very large bars can indicate exploding
+        gradients. Healthy training usually shows gradients within a few orders of magnitude.
+      </div>
       <canvas ref={canvasRef} className="dashboard-chart dashboard-chart-tall" />
     </div>
   );
@@ -853,10 +881,10 @@ function PerClassChart({ data }: { data: { cls: number; accuracy: number }[] }) 
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const barH = 16;
-    const gap = 1;
-    const labelW = 36;
-    const pad = { top: 8, right: 50, bottom: 8 };
+    const barH = 24;
+    const gap = 3;
+    const labelW = 48;
+    const pad = { top: 8, right: 60, bottom: 8 };
     const totalH = pad.top + data.length * (barH + gap) + pad.bottom;
 
     const rect = canvas.getBoundingClientRect();
@@ -874,10 +902,10 @@ function PerClassChart({ data }: { data: { cls: number; accuracy: number }[] }) 
       const y = pad.top + i * (barH + gap);
       const barW = data[i].accuracy * plotW;
 
-      ctx.fillStyle = '#6c7086';
-      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.fillStyle = '#a6adc8';
+      ctx.font = '13px JetBrains Mono, monospace';
       ctx.textAlign = 'right';
-      ctx.fillText(String(data[i].cls), labelW - 4, y + barH / 2 + 3);
+      ctx.fillText(String(data[i].cls), labelW - 6, y + barH / 2 + 4);
 
       ctx.fillStyle = '#313244';
       ctx.fillRect(labelW, y, plotW, barH);
@@ -888,10 +916,10 @@ function PerClassChart({ data }: { data: { cls: number; accuracy: number }[] }) 
       ctx.fillStyle = `rgba(${r}, ${g}, 100, 0.7)`;
       ctx.fillRect(labelW, y, barW, barH);
 
-      ctx.fillStyle = '#a6adc8';
-      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.fillStyle = '#cdd6f4';
+      ctx.font = '12px JetBrains Mono, monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(`${(acc * 100).toFixed(0)}%`, labelW + barW + 4, y + barH / 2 + 3);
+      ctx.fillText(`${(acc * 100).toFixed(1)}%`, labelW + barW + 6, y + barH / 2 + 4);
     }
   }, [data]);
 

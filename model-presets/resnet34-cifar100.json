@@ -2,25 +2,29 @@
   "version": "1.0",
   "graph": {
     "id": "main",
-    "name": "ResNet-34 \u2014 CIFAR-100",
+    "name": "Main Graph",
     "nodes": [
       {
-        "id": "cifar",
+        "id": "data.cifar100-1776539333093-q68y",
         "type": "data.cifar100",
         "position": {
           "x": 0,
-          "y": 0
+          "y": 200
         },
         "properties": {
-          "batchSize": 32
+          "batchSize": 32,
+          "useCoarseLabels": false,
+          "augHFlip": true,
+          "augRandomCrop": true,
+          "augColorJitter": false
         }
       },
       {
-        "id": "stem_conv",
+        "id": "ml.layers.conv2d-1776539333100-a3ma",
         "type": "ml.layers.conv2d",
         "position": {
-          "x": 250,
-          "y": 0
+          "x": 240,
+          "y": 200
         },
         "properties": {
           "outChannels": 64,
@@ -30,35 +34,35 @@
         }
       },
       {
-        "id": "stem_bn",
+        "id": "ml.layers.batchnorm2d-1776539333100-itz4",
         "type": "ml.layers.batchnorm2d",
         "position": {
-          "x": 500,
-          "y": 0
+          "x": 440,
+          "y": 200
         },
         "properties": {}
       },
       {
-        "id": "stem_relu",
+        "id": "ml.activations.relu-1776539333100-jcjf",
         "type": "ml.activations.relu",
         "position": {
-          "x": 700,
-          "y": 0
+          "x": 600,
+          "y": 200
         },
         "properties": {}
       },
       {
-        "id": "L1B1",
+        "id": "subgraph.block-1776539333100-dgnr",
         "type": "subgraph.block",
         "position": {
-          "x": 950,
-          "y": 0
+          "x": 800,
+          "y": 200
         },
         "properties": {
-          "blockName": "L1B1"
+          "blockName": "S1-B1"
         },
         "subgraph": {
-          "id": "L1B1-inner",
+          "id": "subgraph.block-1776539333100-dgnr-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -74,11 +78,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 64,
@@ -92,7 +108,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -101,7 +117,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -110,7 +126,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 64,
@@ -124,7 +140,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -142,21 +158,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -263,17 +267,17 @@
         }
       },
       {
-        "id": "L1B2",
+        "id": "subgraph.block-1776539333100-4tsl",
         "type": "subgraph.block",
         "position": {
-          "x": 1200,
-          "y": 0
+          "x": 1020,
+          "y": 200
         },
         "properties": {
-          "blockName": "L1B2"
+          "blockName": "S1-B2"
         },
         "subgraph": {
-          "id": "L1B2-inner",
+          "id": "subgraph.block-1776539333100-4tsl-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -289,11 +293,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 64,
@@ -307,7 +323,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -316,7 +332,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -325,7 +341,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 64,
@@ -339,7 +355,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -357,21 +373,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -478,17 +482,17 @@
         }
       },
       {
-        "id": "L1B3",
+        "id": "subgraph.block-1776539333100-smac",
         "type": "subgraph.block",
         "position": {
-          "x": 1450,
-          "y": 0
+          "x": 1240,
+          "y": 200
         },
         "properties": {
-          "blockName": "L1B3"
+          "blockName": "S1-B3"
         },
         "subgraph": {
-          "id": "L1B3-inner",
+          "id": "subgraph.block-1776539333100-smac-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -504,11 +508,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 64,
@@ -522,7 +538,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -531,7 +547,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -540,7 +556,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 64,
@@ -554,7 +570,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -572,21 +588,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -693,17 +697,17 @@
         }
       },
       {
-        "id": "L2B1",
+        "id": "subgraph.block-1776539333100-vlpq",
         "type": "subgraph.block",
         "position": {
-          "x": 1700,
-          "y": 0
+          "x": 1460,
+          "y": 200
         },
         "properties": {
-          "blockName": "L2B1"
+          "blockName": "S2-B1"
         },
         "subgraph": {
-          "id": "L2B1-inner",
+          "id": "subgraph.block-1776539333100-vlpq-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -711,7 +715,7 @@
               "type": "subgraph.input",
               "position": {
                 "x": 0,
-                "y": 150
+                "y": 100
               },
               "properties": {
                 "portCount": 1,
@@ -719,11 +723,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1300,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
-                "x": 180,
-                "y": 0
+                "x": 150,
+                "y": 60
               },
               "properties": {
                 "outChannels": 128,
@@ -736,8 +752,8 @@
               "id": "bn1",
               "type": "ml.layers.batchnorm2d",
               "position": {
-                "x": 350,
-                "y": 0
+                "x": 300,
+                "y": 60
               },
               "properties": {}
             },
@@ -745,8 +761,8 @@
               "id": "relu1",
               "type": "ml.activations.relu",
               "position": {
-                "x": 500,
-                "y": 0
+                "x": 440,
+                "y": 60
               },
               "properties": {}
             },
@@ -754,8 +770,8 @@
               "id": "conv2",
               "type": "ml.layers.conv2d",
               "position": {
-                "x": 650,
-                "y": 0
+                "x": 580,
+                "y": 60
               },
               "properties": {
                 "outChannels": 128,
@@ -768,17 +784,17 @@
               "id": "bn2",
               "type": "ml.layers.batchnorm2d",
               "position": {
-                "x": 810,
-                "y": 0
+                "x": 730,
+                "y": 60
               },
               "properties": {}
             },
             {
-              "id": "skip_conv",
+              "id": "proj_conv",
               "type": "ml.layers.conv2d",
               "position": {
-                "x": 400,
-                "y": 300
+                "x": 300,
+                "y": 250
               },
               "properties": {
                 "outChannels": 128,
@@ -788,11 +804,11 @@
               }
             },
             {
-              "id": "skip_bn",
+              "id": "proj_bn",
               "type": "ml.layers.batchnorm2d",
               "position": {
-                "x": 650,
-                "y": 300
+                "x": 500,
+                "y": 250
               },
               "properties": {}
             },
@@ -800,8 +816,8 @@
               "id": "add",
               "type": "ml.structural.add",
               "position": {
-                "x": 960,
-                "y": 150
+                "x": 900,
+                "y": 100
               },
               "properties": {}
             },
@@ -809,22 +825,10 @@
               "id": "relu2",
               "type": "ml.activations.relu",
               "position": {
-                "x": 1100,
-                "y": 0
+                "x": 1060,
+                "y": 100
               },
               "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1250,
-                "y": 150
-              },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
             }
           ],
           "edges": [
@@ -901,25 +905,25 @@
                 "portId": "in"
               },
               "target": {
-                "nodeId": "skip_conv",
+                "nodeId": "proj_conv",
                 "portId": "in"
               }
             },
             {
               "id": "r8",
               "source": {
-                "nodeId": "skip_conv",
+                "nodeId": "proj_conv",
                 "portId": "out"
               },
               "target": {
-                "nodeId": "skip_bn",
+                "nodeId": "proj_bn",
                 "portId": "in"
               }
             },
             {
               "id": "r9",
               "source": {
-                "nodeId": "skip_bn",
+                "nodeId": "proj_bn",
                 "portId": "out"
               },
               "target": {
@@ -953,17 +957,17 @@
         }
       },
       {
-        "id": "L2B2",
+        "id": "subgraph.block-1776539333100-o1r7",
         "type": "subgraph.block",
         "position": {
-          "x": 1950,
-          "y": 0
+          "x": 1680,
+          "y": 200
         },
         "properties": {
-          "blockName": "L2B2"
+          "blockName": "S2-B2"
         },
         "subgraph": {
-          "id": "L2B2-inner",
+          "id": "subgraph.block-1776539333100-o1r7-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -979,11 +983,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 128,
@@ -997,7 +1013,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1006,7 +1022,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1015,7 +1031,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 128,
@@ -1029,7 +1045,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1047,21 +1063,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -1168,17 +1172,17 @@
         }
       },
       {
-        "id": "L2B3",
+        "id": "subgraph.block-1776539333100-orn1",
         "type": "subgraph.block",
         "position": {
-          "x": 2200,
-          "y": 0
+          "x": 1900,
+          "y": 200
         },
         "properties": {
-          "blockName": "L2B3"
+          "blockName": "S2-B3"
         },
         "subgraph": {
-          "id": "L2B3-inner",
+          "id": "subgraph.block-1776539333100-orn1-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -1194,11 +1198,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 128,
@@ -1212,7 +1228,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1221,7 +1237,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1230,7 +1246,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 128,
@@ -1244,7 +1260,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1262,21 +1278,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -1383,17 +1387,17 @@
         }
       },
       {
-        "id": "L2B4",
+        "id": "subgraph.block-1776539333100-eaw1",
         "type": "subgraph.block",
         "position": {
-          "x": 2450,
-          "y": 0
+          "x": 2120,
+          "y": 200
         },
         "properties": {
-          "blockName": "L2B4"
+          "blockName": "S2-B4"
         },
         "subgraph": {
-          "id": "L2B4-inner",
+          "id": "subgraph.block-1776539333100-eaw1-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -1409,11 +1413,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 128,
@@ -1427,7 +1443,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1436,7 +1452,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1445,7 +1461,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 128,
@@ -1459,7 +1475,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1477,21 +1493,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -1598,17 +1602,17 @@
         }
       },
       {
-        "id": "L3B1",
+        "id": "subgraph.block-1776539333100-9ast",
         "type": "subgraph.block",
         "position": {
-          "x": 2700,
-          "y": 0
+          "x": 2340,
+          "y": 200
         },
         "properties": {
-          "blockName": "L3B1"
+          "blockName": "S3-B1"
         },
         "subgraph": {
-          "id": "L3B1-inner",
+          "id": "subgraph.block-1776539333100-9ast-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -1616,7 +1620,7 @@
               "type": "subgraph.input",
               "position": {
                 "x": 0,
-                "y": 150
+                "y": 100
               },
               "properties": {
                 "portCount": 1,
@@ -1624,11 +1628,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1300,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
-                "x": 180,
-                "y": 0
+                "x": 150,
+                "y": 60
               },
               "properties": {
                 "outChannels": 256,
@@ -1641,8 +1657,8 @@
               "id": "bn1",
               "type": "ml.layers.batchnorm2d",
               "position": {
-                "x": 350,
-                "y": 0
+                "x": 300,
+                "y": 60
               },
               "properties": {}
             },
@@ -1650,8 +1666,8 @@
               "id": "relu1",
               "type": "ml.activations.relu",
               "position": {
-                "x": 500,
-                "y": 0
+                "x": 440,
+                "y": 60
               },
               "properties": {}
             },
@@ -1659,8 +1675,8 @@
               "id": "conv2",
               "type": "ml.layers.conv2d",
               "position": {
-                "x": 650,
-                "y": 0
+                "x": 580,
+                "y": 60
               },
               "properties": {
                 "outChannels": 256,
@@ -1673,17 +1689,17 @@
               "id": "bn2",
               "type": "ml.layers.batchnorm2d",
               "position": {
-                "x": 810,
-                "y": 0
+                "x": 730,
+                "y": 60
               },
               "properties": {}
             },
             {
-              "id": "skip_conv",
+              "id": "proj_conv",
               "type": "ml.layers.conv2d",
               "position": {
-                "x": 400,
-                "y": 300
+                "x": 300,
+                "y": 250
               },
               "properties": {
                 "outChannels": 256,
@@ -1693,11 +1709,11 @@
               }
             },
             {
-              "id": "skip_bn",
+              "id": "proj_bn",
               "type": "ml.layers.batchnorm2d",
               "position": {
-                "x": 650,
-                "y": 300
+                "x": 500,
+                "y": 250
               },
               "properties": {}
             },
@@ -1705,8 +1721,8 @@
               "id": "add",
               "type": "ml.structural.add",
               "position": {
-                "x": 960,
-                "y": 150
+                "x": 900,
+                "y": 100
               },
               "properties": {}
             },
@@ -1714,22 +1730,10 @@
               "id": "relu2",
               "type": "ml.activations.relu",
               "position": {
-                "x": 1100,
-                "y": 0
+                "x": 1060,
+                "y": 100
               },
               "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1250,
-                "y": 150
-              },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
             }
           ],
           "edges": [
@@ -1806,25 +1810,25 @@
                 "portId": "in"
               },
               "target": {
-                "nodeId": "skip_conv",
+                "nodeId": "proj_conv",
                 "portId": "in"
               }
             },
             {
               "id": "r8",
               "source": {
-                "nodeId": "skip_conv",
+                "nodeId": "proj_conv",
                 "portId": "out"
               },
               "target": {
-                "nodeId": "skip_bn",
+                "nodeId": "proj_bn",
                 "portId": "in"
               }
             },
             {
               "id": "r9",
               "source": {
-                "nodeId": "skip_bn",
+                "nodeId": "proj_bn",
                 "portId": "out"
               },
               "target": {
@@ -1858,17 +1862,17 @@
         }
       },
       {
-        "id": "L3B2",
+        "id": "subgraph.block-1776539333100-991t",
         "type": "subgraph.block",
         "position": {
-          "x": 2950,
-          "y": 0
+          "x": 2560,
+          "y": 200
         },
         "properties": {
-          "blockName": "L3B2"
+          "blockName": "S3-B2"
         },
         "subgraph": {
-          "id": "L3B2-inner",
+          "id": "subgraph.block-1776539333100-991t-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -1884,11 +1888,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -1902,7 +1918,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1911,7 +1927,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1920,7 +1936,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -1934,7 +1950,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -1952,21 +1968,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -2073,17 +2077,17 @@
         }
       },
       {
-        "id": "L3B3",
+        "id": "subgraph.block-1776539333100-us99",
         "type": "subgraph.block",
         "position": {
-          "x": 3200,
-          "y": 0
+          "x": 2780,
+          "y": 200
         },
         "properties": {
-          "blockName": "L3B3"
+          "blockName": "S3-B3"
         },
         "subgraph": {
-          "id": "L3B3-inner",
+          "id": "subgraph.block-1776539333100-us99-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -2099,11 +2103,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -2117,7 +2133,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2126,7 +2142,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2135,7 +2151,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -2149,7 +2165,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2167,21 +2183,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -2288,17 +2292,17 @@
         }
       },
       {
-        "id": "L3B4",
+        "id": "subgraph.block-1776539333100-nkpe",
         "type": "subgraph.block",
         "position": {
-          "x": 3450,
-          "y": 0
+          "x": 3000,
+          "y": 200
         },
         "properties": {
-          "blockName": "L3B4"
+          "blockName": "S3-B4"
         },
         "subgraph": {
-          "id": "L3B4-inner",
+          "id": "subgraph.block-1776539333100-nkpe-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -2314,11 +2318,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -2332,7 +2348,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2341,7 +2357,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2350,7 +2366,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -2364,7 +2380,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2382,21 +2398,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -2503,17 +2507,17 @@
         }
       },
       {
-        "id": "L3B5",
+        "id": "subgraph.block-1776539333100-rg8f",
         "type": "subgraph.block",
         "position": {
-          "x": 3700,
-          "y": 0
+          "x": 3220,
+          "y": 200
         },
         "properties": {
-          "blockName": "L3B5"
+          "blockName": "S3-B5"
         },
         "subgraph": {
-          "id": "L3B5-inner",
+          "id": "subgraph.block-1776539333100-rg8f-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -2529,11 +2533,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -2547,7 +2563,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2556,7 +2572,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2565,7 +2581,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -2579,7 +2595,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2597,21 +2613,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -2718,17 +2722,17 @@
         }
       },
       {
-        "id": "L3B6",
+        "id": "subgraph.block-1776539333100-nrv4",
         "type": "subgraph.block",
         "position": {
-          "x": 3950,
-          "y": 0
+          "x": 3440,
+          "y": 200
         },
         "properties": {
-          "blockName": "L3B6"
+          "blockName": "S3-B6"
         },
         "subgraph": {
-          "id": "L3B6-inner",
+          "id": "subgraph.block-1776539333100-nrv4-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -2744,11 +2748,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -2762,7 +2778,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2771,7 +2787,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2780,7 +2796,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 256,
@@ -2794,7 +2810,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -2812,21 +2828,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -2933,17 +2937,17 @@
         }
       },
       {
-        "id": "L4B1",
+        "id": "subgraph.block-1776539333100-8e42",
         "type": "subgraph.block",
         "position": {
-          "x": 4200,
-          "y": 0
+          "x": 3660,
+          "y": 200
         },
         "properties": {
-          "blockName": "L4B1"
+          "blockName": "S4-B1"
         },
         "subgraph": {
-          "id": "L4B1-inner",
+          "id": "subgraph.block-1776539333100-8e42-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -2951,7 +2955,7 @@
               "type": "subgraph.input",
               "position": {
                 "x": 0,
-                "y": 150
+                "y": 100
               },
               "properties": {
                 "portCount": 1,
@@ -2959,11 +2963,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1300,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
-                "x": 180,
-                "y": 0
+                "x": 150,
+                "y": 60
               },
               "properties": {
                 "outChannels": 512,
@@ -2976,8 +2992,8 @@
               "id": "bn1",
               "type": "ml.layers.batchnorm2d",
               "position": {
-                "x": 350,
-                "y": 0
+                "x": 300,
+                "y": 60
               },
               "properties": {}
             },
@@ -2985,8 +3001,8 @@
               "id": "relu1",
               "type": "ml.activations.relu",
               "position": {
-                "x": 500,
-                "y": 0
+                "x": 440,
+                "y": 60
               },
               "properties": {}
             },
@@ -2994,8 +3010,8 @@
               "id": "conv2",
               "type": "ml.layers.conv2d",
               "position": {
-                "x": 650,
-                "y": 0
+                "x": 580,
+                "y": 60
               },
               "properties": {
                 "outChannels": 512,
@@ -3008,17 +3024,17 @@
               "id": "bn2",
               "type": "ml.layers.batchnorm2d",
               "position": {
-                "x": 810,
-                "y": 0
+                "x": 730,
+                "y": 60
               },
               "properties": {}
             },
             {
-              "id": "skip_conv",
+              "id": "proj_conv",
               "type": "ml.layers.conv2d",
               "position": {
-                "x": 400,
-                "y": 300
+                "x": 300,
+                "y": 250
               },
               "properties": {
                 "outChannels": 512,
@@ -3028,11 +3044,11 @@
               }
             },
             {
-              "id": "skip_bn",
+              "id": "proj_bn",
               "type": "ml.layers.batchnorm2d",
               "position": {
-                "x": 650,
-                "y": 300
+                "x": 500,
+                "y": 250
               },
               "properties": {}
             },
@@ -3040,8 +3056,8 @@
               "id": "add",
               "type": "ml.structural.add",
               "position": {
-                "x": 960,
-                "y": 150
+                "x": 900,
+                "y": 100
               },
               "properties": {}
             },
@@ -3049,22 +3065,10 @@
               "id": "relu2",
               "type": "ml.activations.relu",
               "position": {
-                "x": 1100,
-                "y": 0
+                "x": 1060,
+                "y": 100
               },
               "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1250,
-                "y": 150
-              },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
             }
           ],
           "edges": [
@@ -3141,25 +3145,25 @@
                 "portId": "in"
               },
               "target": {
-                "nodeId": "skip_conv",
+                "nodeId": "proj_conv",
                 "portId": "in"
               }
             },
             {
               "id": "r8",
               "source": {
-                "nodeId": "skip_conv",
+                "nodeId": "proj_conv",
                 "portId": "out"
               },
               "target": {
-                "nodeId": "skip_bn",
+                "nodeId": "proj_bn",
                 "portId": "in"
               }
             },
             {
               "id": "r9",
               "source": {
-                "nodeId": "skip_bn",
+                "nodeId": "proj_bn",
                 "portId": "out"
               },
               "target": {
@@ -3193,17 +3197,17 @@
         }
       },
       {
-        "id": "L4B2",
+        "id": "subgraph.block-1776539333100-fftr",
         "type": "subgraph.block",
         "position": {
-          "x": 4450,
-          "y": 0
+          "x": 3880,
+          "y": 200
         },
         "properties": {
-          "blockName": "L4B2"
+          "blockName": "S4-B2"
         },
         "subgraph": {
-          "id": "L4B2-inner",
+          "id": "subgraph.block-1776539333100-fftr-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -3219,11 +3223,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 512,
@@ -3237,7 +3253,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -3246,7 +3262,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -3255,7 +3271,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 512,
@@ -3269,7 +3285,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -3287,21 +3303,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -3408,17 +3412,17 @@
         }
       },
       {
-        "id": "L4B3",
+        "id": "subgraph.block-1776539333101-m914",
         "type": "subgraph.block",
         "position": {
-          "x": 4700,
-          "y": 0
+          "x": 4100,
+          "y": 200
         },
         "properties": {
-          "blockName": "L4B3"
+          "blockName": "S4-B3"
         },
         "subgraph": {
-          "id": "L4B3-inner",
+          "id": "subgraph.block-1776539333101-m914-inner",
           "name": "Inner Graph",
           "nodes": [
             {
@@ -3434,11 +3438,23 @@
               }
             },
             {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": {
+                "x": 1100,
+                "y": 100
+              },
+              "properties": {
+                "portCount": 1,
+                "portNames": "out"
+              }
+            },
+            {
               "id": "conv1",
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 150,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 512,
@@ -3452,7 +3468,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 300,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -3461,7 +3477,7 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 440,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -3470,7 +3486,7 @@
               "type": "ml.layers.conv2d",
               "position": {
                 "x": 580,
-                "y": 0
+                "y": 100
               },
               "properties": {
                 "outChannels": 512,
@@ -3484,7 +3500,7 @@
               "type": "ml.layers.batchnorm2d",
               "position": {
                 "x": 730,
-                "y": 0
+                "y": 100
               },
               "properties": {}
             },
@@ -3502,21 +3518,9 @@
               "type": "ml.activations.relu",
               "position": {
                 "x": 990,
-                "y": 0
-              },
-              "properties": {}
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": {
-                "x": 1100,
                 "y": 100
               },
-              "properties": {
-                "portCount": 1,
-                "portNames": "out"
-              }
+              "properties": {}
             }
           ],
           "edges": [
@@ -3623,11 +3627,11 @@
         }
       },
       {
-        "id": "avgpool",
+        "id": "ml.layers.adaptive_avgpool2d-1776539333101-5340",
         "type": "ml.layers.adaptive_avgpool2d",
         "position": {
-          "x": 4950,
-          "y": 0
+          "x": 4320,
+          "y": 200
         },
         "properties": {
           "outputH": 1,
@@ -3635,321 +3639,349 @@
         }
       },
       {
-        "id": "flatten",
+        "id": "ml.layers.flatten-1776539333101-656d",
         "type": "ml.layers.flatten",
         "position": {
-          "x": 5200,
-          "y": 0
+          "x": 4520,
+          "y": 200
         },
         "properties": {}
       },
       {
-        "id": "linear",
+        "id": "ml.layers.dropout-1776539333101-7321",
+        "type": "ml.layers.dropout",
+        "position": {
+          "x": 4720,
+          "y": 200
+        },
+        "properties": {
+          "p": 0.5
+        }
+      },
+      {
+        "id": "ml.layers.linear-1776539333101-jitw",
         "type": "ml.layers.linear",
         "position": {
-          "x": 5450,
-          "y": 0
+          "x": 4920,
+          "y": 200
         },
         "properties": {
           "outFeatures": 100
         }
       },
       {
-        "id": "loss",
+        "id": "ml.loss.cross_entropy-1776539333101-w6lm",
         "type": "ml.loss.cross_entropy",
         "position": {
-          "x": 5700,
-          "y": 50
+          "x": 5140,
+          "y": 250
         },
         "properties": {}
       },
       {
-        "id": "sgd",
+        "id": "ml.optimizers.sgd-1776539333101-pb73",
         "type": "ml.optimizers.sgd",
         "position": {
-          "x": 5950,
-          "y": 100
+          "x": 5380,
+          "y": 300
         },
         "properties": {
           "lr": 0.1,
           "momentum": 0.9,
-          "epochs": 50
+          "weightDecay": 0.0005,
+          "epochs": 50,
+          "valSplit": 0.1,
+          "seed": 42,
+          "scheduler": "cosine",
+          "earlyStopPatience": 0,
+          "gradClip": 0
         }
       }
     ],
     "edges": [
       {
-        "id": "e1",
+        "id": "e-1776539333077",
         "source": {
-          "nodeId": "cifar",
+          "nodeId": "data.cifar100-1776539333093-q68y",
           "portId": "out"
         },
         "target": {
-          "nodeId": "stem_conv",
+          "nodeId": "ml.layers.conv2d-1776539333100-a3ma",
           "portId": "in"
         }
       },
       {
-        "id": "e2",
+        "id": "e-1776539333078",
         "source": {
-          "nodeId": "stem_conv",
+          "nodeId": "ml.layers.conv2d-1776539333100-a3ma",
           "portId": "out"
         },
         "target": {
-          "nodeId": "stem_bn",
+          "nodeId": "ml.layers.batchnorm2d-1776539333100-itz4",
           "portId": "in"
         }
       },
       {
-        "id": "e3",
+        "id": "e-1776539333079",
         "source": {
-          "nodeId": "stem_bn",
+          "nodeId": "ml.layers.batchnorm2d-1776539333100-itz4",
           "portId": "out"
         },
         "target": {
-          "nodeId": "stem_relu",
+          "nodeId": "ml.activations.relu-1776539333100-jcjf",
           "portId": "in"
         }
       },
       {
-        "id": "e4",
+        "id": "e-1776539333080",
         "source": {
-          "nodeId": "stem_relu",
+          "nodeId": "ml.activations.relu-1776539333100-jcjf",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L1B1",
+          "nodeId": "subgraph.block-1776539333100-dgnr",
           "portId": "in"
         }
       },
       {
-        "id": "e5",
+        "id": "e-1776539333081",
         "source": {
-          "nodeId": "L1B1",
+          "nodeId": "subgraph.block-1776539333100-dgnr",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L1B2",
+          "nodeId": "subgraph.block-1776539333100-4tsl",
           "portId": "in"
         }
       },
       {
-        "id": "e6",
+        "id": "e-1776539333082",
         "source": {
-          "nodeId": "L1B2",
+          "nodeId": "subgraph.block-1776539333100-4tsl",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L1B3",
+          "nodeId": "subgraph.block-1776539333100-smac",
           "portId": "in"
         }
       },
       {
-        "id": "e7",
+        "id": "e-1776539333083",
         "source": {
-          "nodeId": "L1B3",
+          "nodeId": "subgraph.block-1776539333100-smac",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L2B1",
+          "nodeId": "subgraph.block-1776539333100-vlpq",
           "portId": "in"
         }
       },
       {
-        "id": "e8",
+        "id": "e-1776539333084",
         "source": {
-          "nodeId": "L2B1",
+          "nodeId": "subgraph.block-1776539333100-vlpq",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L2B2",
+          "nodeId": "subgraph.block-1776539333100-o1r7",
           "portId": "in"
         }
       },
       {
-        "id": "e9",
+        "id": "e-1776539333085",
         "source": {
-          "nodeId": "L2B2",
+          "nodeId": "subgraph.block-1776539333100-o1r7",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L2B3",
+          "nodeId": "subgraph.block-1776539333100-orn1",
           "portId": "in"
         }
       },
       {
-        "id": "e10",
+        "id": "e-1776539333086",
         "source": {
-          "nodeId": "L2B3",
+          "nodeId": "subgraph.block-1776539333100-orn1",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L2B4",
+          "nodeId": "subgraph.block-1776539333100-eaw1",
           "portId": "in"
         }
       },
       {
-        "id": "e11",
+        "id": "e-1776539333087",
         "source": {
-          "nodeId": "L2B4",
+          "nodeId": "subgraph.block-1776539333100-eaw1",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L3B1",
+          "nodeId": "subgraph.block-1776539333100-9ast",
           "portId": "in"
         }
       },
       {
-        "id": "e12",
+        "id": "e-1776539333088",
         "source": {
-          "nodeId": "L3B1",
+          "nodeId": "subgraph.block-1776539333100-9ast",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L3B2",
+          "nodeId": "subgraph.block-1776539333100-991t",
           "portId": "in"
         }
       },
       {
-        "id": "e13",
+        "id": "e-1776539333089",
         "source": {
-          "nodeId": "L3B2",
+          "nodeId": "subgraph.block-1776539333100-991t",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L3B3",
+          "nodeId": "subgraph.block-1776539333100-us99",
           "portId": "in"
         }
       },
       {
-        "id": "e14",
+        "id": "e-1776539333090",
         "source": {
-          "nodeId": "L3B3",
+          "nodeId": "subgraph.block-1776539333100-us99",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L3B4",
+          "nodeId": "subgraph.block-1776539333100-nkpe",
           "portId": "in"
         }
       },
       {
-        "id": "e15",
+        "id": "e-1776539333091",
         "source": {
-          "nodeId": "L3B4",
+          "nodeId": "subgraph.block-1776539333100-nkpe",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L3B5",
+          "nodeId": "subgraph.block-1776539333100-rg8f",
           "portId": "in"
         }
       },
       {
-        "id": "e16",
+        "id": "e-1776539333092",
         "source": {
-          "nodeId": "L3B5",
+          "nodeId": "subgraph.block-1776539333100-rg8f",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L3B6",
+          "nodeId": "subgraph.block-1776539333100-nrv4",
           "portId": "in"
         }
       },
       {
-        "id": "e17",
+        "id": "e-1776539333093",
         "source": {
-          "nodeId": "L3B6",
+          "nodeId": "subgraph.block-1776539333100-nrv4",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L4B1",
+          "nodeId": "subgraph.block-1776539333100-8e42",
           "portId": "in"
         }
       },
       {
-        "id": "e18",
+        "id": "e-1776539333094",
         "source": {
-          "nodeId": "L4B1",
+          "nodeId": "subgraph.block-1776539333100-8e42",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L4B2",
+          "nodeId": "subgraph.block-1776539333100-fftr",
           "portId": "in"
         }
       },
       {
-        "id": "e19",
+        "id": "e-1776539333095",
         "source": {
-          "nodeId": "L4B2",
+          "nodeId": "subgraph.block-1776539333100-fftr",
           "portId": "out"
         },
         "target": {
-          "nodeId": "L4B3",
+          "nodeId": "subgraph.block-1776539333101-m914",
           "portId": "in"
         }
       },
       {
-        "id": "e20",
+        "id": "e-1776539333096",
         "source": {
-          "nodeId": "L4B3",
+          "nodeId": "subgraph.block-1776539333101-m914",
           "portId": "out"
         },
         "target": {
-          "nodeId": "avgpool",
+          "nodeId": "ml.layers.adaptive_avgpool2d-1776539333101-5340",
           "portId": "in"
         }
       },
       {
-        "id": "e21",
+        "id": "e-1776539333097",
         "source": {
-          "nodeId": "avgpool",
+          "nodeId": "ml.layers.adaptive_avgpool2d-1776539333101-5340",
           "portId": "out"
         },
         "target": {
-          "nodeId": "flatten",
+          "nodeId": "ml.layers.flatten-1776539333101-656d",
           "portId": "in"
         }
       },
       {
-        "id": "e22",
+        "id": "e-1776539333098",
         "source": {
-          "nodeId": "flatten",
+          "nodeId": "ml.layers.flatten-1776539333101-656d",
           "portId": "out"
         },
         "target": {
-          "nodeId": "linear",
+          "nodeId": "ml.layers.dropout-1776539333101-7321",
           "portId": "in"
         }
       },
       {
-        "id": "e23",
+        "id": "e-1776539333099",
         "source": {
-          "nodeId": "linear",
+          "nodeId": "ml.layers.dropout-1776539333101-7321",
           "portId": "out"
         },
         "target": {
-          "nodeId": "loss",
+          "nodeId": "ml.layers.linear-1776539333101-jitw",
+          "portId": "in"
+        }
+      },
+      {
+        "id": "e-1776539333100",
+        "source": {
+          "nodeId": "ml.layers.linear-1776539333101-jitw",
+          "portId": "out"
+        },
+        "target": {
+          "nodeId": "ml.loss.cross_entropy-1776539333101-w6lm",
           "portId": "predictions"
         }
       },
       {
-        "id": "e24",
+        "id": "e-1776539333101",
         "source": {
-          "nodeId": "cifar",
+          "nodeId": "data.cifar100-1776539333093-q68y",
           "portId": "labels"
         },
         "target": {
-          "nodeId": "loss",
+          "nodeId": "ml.loss.cross_entropy-1776539333101-w6lm",
           "portId": "labels"
         }
       },
       {
-        "id": "e25",
+        "id": "e-1776539333102",
         "source": {
-          "nodeId": "loss",
+          "nodeId": "ml.loss.cross_entropy-1776539333101-w6lm",
           "portId": "out"
         },
         "target": {
-          "nodeId": "sgd",
+          "nodeId": "ml.optimizers.sgd-1776539333101-pb73",
           "portId": "loss"
         }
       }

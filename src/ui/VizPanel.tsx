@@ -3,6 +3,7 @@
 // Data comes from either live training snapshots or lastResult metadata.
 
 import { useRef, useEffect, useState } from 'react';
+import { useStore } from '@xyflow/react';
 import './VizPanel.css';
 
 interface HistogramData {
@@ -184,23 +185,40 @@ function formatAxis(v: number): string {
 
 function MiniHistogram({ bins, counts, color }: { bins: number[]; counts: number[]; color: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Track canvas CSS size so the bitmap stays sharp when the panel resizes.
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  // React Flow zoom factor — the whole canvas area is CSS-scaled by this, so we
+  // must render the bitmap at (layout_px × zoom × dpr) to stay crisp when zoomed in.
+  const zoom = useStore((s) => s.transform[2]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || bins.length === 0) return;
+    if (!canvas) return;
+    const update = () => setSize({ w: canvas.clientWidth, h: canvas.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || bins.length === 0 || size.w === 0) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    // Upscale the bitmap by the current zoom (but never below 1x) so zooming in
+    // on React Flow doesn't just stretch a low-res bitmap.
+    const scale = dpr * Math.max(1, zoom);
+    const w = size.w;
+    const h = size.h;
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.scale(dpr, dpr);
-
-    const w = rect.width;
-    const h = rect.height;
-    const labelH = 10; // space for axis labels at bottom
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    const labelH = 14; // space for axis labels + ticks at bottom
+    const tickH = 3;
     const plotH = h - labelH;
     const maxCount = Math.max(...counts);
     if (maxCount === 0) return;
@@ -225,32 +243,50 @@ function MiniHistogram({ bins, counts, color }: { bins: number[]; counts: number
     }
     ctx.globalAlpha = 1;
 
-    // Zero line (if 0 is within range)
+    // X axis baseline
+    ctx.strokeStyle = '#45475a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, plotH + 0.5);
+    ctx.lineTo(w, plotH + 0.5);
+    ctx.stroke();
+
+    // X axis tick marks + labels (min, mid, max). Aligned so the min label sits
+    // at the left edge and max at the right edge without clipping.
+    const tickPositions: { frac: number; align: CanvasTextAlign; pxOffset: number }[] = [
+      { frac: 0, align: 'left', pxOffset: 1 },
+      { frac: 0.5, align: 'center', pxOffset: 0 },
+      { frac: 1, align: 'right', pxOffset: -1 },
+    ];
+    ctx.strokeStyle = '#6c7086';
+    ctx.fillStyle = '#a6adc8';
+    ctx.font = '9px JetBrains Mono, monospace';
+    for (const { frac, align, pxOffset } of tickPositions) {
+      const xPos = frac * w;
+      // tick mark
+      ctx.beginPath();
+      ctx.moveTo(Math.round(xPos) + 0.5, plotH);
+      ctx.lineTo(Math.round(xPos) + 0.5, plotH + tickH);
+      ctx.stroke();
+      // label
+      ctx.textAlign = align;
+      const val = vmin + frac * vrange;
+      ctx.fillText(formatAxis(val), xPos + pxOffset, h - 2);
+    }
+
+    // Zero marker (if 0 is within range and not already at an edge)
     if (vmin < 0 && vmax > 0) {
       const zeroX = ((0 - vmin) / vrange) * w;
       ctx.strokeStyle = '#cdd6f4';
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 2]);
       ctx.beginPath();
-      ctx.moveTo(zeroX, 0);
-      ctx.lineTo(zeroX, plotH);
+      ctx.moveTo(Math.round(zeroX) + 0.5, 0);
+      ctx.lineTo(Math.round(zeroX) + 0.5, plotH);
       ctx.stroke();
       ctx.setLineDash([]);
-      // "0" label
-      ctx.fillStyle = '#cdd6f4';
-      ctx.font = '7px JetBrains Mono, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('0', zeroX, h - 1);
     }
-
-    // Min/max labels
-    ctx.fillStyle = '#585b70';
-    ctx.font = '7px JetBrains Mono, monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(formatAxis(vmin), 1, h - 1);
-    ctx.textAlign = 'right';
-    ctx.fillText(formatAxis(vmax), w - 1, h - 1);
-  }, [bins, counts, color]);
+  }, [bins, counts, color, size, zoom]);
 
   return (
     <canvas

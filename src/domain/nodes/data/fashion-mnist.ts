@@ -5,7 +5,7 @@ export const fashionMnistNode: NodeDefinition = {
   version: 1,
   displayName: 'FashionMNIST',
   description: 'Fashion items, 28x28 grayscale, 10 classes',
-  category: ['Data'],
+  category: ['Data', 'Image'],
 
   getProperties: () => [
     { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 32, affects: 'execution' },

@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "CNN — Fashion-MNIST",
+    "nodes": [
+      { "id": "data", "type": "data.fashion_mnist", "position": { "x": 0, "y": 200 }, "properties": { "batchSize": 64 } },
+
+      { "id": "conv1", "type": "ml.layers.conv2d", "position": { "x": 240, "y": 200 }, "properties": { "outChannels": 32, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn1", "type": "ml.layers.batchnorm2d", "position": { "x": 440, "y": 200 }, "properties": {} },
+      { "id": "relu1", "type": "ml.activations.relu", "position": { "x": 600, "y": 200 }, "properties": {} },
+      { "id": "pool1", "type": "ml.layers.maxpool2d", "position": { "x": 760, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+
+      { "id": "conv2", "type": "ml.layers.conv2d", "position": { "x": 940, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn2", "type": "ml.layers.batchnorm2d", "position": { "x": 1140, "y": 200 }, "properties": {} },
+      { "id": "relu2", "type": "ml.activations.relu", "position": { "x": 1300, "y": 200 }, "properties": {} },
+      { "id": "pool2", "type": "ml.layers.maxpool2d", "position": { "x": 1460, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+
+      { "id": "flatten", "type": "ml.layers.flatten", "position": { "x": 1640, "y": 200 }, "properties": {} },
+      { "id": "dropout", "type": "ml.layers.dropout", "position": { "x": 1800, "y": 200 }, "properties": { "p": 0.25 } },
+      { "id": "fc1", "type": "ml.layers.linear", "position": { "x": 1960, "y": 200 }, "properties": { "outFeatures": 128 } },
+      { "id": "relu3", "type": "ml.activations.relu", "position": { "x": 2140, "y": 200 }, "properties": {} },
+      { "id": "fc2", "type": "ml.layers.linear", "position": { "x": 2300, "y": 200 }, "properties": { "outFeatures": 10 } },
+
+      { "id": "loss", "type": "ml.loss.cross_entropy", "position": { "x": 2500, "y": 250 }, "properties": {} },
+      { "id": "adam", "type": "ml.optimizers.adam", "position": { "x": 2720, "y": 300 }, "properties": { "lr": 0.001, "epochs": 15 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "data", "portId": "out" }, "target": { "nodeId": "conv1", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "conv1", "portId": "out" }, "target": { "nodeId": "bn1", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "bn1", "portId": "out" }, "target": { "nodeId": "relu1", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "relu1", "portId": "out" }, "target": { "nodeId": "pool1", "portId": "in" } },
+      { "id": "e5", "source": { "nodeId": "pool1", "portId": "out" }, "target": { "nodeId": "conv2", "portId": "in" } },
+      { "id": "e6", "source": { "nodeId": "conv2", "portId": "out" }, "target": { "nodeId": "bn2", "portId": "in" } },
+      { "id": "e7", "source": { "nodeId": "bn2", "portId": "out" }, "target": { "nodeId": "relu2", "portId": "in" } },
+      { "id": "e8", "source": { "nodeId": "relu2", "portId": "out" }, "target": { "nodeId": "pool2", "portId": "in" } },
+      { "id": "e9", "source": { "nodeId": "pool2", "portId": "out" }, "target": { "nodeId": "flatten", "portId": "in" } },
+      { "id": "e10", "source": { "nodeId": "flatten", "portId": "out" }, "target": { "nodeId": "dropout", "portId": "in" } },
+      { "id": "e11", "source": { "nodeId": "dropout", "portId": "out" }, "target": { "nodeId": "fc1", "portId": "in" } },
+      { "id": "e12", "source": { "nodeId": "fc1", "portId": "out" }, "target": { "nodeId": "relu3", "portId": "in" } },
+      { "id": "e13", "source": { "nodeId": "relu3", "portId": "out" }, "target": { "nodeId": "fc2", "portId": "in" } },
+      { "id": "e14", "source": { "nodeId": "fc2", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e15", "source": { "nodeId": "data", "portId": "labels" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e16", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}

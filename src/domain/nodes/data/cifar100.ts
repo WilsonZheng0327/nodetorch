@@ -9,7 +9,7 @@ export const cifar100Node: NodeDefinition = {
   version: 1,
   displayName: 'CIFAR-100',
   description: '100-class color images, 32x32 RGB',
-  category: ['Data'],
+  category: ['Data', 'Image'],
 
   getProperties: () => [
     {

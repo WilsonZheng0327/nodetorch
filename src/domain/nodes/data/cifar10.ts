@@ -5,7 +5,7 @@ export const cifar10Node: NodeDefinition = {
   version: 1,
   displayName: 'CIFAR-10',
   description: '10-class color images, 32x32 RGB',
-  category: ['Data'],
+  category: ['Data', 'Image'],
 
   getProperties: () => [
     { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 32, affects: 'execution' },

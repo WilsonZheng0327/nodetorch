@@ -1,0 +1,59 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "LSTM — AG News",
+    "nodes": [
+      {
+        "id": "agnews", "type": "data.ag_news",
+        "position": { "x": 0, "y": 0 },
+        "properties": { "batchSize": 64, "maxLen": 128, "vocabSize": 10000 }
+      },
+      {
+        "id": "embed", "type": "ml.layers.embedding",
+        "position": { "x": 250, "y": 0 },
+        "properties": { "numEmbeddings": 10000, "embeddingDim": 64 }
+      },
+      {
+        "id": "lstm", "type": "ml.layers.lstm",
+        "position": { "x": 500, "y": 0 },
+        "properties": { "hiddenSize": 128, "numLayers": 1, "bidirectional": false }
+      },
+      {
+        "id": "pool", "type": "ml.structural.sequence_pool",
+        "position": { "x": 750, "y": 0 },
+        "properties": { "mode": "last" }
+      },
+      {
+        "id": "dropout", "type": "ml.layers.dropout",
+        "position": { "x": 950, "y": 0 },
+        "properties": { "p": 0.3 }
+      },
+      {
+        "id": "linear", "type": "ml.layers.linear",
+        "position": { "x": 1150, "y": 0 },
+        "properties": { "outFeatures": 4 }
+      },
+      {
+        "id": "loss", "type": "ml.loss.cross_entropy",
+        "position": { "x": 1400, "y": 50 },
+        "properties": {}
+      },
+      {
+        "id": "adam", "type": "ml.optimizers.adam",
+        "position": { "x": 1650, "y": 100 },
+        "properties": { "lr": 0.001, "epochs": 5 }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "agnews", "portId": "out" }, "target": { "nodeId": "embed", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "embed", "portId": "out" }, "target": { "nodeId": "lstm", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "lstm", "portId": "out" }, "target": { "nodeId": "pool", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "pool", "portId": "out" }, "target": { "nodeId": "dropout", "portId": "in" } },
+      { "id": "e5", "source": { "nodeId": "dropout", "portId": "out" }, "target": { "nodeId": "linear", "portId": "in" } },
+      { "id": "e6", "source": { "nodeId": "linear", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e7", "source": { "nodeId": "agnews", "portId": "labels" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e8", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}

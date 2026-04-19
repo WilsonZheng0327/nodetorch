@@ -285,22 +285,10 @@ def build_reshape(props: dict, input_shapes: dict) -> nn.Module:
     target_str = props.get("targetShape", "-1")
     in_shape = input_shapes.get("in", [1])
     target = [int(s.strip()) for s in target_str.split(",")]
-    # Resolve 0s (keep original dimension)
+    # Resolve 0s (keep original dimension) but leave -1 for torch.reshape to handle
+    # at runtime — resolving -1 at build time bakes in the batch size, which breaks
+    # when the actual batch size differs (e.g., last batch or different batch size).
     resolved = [in_shape[i] if v == 0 and i < len(in_shape) else v for i, v in enumerate(target)]
-    # Resolve -1 (infer dimension)
-    total = 1
-    for s in in_shape:
-        total *= s
-    neg_idx = -1
-    for i, v in enumerate(resolved):
-        if v == -1:
-            neg_idx = i
-    if neg_idx != -1:
-        known = 1
-        for i, v in enumerate(resolved):
-            if i != neg_idx:
-                known *= v
-        resolved[neg_idx] = total // known
     return ReshapeModule(resolved)
 
 

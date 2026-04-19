@@ -276,6 +276,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard-tab-content::-webkit-scrollbar {
@@ -292,15 +294,15 @@
 }
 
 .dashboard-chart {
+  display: block;
   width: 100%;
-  height: 320px;
-  padding: 10px;
-  box-sizing: border-box;
+  height: 360px;
+  margin-bottom: 24px;
 }
 
 .dashboard-chart-tall {
   height: auto;
-  padding: 0;
+  margin-bottom: 0;
 }
 
 .dashboard-chart-placeholder {
@@ -310,6 +312,14 @@
   justify-content: center;
   color: #6c7086;
   font-size: 14px;
+}
+
+/* Inline explainer text (e.g., above gradients chart) */
+.dashboard-explainer {
+  padding: 10px 14px 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #a6adc8;
 }
 
 /* Per-class + gradient flow scrollable containers */
@@ -339,7 +349,8 @@
 /* Epoch table */
 .dashboard-table-wrap {
   overflow-y: auto;
-  max-height: 300px;
+  flex: 1;
+  min-height: 0;
 }
 
 .dashboard-table-wrap::-webkit-scrollbar {

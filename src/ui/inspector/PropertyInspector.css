@@ -428,16 +428,16 @@
 }
 
 .dataset-detail-text-sample {
-  font-size: 11px;
+  font-size: 12px;
   color: #a6adc8;
-  line-height: 1.4;
-  padding: 4px 6px;
+  line-height: 1.5;
+  padding: 6px 8px;
   background: #313244;
   border-radius: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
 }
 

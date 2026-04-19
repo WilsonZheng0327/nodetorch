@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "Transfer Learning — CIFAR-10",
+    "nodes": [
+      {
+        "id": "cifar", "type": "data.cifar10",
+        "position": { "x": 0, "y": 200 },
+        "properties": { "batchSize": 32, "augHFlip": true, "augRandomCrop": true }
+      },
+      {
+        "id": "resnet", "type": "ml.layers.pretrained_resnet18",
+        "position": { "x": 300, "y": 200 },
+        "properties": { "freeze": true, "mode": "features" }
+      },
+      {
+        "id": "dropout", "type": "ml.layers.dropout",
+        "position": { "x": 600, "y": 200 },
+        "properties": { "p": 0.3 }
+      },
+      {
+        "id": "linear", "type": "ml.layers.linear",
+        "position": { "x": 840, "y": 200 },
+        "properties": { "outFeatures": 10 }
+      },
+      {
+        "id": "loss", "type": "ml.loss.cross_entropy",
+        "position": { "x": 1080, "y": 250 },
+        "properties": {}
+      },
+      {
+        "id": "adam", "type": "ml.optimizers.adam",
+        "position": { "x": 1320, "y": 300 },
+        "properties": { "lr": 0.001, "epochs": 10 }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "cifar", "portId": "out" }, "target": { "nodeId": "resnet", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "resnet", "portId": "out" }, "target": { "nodeId": "dropout", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "dropout", "portId": "out" }, "target": { "nodeId": "linear", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "linear", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e5", "source": { "nodeId": "cifar", "portId": "labels" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e6", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}

@@ -37,7 +37,14 @@ SENTINEL_INPUT = "subgraph.input"
 SENTINEL_OUTPUT = "subgraph.output"
 
 # --- Device management ---
-_device: str = "cpu"
+def _default_device() -> str:
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+_device: str = _default_device()
 
 def get_device() -> torch.device:
     return torch.device(_device)
@@ -296,15 +303,17 @@ def build_and_run_graph(graph_data: dict) -> tuple[
             try:
                 tensors = loader(props)
                 dev = get_device()
-                tensors = {k: v.to(dev) for k, v in tensors.items()}
+                tensors = {k: (v.to(dev) if isinstance(v, torch.Tensor) else v) for k, v in tensors.items()}
                 results[node_id] = tensors
-                outputs = {k: tensor_info(v) for k, v in tensors.items()}
-                first_tensor = next(iter(tensors.values()))
+                outputs = {k: tensor_info(v) for k, v in tensors.items() if isinstance(v, torch.Tensor)}
+                first_tensor = next(v for v in tensors.values() if isinstance(v, torch.Tensor))
+                # Note: dataset nodes do NOT emit an "activations" histogram.
+                # "Activation" means the output of a layer's nonlinearity, but
+                # a dataset node is just raw (optionally normalized) input data.
                 node_results[node_id] = {
                     "outputs": outputs,
                     "metadata": {
                         "outputShape": list(first_tensor.shape),
-                        "activations": activation_info(first_tensor),
                     },
                 }
             except Exception as e:
@@ -655,7 +664,15 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
                 }
 
     # --- Feature maps (Conv output channels) ---
-    if output is not None and isinstance(output, torch.Tensor) and output.dim() == 4:
+    # Only show for layers that actually *produce* new feature channels via learned
+    # filters. ReLU, Pool, BatchNorm etc. pass 4D tensors through but don't create
+    # new features — labeling their output "feature maps" would mislead students.
+    FEATURE_MAP_TYPES = {
+        "ml.layers.conv2d",
+        "ml.layers.conv_transpose2d",
+        "ml.layers.pretrained_resnet18",
+    }
+    if node_type in FEATURE_MAP_TYPES and output is not None and isinstance(output, torch.Tensor) and output.dim() == 4:
         # [batch, channels, H, W] → take first sample, up to 16 channels
         fmaps = output[0].detach().cpu().float()
         n_maps = min(16, fmaps.shape[0])
@@ -758,7 +775,7 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
                         label_tensor = results.get(edge["source"]["nodeId"], {}).get("labels")
                         if label_tensor is None:
                             label_tensor = results.get(edge["source"]["nodeId"], {}).get("out")
-            if pred_tensor is not None and label_tensor is not None:
+            if pred_tensor is not None and label_tensor is not None and pred_tensor.dim() == 2:
                 preds = pred_tensor.argmax(dim=1).cpu()
                 labels = label_tensor.cpu()
                 n_classes = max(int(preds.max().item()) + 1, int(labels.max().item()) + 1)
@@ -1045,13 +1062,13 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
                 total_loss += loss_tensor.item()
 
                 # Compute accuracy from the node before loss (predictions)
-                # Find which node feeds predictions to the loss node
+                # Only for classification tasks (predictions must be 2D [B, classes])
                 for edge in edges:
                     if (edge["target"]["nodeId"] == loss_node_id
                             and edge["target"]["portId"] == "predictions"):
                         pred_node_id = edge["source"]["nodeId"]
                         preds = batch_results.get(pred_node_id, {}).get("out")
-                        if preds is not None:
+                        if preds is not None and preds.dim() == 2:
                             predicted = preds.argmax(dim=1)
                             correct += (predicted == labels).sum().item()
                             total += labels.size(0)
@@ -1130,7 +1147,7 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
                                     and edge["target"]["portId"] == "predictions"):
                                 pnid = edge["source"]["nodeId"]
                                 preds_v = batch_results_v.get(pnid, {}).get("out")
-                                if preds_v is not None:
+                                if preds_v is not None and preds_v.dim() == 2:
                                     pred_v = preds_v.argmax(dim=1)
                                     val_correct += int((pred_v == labels).sum().item())
                                     val_total += int(labels.size(0))
@@ -1297,8 +1314,8 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
             if DATA_LOADERS.get(node_type):
                 tensors = data_loader_fn(node["properties"])
                 final_results[node_id] = tensors
-                outputs = {k: tensor_info(v) for k, v in tensors.items()}
-                first_tensor = next(iter(tensors.values()))
+                outputs = {k: tensor_info(v) for k, v in tensors.items() if isinstance(v, torch.Tensor)}
+                first_tensor = next(v for v in tensors.values() if isinstance(v, torch.Tensor))
                 node_results[node_id] = {
                     "outputs": outputs,
                     "metadata": {"outputShape": list(first_tensor.shape)},
@@ -1532,42 +1549,41 @@ def infer_graph(graph_data: dict) -> dict:
                     # Override batch size to 1 for inference
                     infer_props = {**props, "batchSize": 1}
                     tensors = loader(infer_props)
-                    tensors = {k: v.to(get_device()) for k, v in tensors.items()}
+                    tensors = {k: (v.to(get_device()) if isinstance(v, torch.Tensor) else v) for k, v in tensors.items()}
                     results[node_id] = tensors
-                    outputs = {k: tensor_info(v) for k, v in tensors.items()}
-                    first_tensor = next(iter(tensors.values()))
+                    outputs = {k: tensor_info(v) for k, v in tensors.items() if isinstance(v, torch.Tensor)}
+                    first_tensor = next(v for v in tensors.values() if isinstance(v, torch.Tensor))
 
-                    # Include the actual label and image pixels for display
+                    # Include the actual label for display
                     label = int(tensors["labels"][0]) if "labels" in tensors else None
 
-                    # Send raw pixel data for image preview
-                    image_data = None
-                    image_channels = None
-                    if "out" in tensors and tensors["out"].dim() == 4:
-                        img = tensors["out"][0]  # [C, H, W]
-                        C = img.shape[0]
+                    meta: dict = {
+                        "outputShape": list(first_tensor.shape),
+                        "actualLabel": label,
+                    }
 
+                    # Image datasets: send raw pixel data for preview
+                    if "out" in tensors and isinstance(tensors["out"], torch.Tensor) and tensors["out"].dim() == 4:
+                        img = tensors["out"][0].detach().cpu()
+                        C = img.shape[0]
                         denorm = DENORMALIZERS.get(node_type)
                         if denorm:
                             img = denorm(img)
-
                         img = (img.clamp(0, 1) * 255).byte()
-
                         if C == 1:
-                            image_data = img[0].tolist()
-                            image_channels = 1
+                            meta["imagePixels"] = img[0].tolist()
+                            meta["imageChannels"] = 1
                         else:
-                            image_data = img.permute(1, 2, 0).tolist()
-                            image_channels = C
+                            meta["imagePixels"] = img.permute(1, 2, 0).tolist()
+                            meta["imageChannels"] = C
+
+                    # Text datasets: send raw sample text for preview
+                    if "_texts" in tensors:
+                        meta["sampleText"] = tensors["_texts"][0][:500]
 
                     node_results[node_id] = {
                         "outputs": outputs,
-                        "metadata": {
-                            "outputShape": list(first_tensor.shape),
-                            "actualLabel": label,
-                            "imagePixels": image_data,
-                            "imageChannels": image_channels,
-                        },
+                        "metadata": meta,
                     }
                 except Exception as e:
                     node_results[node_id] = {
@@ -1649,6 +1665,7 @@ def infer_graph(graph_data: dict) -> dict:
                     for e in edges
                 )
                 if is_final and output.dim() == 2:
+                    # Classification: show predicted class + probabilities
                     probs = torch.softmax(output, dim=1)[0]
                     predicted_class = int(probs.argmax())
                     confidence = float(probs[predicted_class])
@@ -1658,6 +1675,18 @@ def infer_graph(graph_data: dict) -> dict:
                         "probabilities": [_safe_float(float(p)) for p in probs],
                     }
                     meta["prediction"] = prediction
+                elif is_final and output.dim() == 4:
+                    # Reconstruction (autoencoder): show output as image
+                    img = output[0].detach().cpu()  # [C, H, W]
+                    img = (img.clamp(0, 1) * 255).byte()
+                    C = img.shape[0]
+                    if C == 1:
+                        meta["imagePixels"] = img[0].tolist()
+                        meta["imageChannels"] = 1
+                    else:
+                        meta["imagePixels"] = img.permute(1, 2, 0).tolist()
+                        meta["imageChannels"] = C
+                    meta["reconstruction"] = True
 
                 out_info = {k: tensor_info(v) for k, v in raw.items()} if isinstance(raw, dict) else {"out": tensor_info(output)}
                 node_results[node_id] = {

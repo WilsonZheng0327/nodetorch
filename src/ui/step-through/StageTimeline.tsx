@@ -8,9 +8,10 @@ interface Props {
   stages: Stage[];
   currentIdx: number;
   onSelect: (idx: number) => void;
+  direction?: 'forward' | 'backward';
 }
 
-export function StageTimeline({ stages, currentIdx, onSelect }: Props) {
+export function StageTimeline({ stages, currentIdx, onSelect, direction = 'forward' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to current stage
@@ -52,7 +53,7 @@ export function StageTimeline({ stages, currentIdx, onSelect }: Props) {
     items.push(
       <div key={stage.stageId} className="stage-timeline-item">
         <StageCard stage={stage} active={i === currentIdx} onClick={() => onSelect(i)} />
-        {i < stages.length - 1 && <div className="stage-timeline-arrow">→</div>}
+        {i < stages.length - 1 && <div className="stage-timeline-arrow">{direction === 'backward' ? '←' : '→'}</div>}
       </div>,
     );
   });

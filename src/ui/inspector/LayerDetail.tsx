@@ -62,7 +62,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
     fetch('http://localhost:8000/loss-landscape', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ graph: JSON.parse(graphJson), gridSize: 11, alphaRange: 1.0 }),
+      body: JSON.stringify({ graph: JSON.parse(graphJson), gridSize: 21, alphaRange: 10.0 }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -438,67 +438,132 @@ function LossLandscapeView({ data }: { data: LandscapeData }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const cellSize = 20;
-    const padding = 24;
-    const w = data.gridSize * cellSize + padding * 2;
-    const h = data.gridSize * cellSize + padding * 2;
-    canvas.width = w;
-    canvas.height = h;
+    const padLeft = 64;         // room for β-axis labels
+    const padTop = 40;          // room for α-axis labels + title
+    const padRight = 24;
+    const padBottom = 56;       // room for x-axis title
+
+    // Fit to container width
+    const containerW = canvas.parentElement?.clientWidth ?? 700;
+    const cellSize = Math.max(12, Math.floor((containerW - padLeft - padRight) / data.gridSize));
+    const plotW = data.gridSize * cellSize;
+    const plotH = data.gridSize * cellSize;
+    const w = plotW + padLeft + padRight;
+    const h = plotH + padTop + padBottom;
+
+    // Render at DPR for crispness
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const range = data.maxLoss - data.minLoss || 1;
 
-    // Draw heatmap
+    // Heatmap cells (blue = low loss, red = high loss)
     for (let r = 0; r < data.gridSize; r++) {
       for (let c = 0; c < data.gridSize; c++) {
         const v = data.grid[r][c];
         const t = (v - data.minLoss) / range;
-        // Warm-to-cool: low loss (good) = cool blue, high loss = warm red
-        // Invert: low t = cool, high t = warm
         const r255 = Math.round(Math.min(255, t * 255));
         const g255 = Math.round(Math.min(255, Math.abs(t - 0.5) * 2 * 255));
         const b255 = Math.round(Math.min(255, (1 - t) * 255));
         ctx.fillStyle = `rgb(${r255}, ${g255}, ${b255})`;
-        ctx.fillRect(padding + c * cellSize, padding + r * cellSize, cellSize, cellSize);
+        ctx.fillRect(padLeft + c * cellSize, padTop + r * cellSize, cellSize, cellSize);
       }
     }
 
-    // Center marker (current weights)
-    const cx = padding + (data.gridSize / 2) * cellSize;
-    const cy = padding + (data.gridSize / 2) * cellSize;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-    ctx.stroke();
+    // Grid lines for readability
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= data.gridSize; i++) {
+      ctx.beginPath();
+      ctx.moveTo(padLeft + i * cellSize + 0.5, padTop);
+      ctx.lineTo(padLeft + i * cellSize + 0.5, padTop + plotH);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(padLeft, padTop + i * cellSize + 0.5);
+      ctx.lineTo(padLeft + plotW, padTop + i * cellSize + 0.5);
+      ctx.stroke();
+    }
 
-    // Axes labels
+    // Center marker (current weights)
+    const cx = padLeft + (data.gridSize / 2) * cellSize;
+    const cy = padTop + (data.gridSize / 2) * cellSize;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.stroke();
+    // Inner dot
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    // "current" label next to marker
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('current weights', cx + 10, cy + 4);
+
+    // --- Axis ticks and labels ---
     ctx.fillStyle = '#cdd6f4';
-    ctx.font = '10px Inter, system-ui, sans-serif';
+    ctx.font = '12px JetBrains Mono, monospace';
+
+    // α axis (horizontal) — bottom
     ctx.textAlign = 'center';
-    ctx.fillText(`α = -${data.alphaRange}`, padding + cellSize / 2, padding - 4);
-    ctx.fillText(`α = +${data.alphaRange}`, padding + (data.gridSize - 0.5) * cellSize, padding - 4);
+    ctx.fillText(`-${data.alphaRange.toFixed(1)}`, padLeft, padTop + plotH + 16);
+    ctx.fillText('0', padLeft + plotW / 2, padTop + plotH + 16);
+    ctx.fillText(`+${data.alphaRange.toFixed(1)}`, padLeft + plotW, padTop + plotH + 16);
+
+    // β axis (vertical) — left side
     ctx.textAlign = 'right';
-    ctx.fillText(`β = -${data.alphaRange}`, padding - 4, padding + cellSize);
-    ctx.fillText(`β = +${data.alphaRange}`, padding - 4, padding + (data.gridSize - 0.5) * cellSize + 4);
+    ctx.fillText(`+${data.alphaRange.toFixed(1)}`, padLeft - 8, padTop + 5);
+    ctx.fillText('0', padLeft - 8, padTop + plotH / 2 + 4);
+    ctx.fillText(`-${data.alphaRange.toFixed(1)}`, padLeft - 8, padTop + plotH);
+
+    // Axis titles
+    ctx.fillStyle = '#a6adc8';
+    ctx.font = '13px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('α  (random direction 1)', padLeft + plotW / 2, padTop + plotH + 38);
+    ctx.save();
+    ctx.translate(16, padTop + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('β  (random direction 2)', 0, 0);
+    ctx.restore();
   }, [data]);
 
   return (
     <div>
-      <canvas ref={canvasRef} style={{ borderRadius: 4, border: '1px solid #45475a', imageRendering: 'pixelated' }} />
+      <div className="confusion-scroll">
+        <canvas ref={canvasRef} style={{ borderRadius: 4, border: '1px solid #45475a', display: 'block' }} />
+      </div>
       <div className="heatmap-legend">
-        <span>min: {data.minLoss.toFixed(4)} (blue)</span>
+        <span>low loss</span>
+        <div className="landscape-color-bar" />
+        <span>high loss</span>
+      </div>
+      <div className="heatmap-legend" style={{ marginTop: 4 }}>
+        <span>min: {data.minLoss.toFixed(4)}</span>
         <span style={{ flex: 1 }}></span>
         <span>center: {data.centerLoss.toFixed(4)}</span>
         <span style={{ flex: 1 }}></span>
-        <span>max: {data.maxLoss.toFixed(4)} (red)</span>
+        <span>max: {data.maxLoss.toFixed(4)}</span>
       </div>
       <div className="heatmap-note">
+        <strong>How to read this:</strong> we pick two random perturbation directions in
+        weight space (α, β) and evaluate the loss at a grid of offsets from the current
+        weights. The white circle at the center is your model's current position. Colors
+        show the loss at each perturbed weight configuration — blue regions are lower loss,
+        red are higher.{' '}
         {data.usedTrainedWeights
-          ? 'Computed around trained weights. Smooth valley = well-converged. Sharp ravines = unstable minimum.'
-          : 'Computed around random init (loss is high everywhere). Train first for a meaningful landscape.'}
+          ? 'A smooth blue valley around the center means the trained solution is stable; sharp ravines mean a brittle minimum that small weight changes would escape.'
+          : 'These weights are random init, so loss is high everywhere — train the model first for a meaningful landscape.'}
       </div>
     </div>
   );
@@ -565,29 +630,32 @@ function ConfusionMatrixView({ data, size, onCellClick, highlightCell }: {
     const canvas = canvasRef.current;
     if (!canvas || data.length === 0) return;
 
-    const cellSize = Math.max(16, Math.min(28, Math.floor(400 / size)));
-    const labelSpace = 30;
+    // Don't shrink cells below 28px — below that the numbers inside stop being
+    // readable. The surrounding `.confusion-scroll` wrapper handles overflow.
+    const cellSize = Math.max(28, Math.min(40, Math.floor(600 / size)));
+    const labelSpace = 40;
     cellSizeRef.current = cellSize;
     labelSpaceRef.current = labelSpace;
     canvas.width = size * cellSize + labelSpace;
-    canvas.height = size * cellSize + labelSpace;
+    canvas.height = size * cellSize + labelSpace + 18; // +18 for "Predicted" footer
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const maxVal = Math.max(...data.flat(), 1);
 
-    ctx.fillStyle = '#6c7086';
-    ctx.font = '9px JetBrains Mono, monospace';
+    ctx.fillStyle = '#a6adc8';
+    ctx.font = '12px JetBrains Mono, monospace';
     ctx.textAlign = 'center';
     for (let c = 0; c < size; c++) {
-      ctx.fillText(String(c), labelSpace + c * cellSize + cellSize / 2, 10);
+      ctx.fillText(String(c), labelSpace + c * cellSize + cellSize / 2, 16);
     }
 
     for (let r = 0; r < size; r++) {
       ctx.textAlign = 'right';
-      ctx.fillStyle = '#6c7086';
-      ctx.fillText(String(r), labelSpace - 4, labelSpace + r * cellSize + cellSize / 2 + 3);
+      ctx.fillStyle = '#a6adc8';
+      ctx.font = '12px JetBrains Mono, monospace';
+      ctx.fillText(String(r), labelSpace - 6, labelSpace + r * cellSize + cellSize / 2 + 4);
 
       for (let c = 0; c < size; c++) {
         const v = data[r][c];
@@ -611,18 +679,18 @@ function ConfusionMatrixView({ data, size, onCellClick, highlightCell }: {
         }
 
         if (v > 0) {
-          ctx.fillStyle = t > 0.5 ? '#fff' : '#a6adc8';
-          ctx.font = '9px JetBrains Mono, monospace';
+          ctx.fillStyle = t > 0.5 ? '#fff' : '#cdd6f4';
+          ctx.font = '11px JetBrains Mono, monospace';
           ctx.textAlign = 'center';
-          ctx.fillText(String(v), x + cellSize / 2, y + cellSize / 2 + 3);
+          ctx.fillText(String(v), x + cellSize / 2, y + cellSize / 2 + 4);
         }
       }
     }
 
-    ctx.fillStyle = '#6c7086';
-    ctx.font = '9px Inter, system-ui, sans-serif';
+    ctx.fillStyle = '#a6adc8';
+    ctx.font = '12px Inter, system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Predicted', labelSpace + (size * cellSize) / 2, size * cellSize + labelSpace + 12);
+    ctx.fillText('Predicted', labelSpace + (size * cellSize) / 2, size * cellSize + labelSpace + 14);
   }, [data, size, highlightCell]);
 
   function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -640,13 +708,17 @@ function ConfusionMatrixView({ data, size, onCellClick, highlightCell }: {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <canvas
-        ref={canvasRef}
-        style={{ borderRadius: 4, cursor: onCellClick ? 'pointer' : 'default' }}
-        onClick={handleClick}
-      />
-      <div style={{ fontSize: 9, color: '#6c7086', marginTop: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+      {/* Scrollable wrapper: confusion matrix starts top-left and scrolls right/down
+          when it exceeds the modal width. */}
+      <div className="confusion-scroll">
+        <canvas
+          ref={canvasRef}
+          style={{ borderRadius: 4, cursor: onCellClick ? 'pointer' : 'default', display: 'block' }}
+          onClick={handleClick}
+        />
+      </div>
+      <div style={{ fontSize: 12, color: '#a6adc8', marginTop: 6 }}>
         Rows = Actual, Columns = Predicted{onCellClick ? ' — click a cell to filter misclassifications' : ''}
       </div>
     </div>
