@@ -33,7 +33,7 @@ from graph_builder import (
 )
 from data_loaders import DATA_LOADERS, DENORMALIZERS
 from forward_utils import execute_node
-from node_viz import get_backward_viz, _compact_grad_stats, _param_grad_stats
+from node_viz import get_backward_viz, compact_stats_with_norm, param_grad_stats
 
 
 def simulate_backprop(graph_data: dict, batch_size: int = 4) -> dict:
@@ -306,10 +306,10 @@ def run_backward_step_through(graph_data: dict) -> dict:
 
         # Gradient stats
         if gradient is not None:
-            stage["stats"] = _compact_grad_stats(gradient)
+            stage["stats"] = compact_stats_with_norm(gradient)
 
         # Param grad stats (gradient-to-weight ratio)
-        pgs = _param_grad_stats(module)
+        pgs = param_grad_stats(module)
         if pgs:
             stage["paramGradStats"] = pgs
 
@@ -495,9 +495,9 @@ def _build_backward_subgraph_stages(
         }
 
         if gradient is not None:
-            stage["stats"] = _compact_grad_stats(gradient)
+            stage["stats"] = compact_stats_with_norm(gradient)
 
-        pgs = _param_grad_stats(inner_mod)
+        pgs = param_grad_stats(inner_mod)
         if pgs:
             stage["paramGradStats"] = pgs
 

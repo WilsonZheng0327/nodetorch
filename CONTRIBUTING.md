@@ -94,9 +94,9 @@ export const layerNodes: NodeDefinition[] = [
 
 That's it for the frontend. The node appears in the palette and shape inference works.
 
-### 2. Backend (forward pass + training)
+### 2. Backend — Module builder (`backend/node_builders.py`)
 
-Add a builder function in `backend/node_builders.py`:
+Add a builder function that creates the `nn.Module`:
 
 ```python
 def build_my_node(props: dict, input_shapes: dict) -> nn.Module:
@@ -109,23 +109,64 @@ def build_my_node(props: dict, input_shapes: dict) -> nn.Module:
 NODE_BUILDERS["ml.layers.my_node"] = build_my_node
 ```
 
-For data nodes, add a loader in `backend/data_loaders.py`:
+### 3. Backend — Visualization (`backend/node_viz.py`)
+
+Add forward and/or backward viz functions. Each returns `{ viz?, extras?, insight? }`.
+
+```python
+# Forward viz — what to show in forward step-through
+def forward_viz_my_node(node_type, module, input_tensor, output, inputs, out_dict):
+    result = {}
+    if output is not None:
+        result["viz"] = _default_viz_for_output(output)
+    result["insight"] = "What this layer did in plain English"
+    # Optional: add extras like weight matrices, kernels, attention maps
+    return result
+
+FORWARD_VIZ["ml.layers.my_node"] = forward_viz_my_node
+
+# Backward viz — what to show in backward step-through
+def backward_viz_my_node(module, activation, gradient):
+    result = {}
+    if gradient is not None:
+        result["viz"] = viz_vector(gradient.flatten())
+    result["insight"] = "What the gradients mean for this layer"
+    return result
+
+BACKWARD_VIZ["ml.layers.my_node"] = backward_viz_my_node
+```
+
+If you don't add a custom entry, the node gets basic shape-based viz for free via the default fallbacks.
+
+### 4. Backend — Special node types
+
+**Data nodes** — add a loader in `backend/data_loaders.py`:
 
 ```python
 def load_my_dataset(props: dict) -> dict[str, torch.Tensor]:
-    # Return a dict of port_id → tensor
     return {"out": images, "labels": labels}
 
 DATA_LOADERS["data.my_dataset"] = load_my_dataset
 ```
 
-For loss nodes, also add the type to `LOSS_NODES` in `backend/graph_builder.py`:
+**Loss nodes** — also add to `LOSS_NODES` in `backend/graph_builder.py`:
 
 ```python
 LOSS_NODES = {"ml.loss.cross_entropy", "ml.loss.my_loss"}
 ```
 
-For optimizer nodes, add to `OPTIMIZER_NODES` and handle in the training loop.
+**Optimizer nodes** — add to `OPTIMIZER_NODES` and handle in the training loop.
+
+### Summary — files to touch per node type
+
+| Node type | Files to edit |
+|-----------|--------------|
+| **Layer** (Conv, Linear, etc.) | `src/domain/nodes/<category>/<node>.ts`, folder `index.ts`, `backend/node_builders.py`, `backend/node_viz.py` |
+| **Activation** (ReLU, etc.) | `src/domain/nodes/activations/<node>.ts`, folder `index.ts`, `backend/node_builders.py`, `backend/node_viz.py` |
+| **Loss** | Same as layer + add to `LOSS_NODES` in `graph_builder.py` |
+| **Optimizer** | `src/domain/nodes/optimizers/<node>.ts`, folder `index.ts`, + training loop in `graph_builder.py` |
+| **Dataset** | `src/domain/nodes/data/<node>.ts`, folder `index.ts`, `backend/data_loaders.py`, `backend/node_viz.py` |
+| **Structural** (Add, Reshape, etc.) | `src/domain/nodes/structural/<node>.ts`, folder `index.ts`, `backend/node_builders.py`, `backend/node_viz.py` |
 
 ## Adding a New Data Type
 
@@ -247,5 +288,6 @@ backend/
   main.py            — FastAPI server, endpoints
   graph_builder.py   — graph → PyTorch execution
   node_builders.py   — per-node-type module builders
+  node_viz.py        — per-node-type visualization (forward + backward step-through)
   data_loaders.py    — per-dataset loader functions
 ```
