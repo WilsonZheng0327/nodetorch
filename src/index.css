@@ -4,6 +4,33 @@
   box-sizing: border-box;
 }
 
+/* Remove focus outline on mouse click, keep it for keyboard navigation */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:root {
+  --bg-base: #11111b;
+  --bg-surface: #1e1e2e;
+  --bg-overlay: #313244;
+  --border: #45475a;
+  --text: #cdd6f4;
+  --text-muted: #a6adc8;
+  --text-faint: #6c7086;
+  --accent: #89b4fa;
+}
+
+[data-theme="light"] {
+  --bg-base: #eff1f5;
+  --bg-surface: #ffffff;
+  --bg-overlay: #e6e9ef;
+  --border: #ccd0da;
+  --text: #4c4f69;
+  --text-muted: #6c6f85;
+  --text-faint: #9ca0b0;
+  --accent: #1e66f5;
+}
+
 body {
-  background: #11111b;
+  background: var(--bg-base);
 }

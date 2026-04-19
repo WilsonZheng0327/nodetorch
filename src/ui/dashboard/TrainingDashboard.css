@@ -128,6 +128,11 @@
   color: #a6adc8;
 }
 
+.dashboard-eta {
+  color: #6c7086;
+  font-weight: 400;
+}
+
 /* Batch progress (within epoch) */
 .dashboard-batch-progress {
   position: relative;

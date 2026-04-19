@@ -26,6 +26,7 @@
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 13px;
   cursor: pointer;
+  outline: none;
 }
 
 .toolbar-btn:hover {
@@ -36,6 +37,13 @@
 .toolbar-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.toolbar-btn-icon {
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toolbar-btn-run {
@@ -135,4 +143,36 @@
   background: rgba(16, 185, 129, 0.15);
   border: 1px solid rgba(16, 185, 129, 0.3);
   color: #10b981;
+}
+
+.toolbar-presets-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  z-index: 50;
+  min-width: 240px;
+  padding: 4px;
+}
+
+.toolbar-presets-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: #cdd6f4;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.toolbar-presets-item:hover {
+  background: #313244;
 }

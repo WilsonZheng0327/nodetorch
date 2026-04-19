@@ -1,6 +1,7 @@
 // Toolbar — save/load graph, run forward pass, train.
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, HardDriveDownload, HardDriveUpload } from 'lucide-react';
 import './Toolbar.css';
 
 interface Props {
@@ -16,14 +17,55 @@ interface Props {
   onHideAllViz: () => void;
   onStepThrough: () => void;
   onSimulateBackprop: () => void;
+  onSaveModel: () => Promise<void>;
+  onLoadModel: () => Promise<void>;
   status: { type: 'idle' | 'running' | 'success' | 'error'; message?: string };
   modelTrained: boolean;
   modelStale: boolean;
 }
 
-export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, status, modelTrained, modelStale }: Props) {
+export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, onSaveModel, onLoadModel, status, modelTrained, modelStale }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [presets, setPresets] = useState<{filename: string; name: string}[]>([]);
+  const [presetsOpen, setPresetsOpen] = useState(false);
+  const presetsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!presetsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (presetsRef.current && !presetsRef.current.contains(e.target as Node)) {
+        setPresetsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [presetsOpen]);
+
+  async function openPresets() {
+    if (presetsOpen) { setPresetsOpen(false); return; }
+    try {
+      const res = await fetch('http://localhost:8000/presets');
+      const data = await res.json();
+      if (data.status === 'ok') setPresets(data.presets);
+    } catch { /* backend not running */ }
+    setPresetsOpen(true);
+  }
+
+  async function loadPreset(filename: string) {
+    try {
+      const res = await fetch('http://localhost:8000/presets/load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename }),
+      });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        onLoad(JSON.stringify(data.data));
+        setPresetsOpen(false);
+      }
+    } catch { /* backend not running */ }
+  }
 
   async function handleSave() {
     const json = onSave();
@@ -122,29 +164,51 @@ export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onC
           </button>
         )}
         <div className="toolbar-separator" />
-        <button className="toolbar-btn" onClick={handleSave} title="Save graph to file">
-          Save
+        <button className="toolbar-btn toolbar-btn-icon" onClick={handleSave} title="Save graph to file">
+          <Download size={15} />
         </button>
-        <button className="toolbar-btn" onClick={handleLoad} title="Load graph from file">
-          Load
+        <button className="toolbar-btn toolbar-btn-icon" onClick={handleLoad} title="Load graph from file">
+          <Upload size={15} />
         </button>
-        <button className="toolbar-btn" onClick={onClear} disabled={busy} title="Clear all nodes and edges">
-          Clear
+        <div ref={presetsRef} style={{ position: 'relative' }}>
+          <button className="toolbar-btn toolbar-btn-icon" onClick={openPresets} title="Load a model preset">
+            <BookOpen size={15} />
+          </button>
+          {presetsOpen && (
+            <div className="toolbar-presets-dropdown">
+              {presets.map((p) => (
+                <button key={p.filename} className="toolbar-presets-item" onClick={() => loadPreset(p.filename)}>
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button className="toolbar-btn toolbar-btn-icon" onClick={onClear} disabled={busy} title="Clear all nodes and edges">
+          <Trash2 size={15} />
         </button>
-        <button className="toolbar-btn" onClick={onOrganize} disabled={busy} title="Auto-organize node layout">
-          Organize
+        <button className="toolbar-btn toolbar-btn-icon" onClick={onOrganize} disabled={busy} title="Auto-organize node layout">
+          <LayoutGrid size={15} />
         </button>
-        <button className="toolbar-btn" onClick={onShowAllViz} title="Show all viz panels">
-          Show Viz
+        <div className="toolbar-separator" />
+        <button className="toolbar-btn toolbar-btn-icon" onClick={onShowAllViz} title="Show all viz panels">
+          <Eye size={15} />
         </button>
-        <button className="toolbar-btn" onClick={onHideAllViz} title="Hide all viz panels">
-          Hide Viz
+        <button className="toolbar-btn toolbar-btn-icon" onClick={onHideAllViz} title="Hide all viz panels">
+          <EyeOff size={15} />
         </button>
-        <button className="toolbar-btn" onClick={onStepThrough} title="Step through forward pass">
-          Step Through
+        <button className="toolbar-btn toolbar-btn-icon" onClick={onStepThrough} title="Step through forward pass">
+          <Footprints size={15} />
         </button>
-        <button className="toolbar-btn" onClick={onSimulateBackprop} title="Animate one backward pass through the graph">
-          Backprop
+        <button className="toolbar-btn toolbar-btn-icon" onClick={onSimulateBackprop} title="Animate one backward pass through the graph">
+          <Undo2 size={15} />
+        </button>
+        <div className="toolbar-separator" />
+        <button className="toolbar-btn toolbar-btn-icon" onClick={() => handleAction(onSaveModel)} disabled={busy || !modelTrained} title="Save trained weights to disk">
+          <HardDriveDownload size={15} />
+        </button>
+        <button className="toolbar-btn toolbar-btn-icon" onClick={() => handleAction(onLoadModel)} disabled={busy} title="Load trained weights from disk">
+          <HardDriveUpload size={15} />
         </button>
         <input
           ref={fileInputRef}

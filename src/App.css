@@ -47,3 +47,86 @@
 .minimap-themed .react-flow__minimap-mask {
   fill: rgba(17, 17, 27, 0.7);
 }
+
+/* Light theme overrides for React Flow canvas */
+[data-theme="light"] .react-flow {
+  --xy-background-color: #eff1f5;
+  --xy-node-background-color: #ffffff;
+  --xy-edge-stroke: #9ca0b0;
+  --xy-minimap-background-color: #e6e9ef;
+}
+
+[data-theme="light"] .react-flow__background {
+  --xy-background-pattern-color: #7c7f93;
+}
+
+[data-theme="light"] .controls-themed {
+  background: #ffffff !important;
+  border-color: #ccd0da !important;
+}
+
+[data-theme="light"] .controls-themed .react-flow__controls-button {
+  background: #ffffff !important;
+  color: #6c6f85 !important;
+  fill: #6c6f85 !important;
+}
+
+[data-theme="light"] .controls-themed .react-flow__controls-button:hover {
+  background: #e6e9ef !important;
+  fill: #4c4f69 !important;
+}
+
+[data-theme="light"] .minimap-themed {
+  background: #ffffff !important;
+  border-color: #ccd0da !important;
+}
+
+[data-theme="light"] .minimap-themed .react-flow__minimap-mask {
+  fill: rgba(239, 241, 245, 0.7);
+}
+
+[data-theme="light"] .connection-error-toast {
+  background: rgba(210, 15, 57, 0.9);
+}
+
+/* Theme toggle */
+.theme-toggle {
+  background: var(--bg-surface, #1e1e2e);
+  border: 1px solid var(--border, #45475a);
+  border-radius: 8px;
+  color: var(--text-muted, #a6adc8);
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle:hover {
+  background: var(--bg-overlay, #313244);
+  color: var(--text, #cdd6f4);
+}
+
+/* Connection rejection toast */
+.connection-error-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: 'Inter', system-ui, sans-serif;
+  z-index: 50;
+  pointer-events: none;
+  animation: toast-fade 3s ease-out forwards;
+}
+
+@keyframes toast-fade {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}

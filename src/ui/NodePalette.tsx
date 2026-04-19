@@ -4,6 +4,7 @@
 import './NodePalette.css';
 
 import { useContext, useState, useEffect, type DragEvent } from 'react';
+import { Blocks, ChevronDown, ChevronRight } from 'lucide-react';
 import type { NodeDefinition } from '../core/nodedef';
 import { DomainCtx } from './EngineNode';
 
@@ -59,7 +60,7 @@ function CategoryGroup({ node, depth }: { node: CategoryNode; depth: number }) {
         className={`palette-folder ${depth === 0 ? 'palette-folder-root' : ''}`}
         onClick={() => setExpanded(!expanded)}
       >
-        <span className="palette-folder-icon">{expanded ? '▾' : '▸'}</span>
+        <span className="palette-folder-icon">{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
         {node.name}
       </button>
 
@@ -72,6 +73,7 @@ function CategoryGroup({ node, depth }: { node: CategoryNode; depth: number }) {
               className="palette-item"
               draggable
               onDragStart={(e) => onDragStart(e, def.type)}
+              title={def.description}
             >
               <span className="palette-item-name">{def.displayName}</span>
               <span className="palette-item-desc">{def.description}</span>
@@ -138,8 +140,10 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
         onClick={() => setCollapsed(!collapsed)}
         title={collapsed ? 'Expand palette (Tab)' : 'Collapse palette (Tab)'}
       >
-        <span className="palette-toggle-title">Node Palette</span>
-        <span className="palette-toggle-icon">{collapsed ? '+' : '−'}</span>
+        <Blocks size={15} />
+        <span className="palette-toggle-title">Nodes</span>
+        <span className="palette-toggle-hint">Tab</span>
+        <span className="palette-toggle-icon">{collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}</span>
       </button>
 
       {!collapsed && (

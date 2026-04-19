@@ -550,6 +550,16 @@ DATASET_DETAILS: dict[str, callable] = {
     "data.ag_news": detail_ag_news,
 }
 
+# Class name lookup per dataset — used for confusion matrix labels, etc.
+CLASS_NAMES: dict[str, list[str]] = {
+    "data.mnist": [str(i) for i in range(10)],
+    "data.fashion_mnist": ["T-shirt", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Boot"],
+    "data.cifar10": ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"],
+    "data.cifar100": [str(i) for i in range(100)],  # too many for labels, use indices
+    "data.imdb": ["Negative", "Positive"],
+    "data.ag_news": ["World", "Sports", "Business", "Sci/Tech"],
+}
+
 
 # --- Augmentation preview ---
 

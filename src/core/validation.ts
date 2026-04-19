@@ -75,6 +75,9 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
   if (dataNodes.length === 0) {
     errors.push({ message: 'No data node — add a dataset (e.g. MNIST)' });
   }
+  if (dataNodes.length > 1) {
+    errors.push({ message: 'Multiple data nodes — only one dataset is supported per graph' });
+  }
 
   // Must have at least one loss node
   const lossNodes = [...graph.nodes.values()].filter((n) => LOSS_TYPES.includes(n.type));
@@ -118,6 +121,52 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
 
     if (!lossConnected) {
       errors.push({ nodeId: optNode.id, message: `${optName}: loss port not connected` });
+    }
+  }
+
+  // Optimizer sanity: epochs and learning rate must be positive
+  for (const optNode of optimizerNodes) {
+    const epochs = optNode.properties.epochs ?? optNode.properties.epoch;
+    const lr = optNode.properties.lr ?? optNode.properties.learningRate;
+    const optName = registry.get(optNode.type)?.displayName ?? optNode.type;
+    if (epochs != null && epochs <= 0) {
+      errors.push({ nodeId: optNode.id, message: `${optName}: epochs must be > 0` });
+    }
+    if (lr != null && lr <= 0) {
+      errors.push({ nodeId: optNode.id, message: `${optName}: learning rate must be > 0` });
+    }
+  }
+
+  // Embedding numEmbeddings must be >= connected dataset's vocabSize
+  for (const [nodeId, node] of graph.nodes) {
+    if (node.type === 'ml.layers.embedding') {
+      const numEmb = node.properties.numEmbeddings;
+      // Find the data node feeding into this embedding (walk upstream)
+      for (const dataNode of dataNodes) {
+        const vocabSize = dataNode.properties.vocabSize;
+        if (numEmb != null && vocabSize != null && numEmb < vocabSize) {
+          errors.push({
+            nodeId,
+            message: `Embedding: numEmbeddings (${numEmb}) < dataset vocabSize (${vocabSize}) — will crash on out-of-range tokens`,
+          });
+        }
+      }
+    }
+  }
+
+  // Subgraph blocks should have inner connections (not empty pass-through)
+  for (const [nodeId, node] of graph.nodes) {
+    if (node.type === 'subgraph.block' && node.subgraph) {
+      const innerEdges = node.subgraph.edges.length;
+      const innerNodes = node.subgraph.nodes.size;
+      // A subgraph with only input+output sentinels and no edges is empty
+      if (innerNodes <= 2 || innerEdges === 0) {
+        const blockName = node.properties.blockName ?? nodeId;
+        errors.push({
+          nodeId,
+          message: `Block "${blockName}" is empty — add layers inside it or remove it`,
+        });
+      }
     }
   }
 

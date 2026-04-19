@@ -20,7 +20,7 @@ interface DetailData {
   attentionMap?: { data: number[][]; rows: number; cols: number };
   hiddenState?: { data: number[][]; rows: number; cols: number; label: string };
   cellState?: { data: number[][]; rows: number; cols: number; label: string };
-  confusionMatrix?: { data: number[][]; size: number };
+  confusionMatrix?: { data: number[][]; size: number; classNames?: string[] };
   misclassifications?: {
     actual: number;
     predicted: number;
@@ -233,6 +233,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
                   <ConfusionMatrixView
                     data={detail.confusionMatrix.data}
                     size={detail.confusionMatrix.size}
+                    classNames={detail.confusionMatrix.classNames}
                     onCellClick={(actual, predicted) => {
                       if (actual === predicted) {
                         setMisclassFilter(null);
@@ -616,9 +617,10 @@ function DreamCanvas({ pixels, channels, label }: { pixels: number[] | number[][
 
 // --- Confusion matrix grid ---
 
-function ConfusionMatrixView({ data, size, onCellClick, highlightCell }: {
+function ConfusionMatrixView({ data, size, classNames, onCellClick, highlightCell }: {
   data: number[][];
   size: number;
+  classNames?: string[];
   onCellClick?: (actual: number, predicted: number) => void;
   highlightCell?: { actual: number; predicted: number } | null;
 }) {
@@ -630,32 +632,40 @@ function ConfusionMatrixView({ data, size, onCellClick, highlightCell }: {
     const canvas = canvasRef.current;
     if (!canvas || data.length === 0) return;
 
-    // Don't shrink cells below 28px — below that the numbers inside stop being
-    // readable. The surrounding `.confusion-scroll` wrapper handles overflow.
+    const hasNames = classNames && classNames.length >= size && size <= 20;
     const cellSize = Math.max(28, Math.min(40, Math.floor(600 / size)));
-    const labelSpace = 40;
+    const labelSpace = hasNames ? 80 : 40;
     cellSizeRef.current = cellSize;
     labelSpaceRef.current = labelSpace;
     canvas.width = size * cellSize + labelSpace;
-    canvas.height = size * cellSize + labelSpace + 18; // +18 for "Predicted" footer
+    canvas.height = size * cellSize + labelSpace + 18;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const maxVal = Math.max(...data.flat(), 1);
 
+    // Column headers
     ctx.fillStyle = '#a6adc8';
-    ctx.font = '12px JetBrains Mono, monospace';
+    ctx.font = hasNames ? '10px Inter, system-ui, sans-serif' : '12px JetBrains Mono, monospace';
     ctx.textAlign = 'center';
     for (let c = 0; c < size; c++) {
-      ctx.fillText(String(c), labelSpace + c * cellSize + cellSize / 2, 16);
+      const label = hasNames ? classNames![c] : String(c);
+      ctx.save();
+      ctx.translate(labelSpace + c * cellSize + cellSize / 2, labelSpace - 6);
+      ctx.rotate(-Math.PI / 4);
+      ctx.textAlign = 'left';
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
     }
 
     for (let r = 0; r < size; r++) {
+      // Row headers
       ctx.textAlign = 'right';
       ctx.fillStyle = '#a6adc8';
-      ctx.font = '12px JetBrains Mono, monospace';
-      ctx.fillText(String(r), labelSpace - 6, labelSpace + r * cellSize + cellSize / 2 + 4);
+      ctx.font = hasNames ? '10px Inter, system-ui, sans-serif' : '12px JetBrains Mono, monospace';
+      const rowLabel = hasNames ? classNames![r] : String(r);
+      ctx.fillText(rowLabel, labelSpace - 6, labelSpace + r * cellSize + cellSize / 2 + 4);
 
       for (let c = 0; c < size; c++) {
         const v = data[r][c];

@@ -20,6 +20,7 @@
 #   - Multi-output modules (LSTM/GRU): return dict instead of tensor, stored as-is in results
 
 import math
+import os
 import torch
 import torch.nn as nn
 
@@ -69,6 +70,31 @@ def has_trained_model() -> bool:
 
 def get_trained_modules() -> dict[str, nn.Module]:
     return _model_store.get("current", {})
+
+
+def save_model(filepath: str = "saved_models/current.pt") -> dict:
+    """Save trained module state dicts to disk."""
+    if "current" not in _model_store:
+        return {"error": "No trained model to save"}
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    state = {nid: mod.state_dict() for nid, mod in _model_store["current"].items()}
+    torch.save(state, filepath)
+    return {"status": "ok", "path": filepath}
+
+
+def load_model(graph_data: dict, filepath: str = "saved_models/current.pt") -> dict:
+    """Load saved state dicts into freshly built modules from the graph."""
+    if not os.path.exists(filepath):
+        return {"error": f"No saved model at {filepath}"}
+    saved_states = torch.load(filepath, map_location=get_device(), weights_only=True)
+    # Build modules from graph to get the architecture
+    modules, _, _, _, _ = build_and_run_graph(graph_data)
+    # Load saved state dicts into the freshly built modules
+    for nid, state_dict in saved_states.items():
+        if nid in modules:
+            modules[nid].load_state_dict(state_dict)
+    _model_store["current"] = modules
+    return {"status": "ok"}
 
 
 def topological_sort(nodes: dict, edges: list) -> list[str]:
@@ -784,9 +810,16 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
                 for p, l in zip(preds.tolist(), labels.tolist()):
                     if 0 <= p < n_classes and 0 <= l < n_classes:
                         matrix[l][p] += 1
+                from data_loaders import CLASS_NAMES
+                data_type = None
+                for nid, nd in _last_run.get("nodes", {}).items():
+                    if nd.get("type", "") in DATA_LOADERS:
+                        data_type = nd["type"]
+                        break
                 detail["confusionMatrix"] = {
                     "data": matrix,
                     "size": n_classes,
+                    "classNames": CLASS_NAMES.get(data_type, []) if data_type else [],
                 }
 
     return detail
@@ -1404,9 +1437,11 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
         for p, l in zip(confusion_preds, confusion_labels):
             if 0 <= p < n_classes and 0 <= l < n_classes:
                 matrix[l][p] += 1
+        from data_loaders import CLASS_NAMES
         _last_run["confusionMatrix"] = {
             "data": matrix,
             "size": n_classes,
+            "classNames": CLASS_NAMES.get(data_node["type"], []),
         }
     if misclass_samples:
         _last_run["misclassifications"] = misclass_samples

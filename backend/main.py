@@ -31,7 +31,7 @@ import asyncio
 import threading
 import logging
 
-from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail, get_device_name, set_device
+from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail, get_device_name, set_device, save_model, load_model
 from step_through import run_step_through
 from activation_max import activation_maximization
 from backprop_sim import simulate_backprop, run_backward_step_through
@@ -146,6 +146,36 @@ async def infer(graph_data: dict):
         return {"status": "ok", "results": results}
     except Exception as e:
         logger.error(f"Inference failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/save-model")
+async def save_model_endpoint(request: dict):
+    """Save trained model weights to disk."""
+    logger.info("Save model requested")
+    filepath = request.get("filepath", "saved_models/current.pt")
+    try:
+        result = save_model(filepath)
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return result
+    except Exception as e:
+        logger.error(f"Save model failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/load-model")
+async def load_model_endpoint(request: dict):
+    """Load trained model weights from disk."""
+    logger.info("Load model requested")
+    filepath = request.get("filepath", "saved_models/current.pt")
+    try:
+        result = load_model(request["graph"], filepath)
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return result
+    except Exception as e:
+        logger.error(f"Load model failed: {e}")
         return {"status": "error", "error": str(e)}
 
 
@@ -300,6 +330,28 @@ async def dataset_detail(dataset_type: str):
     except Exception as e:
         logger.error(f"Dataset detail failed: {e}")
         return {"status": "error", "error": str(e)}
+
+
+@app.get("/presets")
+async def list_presets():
+    import glob
+    preset_dir = Path(__file__).resolve().parent.parent / "model-presets"
+    presets = []
+    for f in sorted(preset_dir.glob("*.json")):
+        try:
+            data = json.loads(f.read_text())
+            presets.append({"filename": f.name, "name": data.get("graph", {}).get("name", f.stem)})
+        except Exception:
+            continue
+    return {"status": "ok", "presets": presets}
+
+
+@app.post("/presets/load")
+async def load_preset(request: dict):
+    filepath = Path(__file__).resolve().parent.parent / "model-presets" / request["filename"]
+    if not filepath.exists():
+        return {"status": "error", "error": "Preset not found"}
+    return {"status": "ok", "data": json.loads(filepath.read_text())}
 
 
 @app.get("/blocks")

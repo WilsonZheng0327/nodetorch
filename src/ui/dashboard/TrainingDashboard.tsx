@@ -173,17 +173,27 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
       </div>
 
       {/* Progress bar — only during/after training */}
-      {latest?.totalEpochs && (
-        <div className="dashboard-progress">
-          <div
-            className="dashboard-progress-bar"
-            style={{ width: `${(latest.epoch / latest.totalEpochs) * 100}%` }}
-          />
-          <span className="dashboard-progress-label">
-            Epoch {latest.epoch} / {latest.totalEpochs}
-          </span>
-        </div>
-      )}
+      {latest?.totalEpochs && (() => {
+        const avgTime = progress.length > 0
+          ? progress.reduce((s, d) => s + (d.time ?? 0), 0) / progress.length
+          : 0;
+        const remaining = (latest.totalEpochs - latest.epoch) * avgTime;
+        const eta = remaining > 0 && isTraining
+          ? remaining >= 60 ? `${Math.round(remaining / 60)}m ${Math.round(remaining % 60)}s` : `${Math.round(remaining)}s`
+          : null;
+        return (
+          <div className="dashboard-progress">
+            <div
+              className="dashboard-progress-bar"
+              style={{ width: `${(latest.epoch / latest.totalEpochs) * 100}%` }}
+            />
+            <span className="dashboard-progress-label">
+              Epoch {latest.epoch} / {latest.totalEpochs}
+              {eta && <span className="dashboard-eta"> — ~{eta} remaining</span>}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Batch progress bar (within epoch) */}
       {isTraining && batchProgress && (

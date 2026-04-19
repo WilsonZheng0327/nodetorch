@@ -120,6 +120,24 @@ function deserializeGraph(data: SerializedGraph): Graph {
   return deserializeGraphData(data.graph);
 }
 
+// --- Friendly error translation ---
+
+/** Translate common PyTorch errors into student-friendly messages. */
+function friendlyError(msg: string): string {
+  if (msg.includes('mat1 and mat2 shapes cannot be multiplied')) {
+    const match = msg.match(/(\d+x\d+).*?(\d+x\d+)/);
+    if (match) return `Shape mismatch in Linear layer: input is ${match[1]} but weights expect ${match[2]}. Check upstream layer output size.`;
+  }
+  if (msg.includes('Expected 4-dimensional input')) return 'This layer expects a 4D tensor [B,C,H,W]. Add a Reshape node or check connections.';
+  if (msg.includes('Expected 3-dimensional input')) return 'This layer expects a 3D tensor [B,seq,features]. Check input dimensions.';
+  if (msg.includes('Expected 2-dimensional input')) return 'This layer expects a 2D tensor [B,features]. Did you forget a Flatten layer?';
+  if (msg.includes('size mismatch')) return `Tensor size mismatch — shapes don't align. Check that connected layers have compatible dimensions.`;
+  if (msg.includes('CUDA out of memory')) return 'GPU out of memory. Try reducing batch size or using CPU.';
+  if (msg.includes('is not a valid device')) return 'Selected device not available. Switch to CPU in the dashboard System tab.';
+  if (msg.includes('negative dimension')) return 'Layer produced a negative dimension — kernel/stride/padding combination is too large for the input size.';
+  return msg;
+}
+
 // --- The hook ---
 
 let edgeCounter = Date.now();
@@ -129,6 +147,7 @@ export function useGraph(domain: DomainContext) {
   const [rfNodes, setRFNodes] = useState<RF.Node[]>([]);
   const [rfEdges, setRFEdges] = useState<RF.Edge[]>([]);
   const [status, setStatus] = useState<{ type: 'idle' | 'running' | 'success' | 'error'; message?: string }>({ type: 'idle' });
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [modelTrained, setModelTrained] = useState(false);
   const [modelStale, setModelStale] = useState(false);
 
@@ -280,9 +299,17 @@ export function useGraph(domain: DomainContext) {
     const prev = undoStack.current.pop()!;
     isUndoRedo.current = true;
     graphRef.current = deserializeGraphData(JSON.parse(prev));
+    // If we're inside a subgraph that no longer exists after undo, pop back to root
+    let g = graphRef.current;
+    let validDepth = 0;
+    for (const entry of navStack) {
+      const node = g.nodes.get(entry.nodeId);
+      if (node?.subgraph) { g = node.subgraph; validDepth++; } else break;
+    }
+    if (validDepth < navStack.length) setNavStack(navStack.slice(0, validDepth));
     await runShape();
     isUndoRedo.current = false;
-  }, [runShape]);
+  }, [runShape, navStack]);
 
   const redo = useCallback(async () => {
     if (redoStack.current.length === 0) return;
@@ -290,9 +317,16 @@ export function useGraph(domain: DomainContext) {
     const next = redoStack.current.pop()!;
     isUndoRedo.current = true;
     graphRef.current = deserializeGraphData(JSON.parse(next));
+    let g = graphRef.current;
+    let validDepth = 0;
+    for (const entry of navStack) {
+      const node = g.nodes.get(entry.nodeId);
+      if (node?.subgraph) { g = node.subgraph; validDepth++; } else break;
+    }
+    if (validDepth < navStack.length) setNavStack(navStack.slice(0, validDepth));
     await runShape();
     isUndoRedo.current = false;
-  }, [runShape]);
+  }, [runShape, navStack]);
 
   // --- Connection Validation ---
 
@@ -306,6 +340,8 @@ export function useGraph(domain: DomainContext) {
     (connection: RF.Connection | RF.Edge): boolean => {
       function reject(reason: string) {
         console.log(`[nodetorch] Connection rejected: ${reason}`, connection);
+        setConnectionError(reason);
+        setTimeout(() => setConnectionError(null), 3000);
         return false;
       }
 
@@ -540,7 +576,7 @@ export function useGraph(domain: DomainContext) {
     }
 
     if (result.status !== 'ok') {
-      setStatus({ type: 'error', message: result.error ?? result.detail ?? 'Forward pass failed' });
+      setStatus({ type: 'error', message: friendlyError(result.error ?? result.detail ?? 'Forward pass failed') });
       return;
     }
 
@@ -610,7 +646,7 @@ export function useGraph(domain: DomainContext) {
     }
 
     if (result.status !== 'ok') {
-      setStatus({ type: 'error', message: result.error ?? 'Inference failed' });
+      setStatus({ type: 'error', message: friendlyError(result.error ?? 'Inference failed') });
       return;
     }
 
@@ -727,6 +763,46 @@ export function useGraph(domain: DomainContext) {
     }
   }, []);
 
+  const saveModel = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:8000/save-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        setStatus({ type: 'success', message: 'Model weights saved' });
+        setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
+      } else {
+        setStatus({ type: 'error', message: data.error ?? 'Failed to save model' });
+      }
+    } catch {
+      setStatus({ type: 'error', message: 'Cannot connect to backend' });
+    }
+  }, []);
+
+  const loadModel = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:8000/load-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
+      });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        setModelTrained(true);
+        setModelStale(false);
+        setStatus({ type: 'success', message: 'Model weights loaded' });
+        setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
+      } else {
+        setStatus({ type: 'error', message: data.error ?? 'Failed to load model' });
+      }
+    } catch {
+      setStatus({ type: 'error', message: 'Cannot connect to backend' });
+    }
+  }, [saveGraph]);
+
   const trainWsRef = useRef<WebSocket | null>(null);
 
   const cancelTrain = useCallback(() => {
@@ -825,7 +901,7 @@ export function useGraph(domain: DomainContext) {
             setStatus({ type: 'success', message });
             setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 5000);
           } else {
-            setStatus({ type: 'error', message: msg.error ?? 'Training failed' });
+            setStatus({ type: 'error', message: friendlyError(msg.error ?? 'Training failed') });
           }
           ws.close();
           cleanup();
@@ -1103,9 +1179,12 @@ export function useGraph(domain: DomainContext) {
     runInfer,
     runTrain,
     cancelTrain,
+    saveModel,
+    loadModel,
     status,
     modelTrained,
     modelStale,
+    connectionError,
     trainingProgress,
     batchProgress,
     trainingActive,
