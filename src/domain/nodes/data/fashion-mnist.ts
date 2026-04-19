@@ -8,7 +8,7 @@ export const fashionMnistNode: NodeDefinition = {
   category: ['Data', 'Image'],
 
   getProperties: () => [
-    { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 32, affects: 'execution' },
+    { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 32, affects: 'execution', help: 'Number of samples per training step. Larger = faster but more memory. Common: 32, 64, 128.' },
   ],
 
   getPorts: () => [

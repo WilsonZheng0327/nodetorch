@@ -8,7 +8,7 @@ export const dropout2dNode: NodeDefinition = {
   category: ['ML', 'Layers', 'Regularization'],
 
   getProperties: () => [
-    { id: 'p', name: 'Drop Probability', type: { kind: 'number', min: 0, max: 1, step: 0.1 }, defaultValue: 0.5, affects: 'execution' },
+    { id: 'p', name: 'Drop Probability', type: { kind: 'number', min: 0, max: 1, step: 0.1 }, defaultValue: 0.5, affects: 'execution', help: 'Probability of zeroing entire channels (not individual pixels). Better for CNNs because it drops spatial features as a unit.' },
   ],
 
   getPorts: () => [

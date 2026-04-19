@@ -1,7 +1,8 @@
 // Toolbar — save/load graph, run forward pass, train.
 
 import { useRef, useState, useEffect } from 'react';
-import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, HardDriveDownload, HardDriveUpload } from 'lucide-react';
+import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, HardDriveDownload, HardDriveUpload, GraduationCap } from 'lucide-react';
+import { tutorialEvent } from './tutorial/TutorialPanel';
 import './Toolbar.css';
 
 interface Props {
@@ -63,6 +64,7 @@ export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onC
       if (data.status === 'ok') {
         onLoad(JSON.stringify(data.data));
         setPresetsOpen(false);
+        tutorialEvent('preset-loaded');
       }
     } catch { /* backend not running */ }
   }
@@ -209,6 +211,10 @@ export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onC
         </button>
         <button className="toolbar-btn toolbar-btn-icon" onClick={() => handleAction(onLoadModel)} disabled={busy} title="Load trained weights from disk">
           <HardDriveUpload size={15} />
+        </button>
+        <div className="toolbar-separator" />
+        <button className="toolbar-btn toolbar-btn-icon" onClick={() => window.dispatchEvent(new Event('nodetorch-tutorial-reopen'))} title="Open tutorial">
+          <GraduationCap size={15} />
         </button>
         <input
           ref={fileInputRef}

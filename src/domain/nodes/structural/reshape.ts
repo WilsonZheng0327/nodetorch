@@ -18,6 +18,7 @@ export const reshapeNode: NodeDefinition = {
       type: { kind: 'string' },
       defaultValue: '-1',
       affects: 'execution',
+      help: 'Comma-separated dimensions. Use -1 for one inferred dim (batch size), 0 to keep original. E.g. "-1, 8, 7, 7" reshapes a flat vector back to [batch, 8, 7, 7].',
     },
   ],
 

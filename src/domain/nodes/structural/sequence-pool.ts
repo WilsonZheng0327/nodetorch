@@ -21,6 +21,7 @@ export const sequencePoolNode: NodeDefinition = {
       },
       defaultValue: 'last',
       affects: 'execution',
+      help: "How to reduce the sequence to a single vector. 'last' takes the final timestep (good for LSTM). 'mean' averages all timesteps. 'max' takes element-wise maximum.",
     },
   ],
 

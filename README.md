@@ -100,7 +100,7 @@ Runs at http://localhost:8000. Auto-detects CUDA/MPS if available.
 | F | Toggle training dashboard |
 | ? | Show all shortcuts |
 | Escape | Close step-through / modals |
-| Ctrl+Z / Ctrl+Y | Undo / Redo |
+| Ctrl+Z / Ctrl+Shift+Z | Undo / Redo |
 | Ctrl+C / Ctrl+V | Copy / Paste nodes |
 | Delete | Remove selected nodes |
 

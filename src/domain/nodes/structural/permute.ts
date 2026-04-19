@@ -17,6 +17,7 @@ export const permuteNode: NodeDefinition = {
       type: { kind: 'string' },
       defaultValue: '0, 2, 1',
       affects: 'execution',
+      help: 'Comma-separated indices specifying the new order of dimensions. E.g. "0, 2, 1" swaps the last two dims — useful for converting [B, seq, features] to [B, features, seq].',
     },
   ],
 

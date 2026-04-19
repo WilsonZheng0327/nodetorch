@@ -18,6 +18,7 @@ export const layerNormNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 1,
       affects: 'execution',
+      help: 'How many trailing dimensions to normalize over. 1 = normalize each feature independently. Used in transformers.',
     },
   ],
 

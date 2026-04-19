@@ -14,6 +14,7 @@ export const maxPool2dNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 2,
       affects: 'execution',
+      help: 'Size of the pooling window. 2 = takes max of each 2x2 region.',
     },
     {
       id: 'stride',
@@ -21,6 +22,7 @@ export const maxPool2dNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 2,
       affects: 'execution',
+      help: 'Step size. Usually equals kernelSize. Stride 2 with kernel 2 halves spatial dimensions.',
     },
     {
       id: 'padding',
@@ -28,6 +30,7 @@ export const maxPool2dNode: NodeDefinition = {
       type: { kind: 'number', min: 0, integer: true },
       defaultValue: 0,
       affects: 'execution',
+      help: 'Zero-padding before pooling. Usually 0.',
     },
   ],
 

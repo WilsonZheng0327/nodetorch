@@ -15,10 +15,10 @@ export const lstmNode: NodeDefinition = {
   category: ['ML', 'Layers', 'Recurrent'],
 
   getProperties: () => [
-    { id: 'hiddenSize', name: 'Hidden Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 128, affects: 'execution' },
-    { id: 'numLayers', name: 'Num Layers', type: { kind: 'number', min: 1, integer: true }, defaultValue: 1, affects: 'execution' },
-    { id: 'bidirectional', name: 'Bidirectional', type: { kind: 'boolean' }, defaultValue: false, affects: 'execution' },
-    { id: 'dropout', name: 'Dropout', type: { kind: 'number', min: 0, max: 1, step: 0.1 }, defaultValue: 0, affects: 'execution' },
+    { id: 'hiddenSize', name: 'Hidden Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 128, affects: 'execution', help: 'Size of the hidden state vector. Larger = more capacity to remember patterns. Common: 64, 128, 256.' },
+    { id: 'numLayers', name: 'Num Layers', type: { kind: 'number', min: 1, integer: true }, defaultValue: 1, affects: 'execution', help: 'Stack multiple LSTM layers. More layers = deeper model but harder to train. 1-2 is typical.' },
+    { id: 'bidirectional', name: 'Bidirectional', type: { kind: 'boolean' }, defaultValue: false, affects: 'execution', help: 'Process sequence in both directions. Doubles output size but captures both past and future context.' },
+    { id: 'dropout', name: 'Dropout', type: { kind: 'number', min: 0, max: 1, step: 0.1 }, defaultValue: 0, affects: 'execution', help: 'Dropout between stacked LSTM layers (only used when numLayers > 1). Helps prevent overfitting.' },
   ],
 
   getPorts: () => [

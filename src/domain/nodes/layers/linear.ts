@@ -17,6 +17,7 @@ export const linearNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 128,
       affects: 'execution',
+      help: 'Number of output neurons. For classification, this should equal the number of classes (e.g. 10 for MNIST, 100 for CIFAR-100).',
     },
   ],
 

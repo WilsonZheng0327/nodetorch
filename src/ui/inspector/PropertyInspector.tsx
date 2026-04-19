@@ -9,6 +9,7 @@ import type { PropertyDefinition } from '../../core/nodedef';
 import { DomainCtx } from '../EngineNode';
 import { DatasetDetail } from './DatasetDetail';
 import { LayerDetail } from './LayerDetail';
+import { tutorialEvent } from '../tutorial/TutorialPanel';
 
 interface Props {
   node: NodeInstance | null;
@@ -199,7 +200,7 @@ export function PropertyInspector({ node, selectedCount, onPropertyChange, onSav
         <div className="inspector-section">
           <button
             className="inspector-dataset-btn"
-            onClick={() => setLayerDetailNode({ id: node.id, type: node.type })}
+            onClick={() => { setLayerDetailNode({ id: node.id, type: node.type }); tutorialEvent('layer-detail-opened'); }}
           >
             View Layer Detail
           </button>
@@ -232,7 +233,10 @@ function PropertyWidget({ definition, value, onChange }: WidgetProps) {
 
   return (
     <div className="inspector-prop">
-      <label className="inspector-prop-label">{definition.name}</label>
+      <label className="inspector-prop-label">
+        {definition.name}
+        {definition.help && <span className="inspector-prop-help" title={definition.help}>?</span>}
+      </label>
       <div className="inspector-prop-detail">{describeType(definition)}</div>
       {type.kind === 'number' && (
         <div className="inspector-number-row">

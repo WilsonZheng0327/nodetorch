@@ -24,6 +24,7 @@ export const concatNode: NodeDefinition = {
       type: { kind: 'number', min: 0, integer: true },
       defaultValue: 1,
       affects: 'execution',
+      help: 'Dimension to concatenate along. 1 = concatenate channels (for CNNs). -1 = concatenate along last dim.',
     },
   ],
 

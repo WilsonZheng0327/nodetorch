@@ -17,6 +17,7 @@ export const mnistNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 1,
       affects: 'execution',
+      help: 'Number of samples per training step. Larger = faster but more memory. Common: 32, 64, 128.',
     },
   ],
 

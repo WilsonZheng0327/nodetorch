@@ -1,0 +1,238 @@
+.tutorial-panel {
+  position: fixed;
+  top: 50%;
+  left: calc(50% + 400px);
+  transform: translate(-50%, -50%);
+  width: 380px;
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 10px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  color: #cdd6f4;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 15;
+  overflow: hidden;
+}
+
+.tutorial-panel-collapsed {
+  width: 380px;
+}
+
+.tutorial-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: grab;
+  user-select: none;
+  background: #181825;
+}
+
+.tutorial-header:active {
+  cursor: grabbing;
+}
+
+.tutorial-header:hover {
+  background: #1e1e2e;
+}
+
+.tutorial-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-header-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.tutorial-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tutorial-icon-btn {
+  background: none;
+  border: none;
+  color: #585b70;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  outline: none;
+}
+
+.tutorial-icon-btn:hover {
+  color: #cdd6f4;
+  background: #313244;
+}
+
+.tutorial-progress-ring {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: #89b4fa;
+  background: rgba(137, 180, 250, 0.1);
+  padding: 2px 5px;
+  border-radius: 8px;
+}
+
+.tutorial-trophy {
+  color: #f9e2af;
+}
+
+/* Progress bar */
+.tutorial-progress-bar-track {
+  height: 3px;
+  background: #313244;
+}
+
+.tutorial-progress-bar-fill {
+  height: 100%;
+  background: #89b4fa;
+  transition: width 0.3s ease;
+  border-radius: 0 2px 2px 0;
+}
+
+/* Body */
+.tutorial-body {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.tutorial-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tutorial-body::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 2px;
+}
+
+/* Goal sections */
+.tutorial-goal {
+  border-top: 1px solid #313244;
+}
+
+.tutorial-goal-done .tutorial-goal-title {
+  color: #6c7086;
+  text-decoration: line-through;
+}
+
+.tutorial-goal-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: #cdd6f4;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  outline: none;
+}
+
+.tutorial-goal-header:hover {
+  background: rgba(49, 50, 68, 0.4);
+}
+
+.tutorial-goal-chevron {
+  color: #585b70;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.tutorial-goal-title {
+  flex: 1;
+}
+
+.tutorial-goal-count {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #6c7086;
+}
+
+.tutorial-goal-desc {
+  padding: 0 12px 6px 32px;
+  font-size: 12px;
+  color: #6c7086;
+  line-height: 1.4;
+}
+
+/* Tasks */
+.tutorial-tasks {
+  padding-bottom: 4px;
+}
+
+.tutorial-task {
+  padding: 2px 0;
+}
+
+.tutorial-task-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 12px 4px 32px;
+  background: none;
+  border: none;
+  color: #a6adc8;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.4;
+  outline: none;
+}
+
+.tutorial-task-toggle:hover {
+  background: rgba(49, 50, 68, 0.3);
+  color: #cdd6f4;
+}
+
+.tutorial-task-done .tutorial-task-toggle {
+  color: #6c7086;
+}
+
+.tutorial-task-done .tutorial-task-text {
+  text-decoration: line-through;
+}
+
+.tutorial-task-check {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #585b70;
+}
+
+.tutorial-task-done .tutorial-task-check {
+  color: #10b981;
+}
+
+.tutorial-task-text {
+  flex: 1;
+}
+
+.tutorial-task-hint {
+  padding: 2px 12px 6px 52px;
+  font-size: 11px;
+  color: #585b70;
+  line-height: 1.45;
+}
+
+/* Completion message */
+.tutorial-congrats {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #a6adc8;
+  line-height: 1.5;
+  text-align: center;
+  border-top: 1px solid #313244;
+}

@@ -14,6 +14,7 @@ export const softmaxNode: NodeDefinition = {
       type: { kind: 'number', min: -1, integer: true },
       defaultValue: -1,
       affects: 'execution',
+      help: 'Dimension to apply softmax over. -1 (last dim) is standard for classification logits.',
     },
   ],
 

@@ -72,10 +72,32 @@
 }
 
 .inspector-prop-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: #cdd6f4;
   font-weight: 500;
   margin-bottom: 2px;
+}
+
+.inspector-prop-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #313244;
+  color: #6c7086;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.inspector-prop-help:hover {
+  background: #45475a;
+  color: #cdd6f4;
 }
 
 .inspector-prop-detail {

@@ -18,6 +18,7 @@ export const embeddingNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 10000,
       affects: 'execution',
+      help: 'Vocabulary size — must be >= the dataset\'s vocabSize. Each unique token gets its own learned vector.',
     },
     {
       id: 'embeddingDim',
@@ -25,6 +26,7 @@ export const embeddingNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 256,
       affects: 'execution',
+      help: 'Length of each embedding vector. Larger = more expressive but more parameters. Common: 64, 128, 256.',
     },
   ],
 

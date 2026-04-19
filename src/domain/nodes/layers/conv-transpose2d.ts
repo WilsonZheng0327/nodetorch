@@ -8,11 +8,11 @@ export const convTranspose2dNode: NodeDefinition = {
   category: ['ML', 'Layers', 'Convolution'],
 
   getProperties: () => [
-    { id: 'outChannels', name: 'Out Channels', type: { kind: 'number', min: 1, integer: true }, defaultValue: 64, affects: 'both' },
-    { id: 'kernelSize', name: 'Kernel Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 3, affects: 'execution' },
-    { id: 'stride', name: 'Stride', type: { kind: 'number', min: 1, integer: true }, defaultValue: 1, affects: 'execution' },
-    { id: 'padding', name: 'Padding', type: { kind: 'number', min: 0, integer: true }, defaultValue: 0, affects: 'execution' },
-    { id: 'outputPadding', name: 'Output Padding', type: { kind: 'number', min: 0, integer: true }, defaultValue: 0, affects: 'execution' },
+    { id: 'outChannels', name: 'Out Channels', type: { kind: 'number', min: 1, integer: true }, defaultValue: 64, affects: 'both', help: 'Number of output channels.' },
+    { id: 'kernelSize', name: 'Kernel Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 3, affects: 'execution', help: 'Size of the upsampling filter.' },
+    { id: 'stride', name: 'Stride', type: { kind: 'number', min: 1, integer: true }, defaultValue: 1, affects: 'execution', help: 'Upsampling factor. Stride 2 doubles spatial dimensions.' },
+    { id: 'padding', name: 'Padding', type: { kind: 'number', min: 0, integer: true }, defaultValue: 0, affects: 'execution', help: 'Controls output size. With kernel=4, stride=2, padding=1: output = 2x input size.' },
+    { id: 'outputPadding', name: 'Output Padding', type: { kind: 'number', min: 0, integer: true }, defaultValue: 0, affects: 'execution', help: 'Extra padding on one side to resolve ambiguous output sizes. Usually 0.' },
   ],
 
   getPorts: () => [

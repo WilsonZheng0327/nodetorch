@@ -15,6 +15,7 @@ import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
 import { createNode as cn, addNode as an, createEdge as ce, addEdge as ae } from './core/graph';
 import { Sun, Moon } from 'lucide-react';
+import { TutorialPanel, tutorialEvent } from './ui/tutorial/TutorialPanel';
 
 const categoryColors: Record<string, string> = {
   Data: '#f59e0b',
@@ -324,119 +325,10 @@ export default function App() {
   // Build a full ResNet-34 for CIFAR-100
   // Architecture: [3, 4, 6, 3] BasicBlocks at [64, 128, 256, 512] channels
   // CIFAR-adapted stem: 3×3 conv stride 1 (no 7×7 stride 2, no maxpool)
-  const demoBuilt = useRef(false);
-  useEffect(() => {
-    if (demoBuilt.current) return;
-    demoBuilt.current = true;
-    async function buildDemo() {
-      // ResNet34 layout: [3, 4, 6, 3] blocks
-      const stages: [number, number][] = [[3, 64], [4, 128], [6, 256], [3, 512]];
-
-      // Stem: CIFAR-100 → Conv(64, 3×3, stride 1, pad 1) → BN → ReLU
-      await graph.addNode('data.cifar100', { x: 0, y: 200 });
-      await graph.addNode('ml.layers.conv2d', { x: 240, y: 200 });
-      await graph.addNode('ml.layers.batchnorm2d', { x: 440, y: 200 });
-      await graph.addNode('ml.activations.relu', { x: 600, y: 200 });
-
-      // Create all ResBlocks (16 total: 3+4+6+3)
-      let blockX = 800;
-      const blockSpacing = 220;
-      const totalBlocks = stages.reduce((s, [count]) => s + count, 0);
-      for (let i = 0; i < totalBlocks; i++) {
-        await graph.addNode('subgraph.block', { x: blockX, y: 200 });
-        blockX += blockSpacing;
-      }
-
-      // Head: AdaptiveAvgPool → Flatten → Dropout → Linear(512→100) → Loss → SGD
-      const headX = blockX;
-      await graph.addNode('ml.layers.adaptive_avgpool2d', { x: headX, y: 200 });
-      await graph.addNode('ml.layers.flatten', { x: headX + 200, y: 200 });
-      await graph.addNode('ml.layers.dropout', { x: headX + 400, y: 200 });
-      await graph.addNode('ml.layers.linear', { x: headX + 600, y: 200 });
-      await graph.addNode('ml.loss.cross_entropy', { x: headX + 820, y: 250 });
-      await graph.addNode('ml.optimizers.sgd', { x: headX + 1060, y: 300 });
-
-      // Collect nodes by type
-      const nodes = Array.from(graph.graph.nodes.values());
-      const cifar = nodes.find((n) => n.type === 'data.cifar100')!;
-      const stemConv = nodes.find((n) => n.type === 'ml.layers.conv2d')!;
-      const stemBn = nodes.find((n) => n.type === 'ml.layers.batchnorm2d')!;
-      const stemRelu = nodes.find((n) => n.type === 'ml.activations.relu')!;
-      const blocks = nodes.filter((n) => n.type === 'subgraph.block');
-      const avgpool = nodes.find((n) => n.type === 'ml.layers.adaptive_avgpool2d')!;
-      const flatten = nodes.find((n) => n.type === 'ml.layers.flatten')!;
-      const dropout = nodes.find((n) => n.type === 'ml.layers.dropout')!;
-      const linear = nodes.find((n) => n.type === 'ml.layers.linear')!;
-      const loss = nodes.find((n) => n.type === 'ml.loss.cross_entropy')!;
-      const sgd = nodes.find((n) => n.type === 'ml.optimizers.sgd')!;
-
-      // Configure stem conv: 3→64, 3×3, stride 1, pad 1
-      await graph.updateProperty(stemConv.id, 'outChannels', 64);
-      await graph.updateProperty(stemConv.id, 'kernelSize', 3);
-      await graph.updateProperty(stemConv.id, 'padding', 1);
-
-      // Configure each ResBlock
-      let blockIdx = 0;
-      for (let stageIdx = 0; stageIdx < stages.length; stageIdx++) {
-        const [count, channels] = stages[stageIdx];
-        for (let i = 0; i < count; i++) {
-          const block = blocks[blockIdx];
-          const label = `S${stageIdx + 1}-B${i + 1}`;
-          await graph.updateProperty(block.id, 'blockName', label);
-
-          if (i === 0 && stageIdx > 0) {
-            // First block of stages 2-4: downsample with projection shortcut
-            buildResBlockDown(block as any, channels);
-          } else {
-            // Identity block (same channels, stride 1)
-            buildResBlock(block as any, channels);
-          }
-          blockIdx++;
-        }
-      }
-
-      // Configure head
-      await graph.updateProperty(linear.id, 'outFeatures', 100);
-
-      // Configure SGD with momentum + weight decay (standard ResNet recipe)
-      await graph.updateProperty(sgd.id, 'lr', 0.1);
-      await graph.updateProperty(sgd.id, 'momentum', 0.9);
-      await graph.updateProperty(sgd.id, 'weightDecay', 5e-4);
-      await graph.updateProperty(sgd.id, 'scheduler', 'cosine');
-      await graph.updateProperty(sgd.id, 'epochs', 50);
-
-      // Enable data augmentation on CIFAR-100
-      await graph.updateProperty(cifar.id, 'augHFlip', true);
-      await graph.updateProperty(cifar.id, 'augRandomCrop', true);
-
-      // Wire stem
-      await graph.connect({ source: cifar.id, sourceHandle: 'out', target: stemConv.id, targetHandle: 'in' });
-      await graph.connect({ source: stemConv.id, sourceHandle: 'out', target: stemBn.id, targetHandle: 'in' });
-      await graph.connect({ source: stemBn.id, sourceHandle: 'out', target: stemRelu.id, targetHandle: 'in' });
-
-      // Wire blocks in chain: stem → block0 → block1 → ... → blockN → head
-      let prevId = stemRelu.id;
-      for (const block of blocks) {
-        await graph.connect({ source: prevId, sourceHandle: 'out', target: block.id, targetHandle: 'in' });
-        prevId = block.id;
-      }
-
-      // Wire head
-      await graph.connect({ source: prevId, sourceHandle: 'out', target: avgpool.id, targetHandle: 'in' });
-      await graph.connect({ source: avgpool.id, sourceHandle: 'out', target: flatten.id, targetHandle: 'in' });
-      await graph.connect({ source: flatten.id, sourceHandle: 'out', target: dropout.id, targetHandle: 'in' });
-      await graph.connect({ source: dropout.id, sourceHandle: 'out', target: linear.id, targetHandle: 'in' });
-      await graph.connect({ source: linear.id, sourceHandle: 'out', target: loss.id, targetHandle: 'predictions' });
-      await graph.connect({ source: cifar.id, sourceHandle: 'labels', target: loss.id, targetHandle: 'labels' });
-      await graph.connect({ source: loss.id, sourceHandle: 'out', target: sgd.id, targetHandle: 'loss' });
-
-      await graph.runShape();
-    }
-    buildDemo().then(() => {
-      setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 100);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Default demo graph disabled — users start with an empty canvas and the tutorial.
+  // To restore, uncomment the block below.
+  // const demoBuilt = useRef(false);
+  // useEffect(() => { ... }, []);
 
   // Fit view when navigating into/out of subgraphs
   useEffect(() => {
@@ -507,8 +399,9 @@ export default function App() {
         {graph.connectionError && (
           <div className="connection-error-toast">{graph.connectionError}</div>
         )}
-        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => setStepThroughOpen(true)} onSimulateBackprop={graph.simulateBackprop} onSaveModel={graph.saveModel} onLoadModel={graph.loadModel} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }} onSimulateBackprop={graph.simulateBackprop} onSaveModel={graph.saveModel} onLoadModel={graph.loadModel} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
+        <TutorialPanel />
         <NodePalette
           savedBlocks={graph.savedBlocks}
           onDeleteBlock={graph.deleteBlock}

@@ -14,6 +14,7 @@ export const leakyReluNode: NodeDefinition = {
       type: { kind: 'number', min: 0, max: 1, step: 0.01 },
       defaultValue: 0.01,
       affects: 'execution',
+      help: 'Slope for negative values. 0.01 = standard LeakyReLU. Higher values let more gradient flow through for negative inputs.',
     },
   ],
 

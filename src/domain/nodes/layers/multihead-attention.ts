@@ -20,6 +20,7 @@ export const multiHeadAttentionNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 256,
       affects: 'execution',
+      help: 'Dimension of input embeddings. Must match the embedding layer\'s output. Must be divisible by numHeads.',
     },
     {
       id: 'numHeads',
@@ -27,6 +28,7 @@ export const multiHeadAttentionNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 8,
       affects: 'execution',
+      help: 'Number of attention heads. Each head attends to different aspects of the input. Common: 4, 8. embedDim must be divisible by this.',
     },
     {
       id: 'dropout',
@@ -34,6 +36,7 @@ export const multiHeadAttentionNode: NodeDefinition = {
       type: { kind: 'number', min: 0, max: 1, step: 0.1 },
       defaultValue: 0.0,
       affects: 'execution',
+      help: 'Dropout applied to attention weights during training. Helps prevent overfitting.',
     },
   ],
 

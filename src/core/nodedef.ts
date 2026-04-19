@@ -69,6 +69,8 @@ export interface PropertyDefinition {
    * - "both" — recompute ports AND re-run executors
    */
   affects?: 'ports' | 'execution' | 'both';
+  /** Help text shown as a tooltip next to the property in the inspector. */
+  help?: string;
 }
 
 // --- Node Definition ---

@@ -3,6 +3,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import * as RF from '@xyflow/react';
+import { tutorialEvent } from './tutorial/TutorialPanel';
 import {
   type Graph,
   createGraph,
@@ -417,6 +418,16 @@ export function useGraph(domain: DomainContext) {
       addNode(currentGraph, node);
       invalidateModel();
       await runShape();
+      // Tutorial auto-detect
+      if (type.startsWith('data.')) tutorialEvent('node-added-data');
+      if (type === 'ml.layers.conv2d') tutorialEvent('node-added-conv2d');
+      if (type === 'ml.layers.linear') tutorialEvent('node-added-linear');
+      if (type === 'ml.layers.flatten') tutorialEvent('node-added-flatten');
+      if (type.startsWith('ml.activations.')) tutorialEvent('node-added-activation');
+      if (type.startsWith('ml.loss.')) tutorialEvent('node-added-loss');
+      if (type.startsWith('ml.optimizers.')) tutorialEvent('node-added-optimizer');
+      if (type.startsWith('ml.layers.batchnorm')) tutorialEvent('node-added-batchnorm');
+      if (type.startsWith('ml.layers.maxpool') || type.startsWith('ml.layers.avgpool')) tutorialEvent('node-added-pool');
     },
     [domain, runShape, invalidateModel, getCurrentGraph, snapshot],
   );
@@ -451,6 +462,7 @@ export function useGraph(domain: DomainContext) {
       markDirty(currentGraph, connection.target);
       invalidateModel();
       await runShape();
+      tutorialEvent('edge-added');
     },
     [runShape, invalidateModel, getCurrentGraph, snapshot],
   );
@@ -606,6 +618,7 @@ export function useGraph(domain: DomainContext) {
       ? { type: 'error', message: 'Forward pass completed with errors — check nodes' }
       : { type: 'success', message: 'Forward pass complete' },
     );
+    if (!hasErrors) tutorialEvent('forward-run');
 
     // Clear success status after a few seconds
     if (!hasErrors) {
@@ -677,6 +690,7 @@ export function useGraph(domain: DomainContext) {
     } else {
       setStatus({ type: 'success', message: 'Inference complete' });
     }
+    tutorialEvent('infer-run');
     setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 5000);
   }, [syncToRF, modelTrained, modelStale]);
 
@@ -704,7 +718,7 @@ export function useGraph(domain: DomainContext) {
     setPinnedVizNodes((prev) => {
       const next = new Set(prev);
       if (next.has(nodeId)) next.delete(nodeId);
-      else next.add(nodeId);
+      else { next.add(nodeId); tutorialEvent('viz-toggled'); }
       return next;
     });
   }, []);
@@ -822,6 +836,7 @@ export function useGraph(domain: DomainContext) {
 
     setStatus({ type: 'running', message: 'Training...' });
     setTrainingActive(true);
+    tutorialEvent('training-started');
     setTrainingProgress([]);
     setSnapshotHistory([]);
     setSelectedEpoch(null);

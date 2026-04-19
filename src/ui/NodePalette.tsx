@@ -5,6 +5,7 @@ import './NodePalette.css';
 
 import { useContext, useState, useEffect, type DragEvent } from 'react';
 import { Blocks, ChevronDown, ChevronRight } from 'lucide-react';
+import { tutorialEvent } from './tutorial/TutorialPanel';
 import type { NodeDefinition } from '../core/nodedef';
 import { DomainCtx } from './EngineNode';
 
@@ -113,7 +114,10 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (e.key === 'Tab') {
         e.preventDefault();
-        setCollapsed((c) => !c);
+        setCollapsed((c) => {
+          if (c) tutorialEvent('palette-opened');
+          return !c;
+        });
       }
     }
     window.addEventListener('keydown', handleKeyDown);
@@ -137,7 +141,7 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
     <div className="palette">
       <button
         className="palette-toggle"
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={() => { if (collapsed) tutorialEvent('palette-opened'); setCollapsed(!collapsed); }}
         title={collapsed ? 'Expand palette (Tab)' : 'Collapse palette (Tab)'}
       >
         <Blocks size={15} />

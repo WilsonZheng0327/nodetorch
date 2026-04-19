@@ -18,6 +18,7 @@ export const cifar100Node: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 32,
       affects: 'execution',
+      help: 'Number of samples per training step. Larger = faster but more memory. Common: 32, 64, 128.',
     },
     {
       id: 'useCoarseLabels',
@@ -32,6 +33,7 @@ export const cifar100Node: NodeDefinition = {
       type: { kind: 'boolean' },
       defaultValue: false,
       affects: 'execution',
+      help: 'Randomly flip images horizontally. Simple augmentation that doubles effective dataset size.',
     },
     {
       id: 'augRandomCrop',
@@ -39,6 +41,7 @@ export const cifar100Node: NodeDefinition = {
       type: { kind: 'boolean' },
       defaultValue: false,
       affects: 'execution',
+      help: 'Randomly crop with 4px padding. Forces the model to handle slight position shifts.',
     },
     {
       id: 'augColorJitter',
@@ -46,6 +49,7 @@ export const cifar100Node: NodeDefinition = {
       type: { kind: 'boolean' },
       defaultValue: false,
       affects: 'execution',
+      help: 'Randomly adjust brightness, contrast, and saturation. Helps generalize to varying lighting.',
     },
   ],
 

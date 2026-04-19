@@ -17,6 +17,7 @@ export const conv2dNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 64,
       affects: 'both',
+      help: 'Number of filters (output feature maps). More filters = more patterns detected. Common: 32, 64, 128, 256.',
     },
     {
       id: 'kernelSize',
@@ -24,6 +25,7 @@ export const conv2dNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 3,
       affects: 'execution',
+      help: 'Size of the sliding window (e.g. 3 = 3x3 filter). Larger kernels see more context but have more parameters. 3 is the most common choice.',
     },
     {
       id: 'stride',
@@ -31,6 +33,7 @@ export const conv2dNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 1,
       affects: 'execution',
+      help: 'Step size of the sliding window. Stride 2 halves the spatial dimensions (downsampling). Stride 1 keeps the same size (with appropriate padding).',
     },
     {
       id: 'padding',
@@ -38,6 +41,7 @@ export const conv2dNode: NodeDefinition = {
       type: { kind: 'number', min: 0, integer: true },
       defaultValue: 0,
       affects: 'execution',
+      help: 'Zero-padding added around the input. Use padding=1 with kernel=3 to keep spatial size unchanged. Formula: same size when padding = (kernel-1)/2.',
     },
   ],
 

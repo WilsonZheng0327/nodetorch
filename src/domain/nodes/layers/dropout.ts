@@ -14,6 +14,7 @@ export const dropoutNode: NodeDefinition = {
       type: { kind: 'number', min: 0, max: 1, step: 0.1 },
       defaultValue: 0.5,
       affects: 'execution',
+      help: 'Probability of zeroing each element. 0.5 = half the neurons randomly disabled per forward pass. Higher = stronger regularization. Only active during training.',
     },
   ],
 
