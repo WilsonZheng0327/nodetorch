@@ -56,6 +56,24 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
   const [misclassFilter, setMisclassFilter] = useState<{ actual: number; predicted: number } | null>(null);
   const [landscape, setLandscape] = useState<LandscapeData | null>(null);
   const [landscapeLoading, setLandscapeLoading] = useState(false);
+  const [latentGrid, setLatentGrid] = useState<{ grid: (number[][] | number[][][] | null)[][]; gridSize: number; latentRange: number; imageH: number; imageW: number; channels: number } | null>(null);
+  const [latentGridLoading, setLatentGridLoading] = useState(false);
+
+  const runLatentGrid = () => {
+    setLatentGridLoading(true);
+    fetch('http://localhost:8000/latent-grid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ graph: JSON.parse(graphJson), gridSize: 10, latentRange: 3.0 }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok') setLatentGrid(data.result);
+        else setError(data.error ?? 'Failed to generate latent grid');
+      })
+      .catch(() => setError('Cannot connect to backend'))
+      .finally(() => setLatentGridLoading(false));
+  };
 
   const runLandscape = () => {
     setLandscapeLoading(true);
@@ -304,7 +322,29 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
                 </DetailSection>
               )}
 
-              {!detail.weightMatrix && !detail.featureMaps && !detail.attentionMap && !detail.hiddenState && !detail.confusionMatrix && (
+              {nodeType === 'ml.structural.reparameterize' && (
+                <DetailSection title="Latent Space Grid">
+                  {!latentGrid && !latentGridLoading && (
+                    <>
+                      <div className="heatmap-note">
+                        Sweeps across two latent dimensions and decodes each point.
+                        Shows how the model organizes concepts in the learned latent space.
+                      </div>
+                      <button className="layer-detail-action-btn" onClick={runLatentGrid}>
+                        Generate Latent Grid (10×10)
+                      </button>
+                    </>
+                  )}
+                  {latentGridLoading && (
+                    <div className="layer-detail-loading">Decoding 100 latent points...</div>
+                  )}
+                  {latentGrid && (
+                    <LatentGridView data={latentGrid} />
+                  )}
+                </DetailSection>
+              )}
+
+              {!detail.weightMatrix && !detail.featureMaps && !detail.attentionMap && !detail.hiddenState && !detail.confusionMatrix && nodeType !== 'ml.structural.reparameterize' && (
                 <div className="layer-detail-loading">No detailed visualization available for this node type</div>
               )}
             </>
@@ -780,6 +820,112 @@ function MisclassCard({ sample }: { sample: {
       <div className="misclass-labels">
         <div className="misclass-actual">actual {sample.actual}</div>
         <div className="misclass-predicted">pred {sample.predicted} ({(sample.confidence * 100).toFixed(0)}%)</div>
+      </div>
+    </div>
+  );
+}
+
+
+// --- Latent Grid View (VAE) ---
+
+function LatentGridView({ data }: { data: { grid: (number[][] | number[][][] | null)[][]; gridSize: number; latentRange: number; imageH: number; imageW: number; channels: number } }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || data.imageH === 0) return;
+
+    const cellSize = Math.max(20, Math.min(40, Math.floor(600 / data.gridSize)));
+    const padLeft = 40;
+    const padTop = 24;
+    const padRight = 8;
+    const padBottom = 40;
+    const totalW = data.gridSize * cellSize + padLeft + padRight;
+    const totalH = data.gridSize * cellSize + padTop + padBottom;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = totalW * dpr;
+    canvas.height = totalH * dpr;
+    canvas.style.width = `${totalW}px`;
+    canvas.style.height = `${totalH}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Black background
+    ctx.fillStyle = '#11111b';
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    // Render each cell
+    for (let r = 0; r < data.gridSize; r++) {
+      for (let c = 0; c < data.gridSize; c++) {
+        const pixels = data.grid[r]?.[c];
+        if (!pixels) continue;
+
+        const x = padLeft + c * cellSize;
+        const y = padTop + r * cellSize;
+        const imgData = ctx.createImageData(data.imageW, data.imageH);
+
+        for (let py = 0; py < data.imageH; py++) {
+          for (let px = 0; px < data.imageW; px++) {
+            const idx = (py * data.imageW + px) * 4;
+            if (data.channels === 1) {
+              const v = (pixels as number[][])[py]?.[px] ?? 0;
+              imgData.data[idx] = v;
+              imgData.data[idx + 1] = v;
+              imgData.data[idx + 2] = v;
+            } else {
+              const p = (pixels as number[][][])[py]?.[px] ?? [0, 0, 0];
+              imgData.data[idx] = p[0];
+              imgData.data[idx + 1] = p[1];
+              imgData.data[idx + 2] = p[2];
+            }
+            imgData.data[idx + 3] = 255;
+          }
+        }
+
+        // Draw the small image scaled into the cell
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = data.imageW;
+        tmpCanvas.height = data.imageH;
+        tmpCanvas.getContext('2d')!.putImageData(imgData, 0, 0);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(tmpCanvas, x, y, cellSize - 1, cellSize - 1);
+      }
+    }
+
+    // Axis labels
+    ctx.fillStyle = '#a6adc8';
+    ctx.font = '11px JetBrains Mono, monospace';
+
+    // X axis (dim 0)
+    ctx.textAlign = 'center';
+    ctx.fillText(`-${data.latentRange}`, padLeft, totalH - 6);
+    ctx.fillText('0', padLeft + (data.gridSize * cellSize) / 2, totalH - 6);
+    ctx.fillText(`+${data.latentRange}`, padLeft + data.gridSize * cellSize, totalH - 6);
+    ctx.fillText('latent dim 0', padLeft + (data.gridSize * cellSize) / 2, totalH - 20);
+
+    // Y axis (dim 1)
+    ctx.textAlign = 'right';
+    ctx.fillText(`-${data.latentRange}`, padLeft - 4, padTop + 8);
+    ctx.fillText(`+${data.latentRange}`, padLeft - 4, padTop + data.gridSize * cellSize);
+    ctx.save();
+    ctx.translate(12, padTop + (data.gridSize * cellSize) / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('latent dim 1', 0, 0);
+    ctx.restore();
+  }, [data]);
+
+  return (
+    <div>
+      <div className="confusion-scroll">
+        <canvas ref={canvasRef} style={{ borderRadius: 4, border: '1px solid #45475a', display: 'block' }} />
+      </div>
+      <div className="heatmap-note" style={{ marginTop: 8 }}>
+        Each cell is decoded from a different point in the 2D latent space.
+        Smooth transitions mean the model learned a continuous, meaningful representation.
       </div>
     </div>
   );

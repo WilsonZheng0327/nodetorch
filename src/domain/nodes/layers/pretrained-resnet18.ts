@@ -10,7 +10,7 @@ export const pretrainedResnet18Node: NodeDefinition = {
   version: 1,
   displayName: 'ResNet18 (pretrained)',
   description: 'Pretrained ResNet-18 from torchvision. Good for transfer learning.',
-  category: ['ML', 'Layers', 'Pretrained'],
+  category: ['ML', 'Pretrained'],
 
   getProperties: () => [
     {

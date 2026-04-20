@@ -25,6 +25,7 @@ from graph_builder import (
     get_device,
     OPTIMIZER_NODES,
     LOSS_NODES,
+    ALL_LOSS_NODES,
     SubGraphModule,
 )
 from data_loaders import DATA_LOADERS
@@ -111,7 +112,7 @@ def activation_maximization(
                         continue
                     n = nodes[nid]
                     ntype = n["type"]
-                    if ntype in OPTIMIZER_NODES or ntype in LOSS_NODES:
+                    if ntype in OPTIMIZER_NODES or ntype in ALL_LOSS_NODES:
                         continue
                     mod = modules.get(nid)
                     if mod is None:

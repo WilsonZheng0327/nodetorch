@@ -147,6 +147,7 @@ export function useGraph(domain: DomainContext) {
   const graphRef = useRef<Graph>(createGraph('main', 'Main Graph'));
   const [rfNodes, setRFNodes] = useState<RF.Node[]>([]);
   const [rfEdges, setRFEdges] = useState<RF.Edge[]>([]);
+  const [graphVersion, setGraphVersion] = useState(0);  // bumped on every mutation to force re-renders
   const [status, setStatus] = useState<{ type: 'idle' | 'running' | 'success' | 'error'; message?: string }>({ type: 'idle' });
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [modelTrained, setModelTrained] = useState(false);
@@ -281,15 +282,20 @@ export function useGraph(domain: DomainContext) {
       }));
     });
     setRFEdges(toRFEdges(currentGraph));
+    setGraphVersion((v) => v + 1);
   }, [pruneInvalidEdges, getCurrentGraph]);
 
   // Run shape inference on the graph, then sync to React Flow
   const runShape = useCallback(async () => {
-    await domain.engine.execute(
-      graphRef.current,
-      'shape',
-      (nodeType, executorKey) => domain.nodeRegistry.getExecutor(nodeType, executorKey),
-    );
+    try {
+      await domain.engine.execute(
+        graphRef.current,
+        'shape',
+        (nodeType, executorKey) => domain.nodeRegistry.getExecutor(nodeType, executorKey),
+      );
+    } catch (e) {
+      console.error('[nodetorch] Shape inference failed:', e);
+    }
     syncToRF();
   }, [domain, syncToRF]);
 
@@ -473,6 +479,10 @@ export function useGraph(domain: DomainContext) {
       setProperty(getCurrentGraph(), nodeId, key, value);
       invalidateModel();
       await runShape();
+      // Force a re-render even if runShape didn't change RF nodes
+      // (covers edge cases where the node object is mutated in place
+      // but React doesn't detect the prop change)
+      setGraphVersion((v) => v + 1);
     },
     [runShape, invalidateModel, getCurrentGraph, snapshot],
   );
@@ -694,6 +704,38 @@ export function useGraph(domain: DomainContext) {
     setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 5000);
   }, [syncToRF, modelTrained, modelStale]);
 
+  const [testResult, setTestResult] = useState<{
+    testLoss: number; testAccuracy: number; testSamples: number;
+    perClassAccuracy: { cls: number; name: string; accuracy: number; count: number }[];
+  } | null>(null);
+
+  const runTest = useCallback(async () => {
+    if (!modelTrained) {
+      setStatus({ type: 'error', message: 'No trained model — train first' });
+      return;
+    }
+    setStatus({ type: 'running', message: 'Evaluating on test set...' });
+    try {
+      const res = await fetch('http://localhost:8000/evaluate-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
+      });
+      const data = await res.json();
+      if (data.status !== 'ok') {
+        setStatus({ type: 'error', message: friendlyError(data.error ?? 'Test evaluation failed') });
+        return;
+      }
+      setTestResult(data.result);
+      const acc = (data.result.testAccuracy * 100).toFixed(1);
+      const loss = data.result.testLoss.toFixed(4);
+      setStatus({ type: 'success', message: `Test set: ${acc}% accuracy, ${loss} loss (${data.result.testSamples} samples)` });
+      setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 8000);
+    } catch {
+      setStatus({ type: 'error', message: 'Cannot connect to backend' });
+    }
+  }, [modelTrained, saveGraph]);
+
   const [trainingProgress, setTrainingProgress] = useState<{ epoch: number; loss: number; accuracy: number }[]>([]);
 
   // Full history of per-epoch visualization snapshots (indexed by epoch number)
@@ -779,43 +821,79 @@ export function useGraph(domain: DomainContext) {
 
   const saveModel = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/save-model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (data.status === 'ok') {
-        setStatus({ type: 'success', message: 'Model weights saved' });
-        setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
-      } else {
-        setStatus({ type: 'error', message: data.error ?? 'Failed to save model' });
+      const res = await fetch('http://localhost:8000/download-weights');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed to download' }));
+        setStatus({ type: 'error', message: err.error ?? 'No trained model to save' });
+        return;
       }
+      const blob = await res.blob();
+
+      // Use File System Access API if available
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: 'weights.pt',
+            types: [{ description: 'PyTorch Weights', accept: { 'application/octet-stream': ['.pt'] } }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          setStatus({ type: 'success', message: 'Weights saved' });
+          setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
+          return;
+        } catch {
+          return; // user cancelled
+        }
+      }
+
+      // Fallback: auto-download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'weights.pt';
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus({ type: 'success', message: 'Weights saved' });
+      setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
     } catch {
       setStatus({ type: 'error', message: 'Cannot connect to backend' });
     }
   }, []);
 
+  const weightsInputRef = useRef<HTMLInputElement>(null);
   const loadModel = useCallback(async () => {
+    weightsInputRef.current?.click();
+  }, []);
+
+  const handleWeightsFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
     try {
-      const res = await fetch('http://localhost:8000/load-model', {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('graph', saveGraph());
+      const res = await fetch('http://localhost:8000/upload-weights', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
+        body: formData,
       });
       const data = await res.json();
       if (data.status === 'ok') {
         setModelTrained(true);
         setModelStale(false);
-        setStatus({ type: 'success', message: 'Model weights loaded' });
+        setStatus({ type: 'success', message: `Weights loaded from "${file.name}"` });
         setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
       } else {
-        setStatus({ type: 'error', message: data.error ?? 'Failed to load model' });
+        setStatus({ type: 'error', message: friendlyError(data.error ?? 'Failed to load weights') });
+        setTimeout(() => setStatus((s) => s.type === 'error' ? { type: 'idle' } : s), 5000);
+        await runShape();
       }
     } catch {
       setStatus({ type: 'error', message: 'Cannot connect to backend' });
     }
-  }, [saveGraph]);
+  }, [saveGraph, runShape]);
 
   const trainWsRef = useRef<WebSocket | null>(null);
 
@@ -894,6 +972,7 @@ export function useGraph(domain: DomainContext) {
             samples: msg.samples,
             gradientFlow: msg.gradientFlow,
             perClassAccuracy: msg.perClassAccuracy,
+            trackedSamples: msg.trackedSamples,
           }]);
           // Accumulate visualization snapshots per epoch
           if (msg.nodeSnapshots) {
@@ -1174,6 +1253,7 @@ export function useGraph(domain: DomainContext) {
   return {
     graph: graphRef.current,
     currentGraph: getCurrentGraph(),
+    graphVersion,
     rfNodes,
     rfEdges,
     navStack,
@@ -1192,10 +1272,14 @@ export function useGraph(domain: DomainContext) {
     clearGraph,
     runForward,
     runInfer,
+    runTest,
+    testResult,
     runTrain,
     cancelTrain,
     saveModel,
     loadModel,
+    weightsInputRef,
+    handleWeightsFile,
     status,
     modelTrained,
     modelStale,

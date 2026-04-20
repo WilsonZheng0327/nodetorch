@@ -37,9 +37,11 @@ function isDismissed(): boolean {
 
 /** True on the very first visit (no localStorage keys yet). */
 function isFirstVisit(): boolean {
-  localStorage.removeItem('nodetorch-tutorial-seen')
-  localStorage.removeItem('nodetorch-tutorial')
-  localStorage.removeItem('nodetorch-tutorial-dismissed')
+
+  // UNCOMMENT TO SHOW TUTORIAL ON EVERY REFRESH
+  // localStorage.removeItem('nodetorch-tutorial-seen')
+  // localStorage.removeItem('nodetorch-tutorial')
+  // localStorage.removeItem('nodetorch-tutorial-dismissed')
 
   return !localStorage.getItem(SEEN_KEY);
 }

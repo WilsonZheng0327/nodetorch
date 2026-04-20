@@ -8,9 +8,9 @@ import './Toolbar.css';
 interface Props {
   onSave: () => string;
   onLoad: (json: string) => void;
-  onRun: () => Promise<void>;
   onInfer: () => Promise<void>;
   onTrain: () => Promise<void>;
+  onTest: () => Promise<void>;
   onCancel: () => void;
   onClear: () => void;
   onOrganize: () => void;
@@ -25,7 +25,7 @@ interface Props {
   modelStale: boolean;
 }
 
-export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, onSaveModel, onLoadModel, status, modelTrained, modelStale }: Props) {
+export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, onSaveModel, onLoadModel, status, modelTrained, modelStale }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [presets, setPresets] = useState<{filename: string; name: string}[]>([]);
@@ -132,22 +132,6 @@ export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onC
   return (
     <div className="toolbar">
       <div className="toolbar-buttons">
-        <button
-          className="toolbar-btn toolbar-btn-run"
-          onClick={() => handleAction(onRun)}
-          disabled={busy}
-          title="Run forward pass (random weights)"
-        >
-          Run
-        </button>
-        <button
-          className={`toolbar-btn toolbar-btn-infer ${!modelTrained ? 'toolbar-btn-disabled-hint' : ''} ${modelStale ? 'toolbar-btn-stale' : ''}`}
-          onClick={() => handleAction(onInfer)}
-          disabled={busy}
-          title={!modelTrained ? 'Train a model first' : modelStale ? 'Model outdated — retrain' : 'Infer using trained weights'}
-        >
-          Infer{modelStale ? ' !' : ''}
-        </button>
         {busy ? (
           <button
             className="toolbar-btn toolbar-btn-cancel"
@@ -165,6 +149,22 @@ export function Toolbar({ onSave, onLoad, onRun, onInfer, onTrain, onCancel, onC
             Train
           </button>
         )}
+        <button
+          className={`toolbar-btn toolbar-btn-test ${!modelTrained ? 'toolbar-btn-disabled-hint' : ''}`}
+          onClick={() => handleAction(onTest)}
+          disabled={busy || !modelTrained}
+          title={!modelTrained ? 'Train a model first' : 'Evaluate on the held-out test set'}
+        >
+          Test
+        </button>
+        <button
+          className={`toolbar-btn toolbar-btn-infer ${!modelTrained ? 'toolbar-btn-disabled-hint' : ''} ${modelStale ? 'toolbar-btn-stale' : ''}`}
+          onClick={() => handleAction(onInfer)}
+          disabled={busy}
+          title={!modelTrained ? 'Train a model first' : modelStale ? 'Model outdated — retrain' : 'Infer using trained weights'}
+        >
+          Infer{modelStale ? ' !' : ''}
+        </button>
         <div className="toolbar-separator" />
         <button className="toolbar-btn toolbar-btn-icon" onClick={handleSave} title="Save graph to file">
           <Download size={15} />

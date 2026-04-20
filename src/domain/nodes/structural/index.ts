@@ -4,6 +4,7 @@ import { concatNode } from './concat';
 import { reshapeNode } from './reshape';
 import { permuteNode } from './permute';
 import { sequencePoolNode } from './sequence-pool';
+import { reparameterizeNode } from './reparameterize';
 
 export const structuralNodes: NodeDefinition[] = [
   addNode,
@@ -11,4 +12,5 @@ export const structuralNodes: NodeDefinition[] = [
   reshapeNode,
   permuteNode,
   sequencePoolNode,
+  reparameterizeNode,
 ];

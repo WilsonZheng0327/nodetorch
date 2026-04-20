@@ -3,6 +3,18 @@
 import { useRef, useEffect, useState } from 'react';
 import './TrainingDashboard.css';
 
+export interface TrackedSampleProbe {
+  idx: number;
+  label: number | null;
+  imagePixels?: number[][] | number[][][];
+  imageChannels?: number;
+  probabilities?: number[];
+  predictedClass?: number;
+  confidence?: number;
+  outputNorm?: number;
+  loss?: number;
+}
+
 export interface EpochData {
   epoch: number;
   totalEpochs?: number;
@@ -16,6 +28,7 @@ export interface EpochData {
   samples?: number;
   gradientFlow?: { name: string; norm: number }[];
   perClassAccuracy?: { cls: number; accuracy: number }[];
+  trackedSamples?: TrackedSampleProbe[];
 }
 
 interface SystemInfo {
@@ -58,6 +71,14 @@ export interface FullRun extends SavedRun {
   epochHistory: EpochData[];
 }
 
+export interface TestResult {
+  testLoss: number;
+  testAccuracy: number;
+  testSamples: number;
+  perClassAccuracy: { cls: number; name: string; accuracy: number; count: number }[];
+  confusionMatrix?: { data: number[][]; size: number; classNames?: string[] };
+}
+
 interface Props {
   progress: EpochData[];
   isTraining: boolean;
@@ -66,11 +87,12 @@ interface Props {
   onSelectEpoch: (epoch: number | null) => void;
   totalSnapshotEpochs: number;
   modelSummary?: ModelLayerInfo[];
+  testResult?: TestResult | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
-export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs, modelSummary, open: openProp, onOpenChange }: Props) {
+export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs, modelSummary, testResult, open: openProp, onOpenChange }: Props) {
   const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'epochs' | 'summary' | 'runs' | 'system'>('loss');
   const [savedRuns, setSavedRuns] = useState<SavedRun[] | null>(null);
   const [runsLoading, setRunsLoading] = useState(false);
@@ -235,19 +257,29 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
 
       {/* Tab selector */}
       <div className="dashboard-tabs">
-        {(['loss', 'accuracy', 'gradients', 'perclass', 'epochs', 'summary', 'runs', 'system'] as const).map((tab) => (
+        {(['loss', 'accuracy', 'gradients', 'perclass', 'samples', 'test', 'epochs'] as const).map((tab) => (
           <button
             key={tab}
             className={`dashboard-tab ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {{ loss: 'Loss', accuracy: 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', epochs: 'Epochs', summary: 'Summary', runs: 'Runs', system: 'System' }[tab]}
+            {{ loss: 'Loss', accuracy: 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', samples: 'Samples', test: 'Test', epochs: 'Epochs' }[tab]}
+          </button>
+        ))}
+        <span className="dashboard-tab-divider" />
+        {(['summary', 'runs', 'system'] as const).map((tab) => (
+          <button
+            key={tab}
+            className={`dashboard-tab ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {{ summary: 'Model', runs: 'Runs', system: 'System' }[tab]}
           </button>
         ))}
       </div>
 
       {/* Epoch slider — scrub through training history */}
-      {totalSnapshotEpochs >= 2 && activeTab !== 'system' && activeTab !== 'epochs' && activeTab !== 'summary' && activeTab !== 'runs' && (
+      {totalSnapshotEpochs >= 2 && activeTab !== 'system' && activeTab !== 'epochs' && activeTab !== 'summary' && activeTab !== 'runs' && activeTab !== 'test' && (
         <div className="dashboard-epoch-slider">
           <span className="dashboard-epoch-slider-label">Epoch</span>
           <input
@@ -283,6 +315,10 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
             compareRun={compareRun}
             onClearCompare={() => setCompareRun(null)}
           />
+        ) : activeTab === 'samples' ? (
+          <TrackedSamplesView progress={progress} />
+        ) : activeTab === 'test' ? (
+          <TestResultView result={testResult} />
         ) : activeTab === 'epochs' ? (
           <div className="dashboard-table-wrap">
             {progress.length > 0 ? (
@@ -444,7 +480,7 @@ function SystemInfoPanel({ info }: { info: SystemInfo | null }) {
 
 function ModelSummaryPanel({ layers }: { layers: ModelLayerInfo[] }) {
   if (layers.length === 0) {
-    return <div className="dashboard-chart-placeholder">Run forward pass to see model summary</div>;
+    return <div className="dashboard-chart-placeholder">Add nodes to see model parameters</div>;
   }
 
   const totalParams = layers.reduce((sum, l) => sum + (l.paramCount ?? 0), 0);
@@ -940,6 +976,199 @@ function PerClassChart({ data }: { data: { cls: number; accuracy: number }[] }) 
   return (
     <div className="dashboard-perclass-scroll">
       <canvas ref={canvasRef} className="dashboard-chart dashboard-chart-tall" />
+    </div>
+  );
+}
+
+
+// --- Tracked Samples View ---
+
+function TrackedSamplesView({ progress }: { progress: EpochData[] }) {
+  if (progress.length === 0 || !progress[0].trackedSamples?.length) {
+    return <div className="dashboard-chart-placeholder">No tracked samples — train to see results</div>;
+  }
+
+  // Get sample info from the first epoch (images don't change)
+  const sampleCount = progress[0].trackedSamples!.length;
+  const firstProbes = progress[0].trackedSamples!;
+
+  return (
+    <div className="tracked-samples-view">
+      {firstProbes.map((sample, sIdx) => (
+        <TrackedSampleRow
+          key={sample.idx}
+          sampleIdx={sIdx}
+          sample={sample}
+          probes={progress.map(ep => ep.trackedSamples?.[sIdx])}
+          epochs={progress.map(ep => ep.epoch)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TrackedSampleRow({ sampleIdx, sample, probes, epochs }: {
+  sampleIdx: number;
+  sample: TrackedSampleProbe;
+  probes: (TrackedSampleProbe | undefined)[];
+  epochs: number[];
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Draw the sample image thumbnail
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !sample.imagePixels) return;
+    const pixels = sample.imagePixels;
+    const h = pixels.length;
+    const firstRow = pixels[0];
+    const isRGB = Array.isArray(firstRow[0]);
+    const w = isRGB ? (firstRow as number[][]).length : (firstRow as number[]).length;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const data = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        if (isRGB) {
+          const px = (pixels as number[][][])[y][x];
+          data.data[idx] = px[0]; data.data[idx + 1] = px[1]; data.data[idx + 2] = px[2];
+        } else {
+          const v = (pixels as number[][])[y][x];
+          data.data[idx] = v; data.data[idx + 1] = v; data.data[idx + 2] = v;
+        }
+        data.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(data, 0, 0);
+  }, [sample.imagePixels]);
+
+  // Get latest prediction
+  const latestProbe = probes[probes.length - 1];
+  const isClassification = latestProbe?.probabilities != null;
+
+  return (
+    <div className="tracked-sample-row">
+      {/* Thumbnail */}
+      <div className="tracked-sample-thumb">
+        {sample.imagePixels ? (
+          <canvas ref={canvasRef} className="tracked-sample-img" />
+        ) : (
+          <div className="tracked-sample-no-img">#{sample.idx}</div>
+        )}
+        <div className="tracked-sample-label">Label: {sample.label ?? '?'}</div>
+      </div>
+
+      {/* Prediction timeline */}
+      <div className="tracked-sample-timeline">
+        {isClassification ? (
+          <>
+            <div className="tracked-sample-timeline-header">
+              <span>Confidence over epochs</span>
+              <span className="tracked-sample-latest">
+                {latestProbe?.predictedClass != null && (
+                  <>Predicted: {latestProbe.predictedClass} ({((latestProbe.confidence ?? 0) * 100).toFixed(1)}%)</>
+                )}
+              </span>
+            </div>
+            <div className="tracked-sample-bars">
+              {probes.map((p, i) => {
+                if (!p) return null;
+                const correct = p.predictedClass === sample.label;
+                const conf = (p.confidence ?? 0) * 100;
+                return (
+                  <div key={i} className="tracked-sample-bar-col" title={`Epoch ${epochs[i]}: class ${p.predictedClass} (${conf.toFixed(1)}%)`}>
+                    <div className="tracked-sample-bar-track">
+                      <div
+                        className={`tracked-sample-bar-fill ${correct ? 'tracked-sample-bar-correct' : 'tracked-sample-bar-wrong'}`}
+                        style={{ height: `${conf}%` }}
+                      />
+                    </div>
+                    <span className="tracked-sample-bar-epoch">{epochs[i]}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="tracked-sample-timeline-header">
+              <span>Loss over epochs</span>
+            </div>
+            <div className="tracked-sample-bars">
+              {probes.map((p, i) => {
+                if (!p || p.loss == null) return null;
+                const maxLoss = Math.max(...probes.filter(Boolean).map(pp => pp!.loss ?? 0), 0.01);
+                const pct = (p.loss / maxLoss) * 100;
+                return (
+                  <div key={i} className="tracked-sample-bar-col" title={`Epoch ${epochs[i]}: loss ${p.loss.toFixed(4)}`}>
+                    <div className="tracked-sample-bar-track">
+                      <div className="tracked-sample-bar-fill tracked-sample-bar-loss" style={{ height: `${pct}%` }} />
+                    </div>
+                    <span className="tracked-sample-bar-epoch">{epochs[i]}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// --- Test Result View ---
+
+function TestResultView({ result }: { result?: TestResult | null }) {
+  if (!result) {
+    return <div className="dashboard-chart-placeholder">No test results yet — click "Test" after training to evaluate on the held-out test set</div>;
+  }
+
+  return (
+    <div className="test-result-view">
+      <div className="test-result-summary">
+        <div className="test-result-metric">
+          <span className="test-result-metric-value">{(result.testAccuracy * 100).toFixed(1)}%</span>
+          <span className="test-result-metric-label">Test Accuracy</span>
+        </div>
+        <div className="test-result-metric">
+          <span className="test-result-metric-value">{result.testLoss.toFixed(4)}</span>
+          <span className="test-result-metric-label">Test Loss</span>
+        </div>
+        <div className="test-result-metric">
+          <span className="test-result-metric-value">{result.testSamples.toLocaleString()}</span>
+          <span className="test-result-metric-label">Samples</span>
+        </div>
+      </div>
+
+      <div className="test-result-note">
+        These results are on the <strong>held-out test set</strong> — data the model never saw during training.
+        This measures how well the model generalizes to new, unseen data.
+      </div>
+
+      {result.perClassAccuracy.length > 0 && (
+        <div className="test-result-perclass">
+          <div className="test-result-section-title">Per-Class Accuracy</div>
+          <div className="test-result-class-list">
+            {result.perClassAccuracy.map((c) => (
+              <div key={c.cls} className="test-result-class-row">
+                <span className="test-result-class-name">{c.name}</span>
+                <div className="test-result-class-bar-bg">
+                  <div
+                    className="test-result-class-bar"
+                    style={{ width: `${c.accuracy * 100}%`, background: c.accuracy >= 0.8 ? '#10b981' : c.accuracy >= 0.5 ? '#f59e0b' : '#ef4444' }}
+                  />
+                </div>
+                <span className="test-result-class-val">{(c.accuracy * 100).toFixed(1)}%</span>
+                <span className="test-result-class-count">({c.count})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

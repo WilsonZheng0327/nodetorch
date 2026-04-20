@@ -61,7 +61,7 @@ export function validateForward(graph: Graph, registry: NodeRegistry): Validatio
 
 // --- Training checks (includes all forward checks + training-specific) ---
 
-const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse'];
+const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse', 'ml.loss.vae'];
 const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam', 'ml.optimizers.adamw'];
 const DATA_TYPES = ['data.mnist', 'data.cifar10', 'data.cifar100', 'data.fashion_mnist', 'data.imdb', 'data.ag_news'];
 
@@ -94,21 +94,36 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
     errors.push({ message: 'Multiple optimizer nodes — only one is supported' });
   }
 
-  // Loss node must have both predictions and labels connected
+  // Loss node must have required inputs connected
   for (const lossNode of lossNodes) {
-    const predConnected = graph.edges.some(
-      (e) => e.target.nodeId === lossNode.id && e.target.portId === 'predictions',
-    );
-    const labelsConnected = graph.edges.some(
-      (e) => e.target.nodeId === lossNode.id && e.target.portId === 'labels',
-    );
     const lossName = registry.get(lossNode.type)?.displayName ?? lossNode.type;
 
-    if (!predConnected) {
-      errors.push({ nodeId: lossNode.id, message: `${lossName}: predictions port not connected` });
-    }
-    if (!labelsConnected) {
-      errors.push({ nodeId: lossNode.id, message: `${lossName}: labels port not connected` });
+    if (lossNode.type === 'ml.loss.vae') {
+      // VAE loss has 4 required inputs: reconstruction, original, mean, logvar
+      const requiredPorts = ['reconstruction', 'original', 'mean', 'logvar'];
+      for (const portId of requiredPorts) {
+        const connected = graph.edges.some(
+          (e) => e.target.nodeId === lossNode.id && e.target.portId === portId,
+        );
+        if (!connected) {
+          errors.push({ nodeId: lossNode.id, message: `${lossName}: ${portId} port not connected` });
+        }
+      }
+    } else {
+      // Standard losses: predictions + labels
+      const predConnected = graph.edges.some(
+        (e) => e.target.nodeId === lossNode.id && e.target.portId === 'predictions',
+      );
+      const labelsConnected = graph.edges.some(
+        (e) => e.target.nodeId === lossNode.id && e.target.portId === 'labels',
+      );
+
+      if (!predConnected) {
+        errors.push({ nodeId: lossNode.id, message: `${lossName}: predictions port not connected` });
+      }
+      if (!labelsConnected) {
+        errors.push({ nodeId: lossNode.id, message: `${lossName}: labels port not connected` });
+      }
     }
   }
 

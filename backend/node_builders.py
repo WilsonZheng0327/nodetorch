@@ -241,7 +241,38 @@ def build_mse_loss(props: dict, input_shapes: dict) -> nn.Module:
     return nn.MSELoss()
 
 
+class VAELossModule(nn.Module):
+    """VAE loss: reconstruction (MSE) + beta * KL divergence.
+    Takes 4 named inputs: reconstruction, original, mean, logvar."""
+    def __init__(self, beta: float = 1.0):
+        super().__init__()
+        self.beta = beta
+
+    def forward(self, reconstruction: torch.Tensor, original: torch.Tensor,
+                mean: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+        recon_loss = nn.functional.mse_loss(reconstruction, original, reduction='mean')
+        kl_loss = -0.5 * torch.mean(1 + logvar - mean.pow(2) - logvar.exp())
+        return recon_loss + self.beta * kl_loss
+
+
+def build_vae_loss(props: dict, input_shapes: dict) -> nn.Module:
+    return VAELossModule(beta=props.get("beta", 1.0))
+
+
 # --- Structural (all need wrappers — none are native nn.Modules) ---
+
+class ReparameterizeModule(nn.Module):
+    """VAE reparameterization trick: z = mean + exp(0.5 * logvar) * noise.
+    Allows gradients to flow through the sampling step."""
+    def forward(self, mean: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mean + eps * std
+
+
+def build_reparameterize(props: dict, input_shapes: dict) -> nn.Module:
+    return ReparameterizeModule()
+
 
 class AddModule(nn.Module):
     """Why wrapper: element-wise addition is just `a + b` — not a PyTorch module.
@@ -471,7 +502,9 @@ NODE_BUILDERS: dict[str, callable] = {
     # Loss (no wrapper)
     "ml.loss.cross_entropy": build_cross_entropy_loss,
     "ml.loss.mse": build_mse_loss,
+    "ml.loss.vae": build_vae_loss,
     # Structural (all wrapped)
+    "ml.structural.reparameterize": build_reparameterize,
     "ml.structural.add": build_add,
     "ml.structural.concat": build_concat,
     "ml.structural.reshape": build_reshape,

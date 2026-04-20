@@ -39,7 +39,20 @@ function buildCategoryTree(defs: NodeDefinition[]): Map<string, CategoryNode> {
     }
   }
 
+  sortTree(root);
   return root;
+}
+
+function sortTree(level: Map<string, CategoryNode>) {
+  // Sort items alphabetically within each category
+  for (const node of level.values()) {
+    node.items.sort((a, b) => a.displayName.localeCompare(b.displayName));
+    if (node.children.size > 0) sortTree(node.children);
+  }
+  // Sort categories alphabetically
+  const sorted = [...level.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  level.clear();
+  for (const [k, v] of sorted) level.set(k, v);
 }
 
 function onDragStart(event: DragEvent, nodeType: string) {

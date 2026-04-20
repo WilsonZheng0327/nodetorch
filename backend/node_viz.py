@@ -16,7 +16,7 @@ from __future__ import annotations
 import math
 import torch
 import torch.nn as nn
-from graph_builder import _safe_float, LOSS_NODES
+from graph_builder import _safe_float, LOSS_NODES, ALL_LOSS_NODES
 from data_loaders import DATA_LOADERS
 
 # ============================================================================
@@ -607,9 +607,10 @@ FORWARD_VIZ: dict[str, callable] = {
     "ml.structural.reshape": forward_viz_structural,
     "ml.structural.permute": forward_viz_structural,
     "ml.structural.sequence_pool": forward_viz_structural,
+    "ml.structural.reparameterize": forward_viz_structural,
 }
 
-for _lt in LOSS_NODES:
+for _lt in ALL_LOSS_NODES:
     FORWARD_VIZ[_lt] = forward_viz_loss
 for _dt in DATA_LOADERS:
     FORWARD_VIZ[_dt] = forward_viz_data
@@ -915,9 +916,10 @@ BACKWARD_VIZ: dict[str, callable] = {
     "ml.structural.reshape": _backward_viz_structural,
     "ml.structural.permute": _backward_viz_structural,
     "ml.structural.sequence_pool": _backward_viz_structural,
+    "ml.structural.reparameterize": _backward_viz_structural,
 }
 
-for _lt in LOSS_NODES:
+for _lt in ALL_LOSS_NODES:
     BACKWARD_VIZ[_lt] = backward_viz_loss
 
 

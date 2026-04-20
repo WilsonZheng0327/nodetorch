@@ -32,7 +32,9 @@ from data_loaders import DATA_LOADERS, TRAIN_DATASETS, DENORMALIZERS
 LOSS_NODES = {"ml.loss.cross_entropy", "ml.loss.mse"}
 OPTIMIZER_NODES = {"ml.optimizers.sgd", "ml.optimizers.adam", "ml.optimizers.adamw"}
 # Structural nodes with multiple named inputs (passed as **kwargs)
-MULTI_INPUT_NODES = {"ml.structural.add", "ml.structural.concat", "ml.layers.multihead_attention", "ml.layers.attention"}
+MULTI_INPUT_NODES = {"ml.structural.add", "ml.structural.concat", "ml.layers.multihead_attention", "ml.layers.attention", "ml.structural.reparameterize", "ml.loss.vae"}
+# All node types recognized as loss functions (for training loop loss detection)
+ALL_LOSS_NODES = LOSS_NODES | {"ml.loss.vae"}
 SUBGRAPH_TYPE = "subgraph.block"
 SENTINEL_INPUT = "subgraph.input"
 SENTINEL_OUTPUT = "subgraph.output"
@@ -82,17 +84,115 @@ def save_model(filepath: str = "saved_models/current.pt") -> dict:
     return {"status": "ok", "path": filepath}
 
 
+def save_model_bytes() -> bytes | None:
+    """Serialize trained module state dicts to bytes for download."""
+    if "current" not in _model_store:
+        return None
+    import io
+    buf = io.BytesIO()
+    state = {nid: mod.state_dict() for nid, mod in _model_store["current"].items()}
+    torch.save(state, buf)
+    return buf.getvalue()
+
+
+def load_model_bytes(graph_data: dict, data: bytes) -> dict:
+    """Load state dicts from bytes into freshly built modules."""
+    import io
+    saved_states = torch.load(io.BytesIO(data), map_location=get_device(), weights_only=True)
+    modules = build_modules(graph_data)
+    loaded = 0
+    for nid, state_dict in saved_states.items():
+        if nid in modules:
+            modules[nid].load_state_dict(state_dict)
+            loaded += 1
+    if loaded == 0:
+        return {"error": "No matching layers found — graph structure may have changed"}
+    _model_store["current"] = modules
+    return {"status": "ok"}
+
+
+def build_modules(graph_data: dict) -> dict[str, nn.Module]:
+    """Build modules from the graph without storing results or metadata.
+
+    Runs a minimal forward pass internally (needed to determine input shapes
+    for downstream layers) but discards the outputs. Much lighter than
+    build_and_run_graph for cases where you only need the module architecture.
+    """
+    graph = graph_data["graph"]
+    nodes = {n["id"]: n for n in graph["nodes"]}
+    edges = graph["edges"]
+    order = topological_sort(nodes, edges)
+
+    modules: dict[str, nn.Module] = {}
+    results: dict[str, dict] = {}
+    dev = get_device()
+
+    with torch.no_grad():
+        for node_id in order:
+            node = nodes[node_id]
+            node_type = node["type"]
+            props = node.get("properties", {})
+
+            loader = DATA_LOADERS.get(node_type)
+            if loader:
+                tensors = loader(props)
+                results[node_id] = {k: (v.to(dev) if isinstance(v, torch.Tensor) else v) for k, v in tensors.items()}
+                continue
+
+            if node_type in OPTIMIZER_NODES:
+                continue
+
+            inputs = gather_inputs(node_id, edges, results)
+            input_shapes = {k: list(v.shape) for k, v in inputs.items() if isinstance(v, torch.Tensor)}
+
+            if node_type == SUBGRAPH_TYPE:
+                subgraph_data = node.get("subgraph")
+                if subgraph_data:
+                    sg_module = build_subgraph_module(subgraph_data, input_shapes)
+                    modules[node_id] = sg_module.to(dev)
+                    sg_out = sg_module(**inputs)
+                    first_key = next(iter(sg_out), None)
+                    if first_key:
+                        results[node_id] = {"out": sg_out[first_key]}
+                continue
+
+            builder = NODE_BUILDERS.get(node_type)
+            if not builder:
+                continue
+
+            try:
+                module = builder(props, input_shapes)
+                modules[node_id] = module.to(dev)
+
+                if node_type in LOSS_NODES:
+                    if "predictions" in inputs and "labels" in inputs:
+                        results[node_id] = {"out": module(inputs["predictions"], inputs["labels"])}
+                elif node_type in MULTI_INPUT_NODES:
+                    results[node_id] = {"out": module(**{k: v for k, v in inputs.items()})}
+                elif "in" in inputs:
+                    raw = module(inputs["in"])
+                    results[node_id] = raw if isinstance(raw, dict) else {"out": raw}
+            except Exception:
+                continue
+
+    return modules
+
+
 def load_model(graph_data: dict, filepath: str = "saved_models/current.pt") -> dict:
     """Load saved state dicts into freshly built modules from the graph."""
     if not os.path.exists(filepath):
         return {"error": f"No saved model at {filepath}"}
     saved_states = torch.load(filepath, map_location=get_device(), weights_only=True)
-    # Build modules from graph to get the architecture
-    modules, _, _, _, _ = build_and_run_graph(graph_data)
-    # Load saved state dicts into the freshly built modules
+    # Build modules from graph (lightweight — no metadata/results)
+    modules = build_modules(graph_data)
+    # Load saved state dicts
+    loaded = 0
     for nid, state_dict in saved_states.items():
         if nid in modules:
             modules[nid].load_state_dict(state_dict)
+            loaded += 1
+    if loaded == 0:
+        return {"error": "No matching layers found — graph structure may have changed"}
     _model_store["current"] = modules
     return {"status": "ok"}
 
@@ -171,7 +271,7 @@ class SubGraphModule(nn.Module):
                 continue
 
             # Skip optimizers/loss inside subgraph
-            if node_type in OPTIMIZER_NODES or node_type in LOSS_NODES:
+            if node_type in OPTIMIZER_NODES or node_type in ALL_LOSS_NODES:
                 continue
 
             node_inputs = gather_inputs(node_id, self.inner_edges, results)
@@ -221,7 +321,7 @@ def build_subgraph_module(subgraph_data: dict, parent_input_shapes: dict) -> Sub
         if node_type == SENTINEL_OUTPUT:
             continue
 
-        if node_type in OPTIMIZER_NODES or node_type in LOSS_NODES:
+        if node_type in OPTIMIZER_NODES or node_type in ALL_LOSS_NODES:
             continue
 
         # Gather input shapes from upstream
@@ -932,10 +1032,10 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
             return 1.0
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=_warmup_lambda)
 
-    # Find loss node
+    # Find loss node (includes standard losses and VAE loss)
     loss_node_id = None
     for nid, n in nodes.items():
-        if n["type"] in LOSS_NODES:
+        if n["type"] in ALL_LOSS_NODES:
             loss_node_id = nid
             break
 
@@ -997,6 +1097,9 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
     best_val_loss = float('inf')
     epochs_since_improvement = 0
     early_stopped = False
+
+    # --- Tracked samples: pick N fixed samples to probe each epoch ---
+    tracked_samples = _pick_tracked_samples(train_dataset, dataset_type, n=4)
 
     for epoch in range(epochs):
         # Check for cancellation
@@ -1307,6 +1410,11 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
         if scheduler is not None:
             scheduler.step()
 
+        # Probe tracked samples through the current model
+        tracked_probes = _probe_tracked_samples(
+            tracked_samples, modules, nodes, edges, order, dataset_type,
+        )
+
         epoch_result = {
             "epoch": epoch + 1,
             "totalEpochs": epochs,
@@ -1324,6 +1432,7 @@ def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=Non
                 for cls in per_class_total.keys()
             ], key=lambda x: x["accuracy"]) if per_class_total else [],
             "nodeSnapshots": node_snapshots,
+            "trackedSamples": tracked_probes,
         }
         epoch_results.append(epoch_result)
 
@@ -1552,6 +1661,171 @@ def activation_info(tensor: torch.Tensor) -> dict:
     }
 
 
+def evaluate_test_set(graph_data: dict) -> dict:
+    """Evaluate trained model on the held-out test set.
+
+    Returns test loss, test accuracy, per-class accuracy, and sample count.
+    Only works for classification models (2D predictions).
+    """
+    if not has_trained_model():
+        return {"error": "No trained model — train first"}
+
+    trained_modules = get_trained_modules()
+    graph = graph_data["graph"]
+    nodes = {n["id"]: n for n in graph["nodes"]}
+    edges = graph["edges"]
+    order = topological_sort(nodes, edges)
+
+    # Find data, loss, and prediction nodes
+    data_node = None
+    loss_node_id = None
+    pred_node_id = None
+    for nid in order:
+        n = nodes[nid]
+        if n["type"] in DATA_LOADERS:
+            data_node = n
+        if n["type"] in ALL_LOSS_NODES:
+            loss_node_id = nid
+            for edge in edges:
+                if edge["target"]["nodeId"] == nid and edge["target"]["portId"] == "predictions":
+                    pred_node_id = edge["source"]["nodeId"]
+
+    if not data_node:
+        return {"error": "No data node in graph"}
+
+    # Load test dataset
+    from data_loaders import TEST_DATASETS, CLASS_NAMES
+    dataset_type = data_node["type"]
+    test_builder = TEST_DATASETS.get(dataset_type)
+    if not test_builder:
+        return {"error": f"No test set available for {dataset_type}"}
+
+    data_props = data_node.get("properties", {})
+    import inspect
+    if inspect.signature(test_builder).parameters:
+        test_dataset = test_builder(**{
+            k: data_props[k] for k in inspect.signature(test_builder).parameters
+            if k in data_props
+        })
+    else:
+        test_dataset = test_builder()
+
+    batch_size = data_props.get("batchSize", 32)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    dev = get_device()
+    total_loss = 0.0
+    correct = 0
+    total = 0
+    per_class_correct: dict[int, int] = {}
+    per_class_total: dict[int, int] = {}
+    all_preds: list[int] = []
+    all_labels: list[int] = []
+
+    for mod in trained_modules.values():
+        if isinstance(mod, nn.Module):
+            mod.eval()
+
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images, labels = images.to(dev), labels.to(dev)
+
+            batch_results: dict[str, dict] = {}
+            data_nid = data_node["id"]
+            batch_results[data_nid] = {"out": images, "labels": labels}
+
+            for nid in order:
+                if nid == data_nid:
+                    continue
+                n = nodes[nid]
+                ntype = n["type"]
+                if ntype in OPTIMIZER_NODES:
+                    continue
+                mod = trained_modules.get(nid)
+                if mod is None:
+                    continue
+
+                inputs = gather_inputs(nid, edges, batch_results)
+
+                if ntype in LOSS_NODES:
+                    if "predictions" in inputs and "labels" in inputs:
+                        loss = mod(inputs["predictions"], inputs["labels"])
+                        batch_results[nid] = {"out": loss}
+                        total_loss += loss.item()
+                    continue
+
+                if ntype == SUBGRAPH_TYPE:
+                    sg_out = mod(**inputs)
+                    first_key = next(iter(sg_out), None)
+                    if first_key:
+                        batch_results[nid] = {"out": sg_out[first_key]}
+                    continue
+
+                if ntype in MULTI_INPUT_NODES:
+                    batch_results[nid] = {"out": mod(**{k: v for k, v in inputs.items()})}
+                    continue
+
+                if "in" in inputs:
+                    raw = mod(inputs["in"])
+                    if isinstance(raw, dict):
+                        batch_results[nid] = raw
+                    else:
+                        batch_results[nid] = {"out": raw}
+
+            # Accuracy + confusion data (classification only)
+            if pred_node_id and pred_node_id in batch_results:
+                preds = batch_results[pred_node_id].get("out")
+                if preds is not None and preds.dim() == 2:
+                    predicted = preds.argmax(dim=1)
+                    correct += (predicted == labels).sum().item()
+                    total += labels.size(0)
+                    all_preds.extend(predicted.cpu().tolist())
+                    all_labels.extend(labels.cpu().tolist())
+                    for cls in labels.unique().tolist():
+                        cls = int(cls)
+                        mask = labels == cls
+                        per_class_total[cls] = per_class_total.get(cls, 0) + mask.sum().item()
+                        per_class_correct[cls] = per_class_correct.get(cls, 0) + (predicted[mask] == cls).sum().item()
+
+    # Set modules back to train mode
+    for mod in trained_modules.values():
+        if isinstance(mod, nn.Module):
+            mod.train()
+
+    n_batches = len(test_loader)
+    avg_loss = total_loss / n_batches if n_batches > 0 else 0
+    accuracy = correct / total if total > 0 else 0
+
+    class_names = CLASS_NAMES.get(dataset_type, [])
+    per_class = []
+    for cls in sorted(per_class_total.keys()):
+        acc = per_class_correct.get(cls, 0) / per_class_total[cls] if per_class_total.get(cls, 0) > 0 else 0
+        name = class_names[cls] if cls < len(class_names) else str(cls)
+        per_class.append({"cls": cls, "name": name, "accuracy": _safe_float(acc), "count": per_class_total[cls]})
+
+    # Build confusion matrix
+    confusion = None
+    if all_preds and all_labels:
+        n_classes = max(max(all_preds), max(all_labels)) + 1
+        matrix = [[0] * n_classes for _ in range(n_classes)]
+        for p, l in zip(all_preds, all_labels):
+            if 0 <= p < n_classes and 0 <= l < n_classes:
+                matrix[l][p] += 1
+        confusion = {
+            "data": matrix,
+            "size": n_classes,
+            "classNames": class_names,
+        }
+
+    return {
+        "testLoss": _safe_float(avg_loss),
+        "testAccuracy": _safe_float(accuracy),
+        "testSamples": total,
+        "perClassAccuracy": per_class,
+        "confusionMatrix": confusion,
+    }
+
+
 def infer_graph(graph_data: dict) -> dict:
     """
     Run inference using trained weights.
@@ -1628,7 +1902,7 @@ def infer_graph(graph_data: dict) -> dict:
                 continue
 
             # Optimizer/loss: skip during inference
-            if node_type in OPTIMIZER_NODES or node_type in LOSS_NODES:
+            if node_type in OPTIMIZER_NODES or node_type in ALL_LOSS_NODES:
                 node_results[node_id] = {"outputs": {}, "metadata": {}}
                 continue
 
@@ -1745,6 +2019,201 @@ def infer_graph(graph_data: dict) -> dict:
         "nodeResults": node_results,
         "prediction": prediction,
     }
+
+
+def _pick_tracked_samples(dataset, dataset_type: str, n: int = 4) -> list[dict]:
+    """Pick N fixed samples from the dataset to track across epochs.
+
+    Returns a list of dicts, each with:
+      - idx: index in the dataset
+      - label: class label (int)
+      - image: pixel data for display (if image dataset)
+      - text: raw text (if text dataset)
+      - input: the raw input tensor (for forwarding through the model)
+    """
+    import random
+    from data_loaders import DENORMALIZERS
+
+    indices = random.sample(range(len(dataset)), min(n, len(dataset)))
+    samples = []
+
+    for idx in indices:
+        item = dataset[idx]
+        # Most datasets return (input_tensor, label_tensor)
+        if isinstance(item, (tuple, list)) and len(item) == 2:
+            inp, lbl = item
+        else:
+            continue
+
+        sample: dict = {
+            "idx": idx,
+            "label": int(lbl) if isinstance(lbl, (int, torch.Tensor)) else None,
+            "input": inp if isinstance(inp, torch.Tensor) else torch.tensor(inp),
+        }
+
+        # Image preview (4D-capable datasets)
+        if isinstance(inp, torch.Tensor) and inp.dim() == 3:
+            img = inp.detach().cpu()
+            denorm = DENORMALIZERS.get(dataset_type)
+            if denorm:
+                img = denorm(img)
+            img = (img.clamp(0, 1) * 255).byte()
+            C = img.shape[0]
+            if C == 1:
+                sample["imagePixels"] = img[0].tolist()
+                sample["imageChannels"] = 1
+            else:
+                sample["imagePixels"] = img.permute(1, 2, 0).tolist()
+                sample["imageChannels"] = C
+
+        samples.append(sample)
+
+    return samples
+
+
+def _probe_tracked_samples(
+    tracked: list[dict],
+    modules: dict,
+    nodes: dict,
+    edges: list,
+    order: list[str],
+    dataset_type: str,
+) -> list[dict]:
+    """Run tracked samples through the current model and record predictions.
+
+    Returns a list matching the tracked samples, each with:
+      - idx, label (from tracked)
+      - imagePixels, imageChannels (from tracked, only on first epoch for efficiency)
+      - probabilities: softmax output (if classification, i.e. 2D output)
+      - predictedClass, confidence
+      - loss: per-sample loss value (if available)
+      - output: summary of the final layer output (for non-classification models)
+    """
+    if not tracked:
+        return []
+
+    dev = get_device()
+    data_nid = None
+    loss_nid = None
+    for nid in order:
+        n = nodes[nid]
+        if n["type"] in DATA_LOADERS:
+            data_nid = nid
+        if n["type"] in ALL_LOSS_NODES:
+            loss_nid = nid
+
+    if not data_nid:
+        return []
+
+    # Find the node feeding predictions to loss (final layer)
+    pred_nid = None
+    if loss_nid:
+        for edge in edges:
+            if (edge["target"]["nodeId"] == loss_nid
+                    and edge["target"]["portId"] == "predictions"):
+                pred_nid = edge["source"]["nodeId"]
+                break
+
+    results = []
+    for s in tracked:
+        inp = s["input"].unsqueeze(0).to(dev)  # add batch dim
+        label_tensor = torch.tensor([s["label"]], dtype=torch.long).to(dev) if s["label"] is not None else None
+
+        # Forward pass through the graph
+        batch_results: dict[str, dict] = {}
+        batch_results[data_nid] = {"out": inp, "labels": label_tensor}
+
+        with torch.no_grad():
+            for nid in order:
+                if nid == data_nid:
+                    continue
+                n = nodes[nid]
+                ntype = n["type"]
+                if ntype in OPTIMIZER_NODES:
+                    continue
+                mod = modules.get(nid)
+                if mod is None:
+                    continue
+                mod.eval()
+
+                inputs = gather_inputs(nid, edges, batch_results)
+
+                if ntype in LOSS_NODES:
+                    if "predictions" in inputs and "labels" in inputs:
+                        try:
+                            loss_val = mod(inputs["predictions"], inputs["labels"])
+                            batch_results[nid] = {"out": loss_val}
+                        except Exception:
+                            pass
+                    continue
+
+                if ntype == SUBGRAPH_TYPE:
+                    try:
+                        sg_out = mod(**inputs)
+                        first_key = next(iter(sg_out), None)
+                        if first_key:
+                            batch_results[nid] = {"out": sg_out[first_key]}
+                    except Exception:
+                        pass
+                    continue
+
+                if ntype in MULTI_INPUT_NODES:
+                    try:
+                        batch_results[nid] = {"out": mod(**{k: v for k, v in inputs.items()})}
+                    except Exception:
+                        pass
+                    continue
+
+                if "in" in inputs:
+                    try:
+                        raw = mod(inputs["in"])
+                        if isinstance(raw, dict):
+                            batch_results[nid] = raw
+                        else:
+                            batch_results[nid] = {"out": raw}
+                    except Exception:
+                        pass
+
+        # Set modules back to train mode
+        for mod in modules.values():
+            if isinstance(mod, nn.Module):
+                mod.train()
+
+        # Build probe result
+        probe: dict = {
+            "idx": s["idx"],
+            "label": s["label"],
+        }
+
+        # Only send image/text on first call (frontend caches it)
+        if "imagePixels" in s:
+            probe["imagePixels"] = s["imagePixels"]
+            probe["imageChannels"] = s.get("imageChannels", 1)
+
+        # Extract prediction from the final layer
+        if pred_nid and pred_nid in batch_results:
+            pred_out = batch_results[pred_nid].get("out")
+            if pred_out is not None and isinstance(pred_out, torch.Tensor):
+                if pred_out.dim() == 2:
+                    # Classification: softmax probabilities
+                    probs = torch.softmax(pred_out, dim=1)[0]
+                    probe["probabilities"] = [_safe_float(float(p)) for p in probs.tolist()]
+                    pred_class = int(probs.argmax())
+                    probe["predictedClass"] = pred_class
+                    probe["confidence"] = _safe_float(float(probs[pred_class]))
+                else:
+                    # Non-classification (autoencoder etc): just report output norm
+                    probe["outputNorm"] = _safe_float(float(pred_out.detach().float().norm()))
+
+        # Per-sample loss
+        if loss_nid and loss_nid in batch_results:
+            loss_out = batch_results[loss_nid].get("out")
+            if loss_out is not None and isinstance(loss_out, torch.Tensor):
+                probe["loss"] = _safe_float(float(loss_out.item()))
+
+        results.append(probe)
+
+    return results
 
 
 def _collect_misclassifications(

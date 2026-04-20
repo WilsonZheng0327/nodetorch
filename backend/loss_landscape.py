@@ -26,6 +26,7 @@ from graph_builder import (
     get_device,
     OPTIMIZER_NODES,
     LOSS_NODES,
+    ALL_LOSS_NODES,
 )
 from data_loaders import DATA_LOADERS
 from forward_utils import execute_node
@@ -72,7 +73,7 @@ def compute_loss_landscape(
     loss_nid = None
     data_nid = None
     for nid, n in nodes.items():
-        if n["type"] in LOSS_NODES:
+        if n["type"] in ALL_LOSS_NODES:
             loss_nid = nid
         if n["type"] in DATA_LOADERS:
             data_nid = nid

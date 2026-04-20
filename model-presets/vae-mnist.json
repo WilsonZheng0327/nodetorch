@@ -1,0 +1,64 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "VAE — MNIST",
+    "nodes": [
+      { "id": "mnist", "type": "data.mnist", "position": { "x": 0, "y": 200 }, "properties": { "batchSize": 64 } },
+
+      { "id": "enc_conv1", "type": "ml.layers.conv2d", "position": { "x": 250, "y": 200 }, "properties": { "outChannels": 16, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "enc_relu1", "type": "ml.activations.relu", "position": { "x": 450, "y": 200 }, "properties": {} },
+      { "id": "enc_pool1", "type": "ml.layers.maxpool2d", "position": { "x": 600, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+      { "id": "enc_conv2", "type": "ml.layers.conv2d", "position": { "x": 780, "y": 200 }, "properties": { "outChannels": 8, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "enc_relu2", "type": "ml.activations.relu", "position": { "x": 960, "y": 200 }, "properties": {} },
+      { "id": "enc_pool2", "type": "ml.layers.maxpool2d", "position": { "x": 1100, "y": 200 }, "properties": { "kernelSize": 2, "stride": 2, "padding": 0 } },
+
+      { "id": "flatten", "type": "ml.layers.flatten", "position": { "x": 1280, "y": 200 }, "properties": {} },
+
+      { "id": "linear_mean", "type": "ml.layers.linear", "position": { "x": 1480, "y": 100 }, "properties": { "outFeatures": 32 } },
+      { "id": "linear_logvar", "type": "ml.layers.linear", "position": { "x": 1480, "y": 300 }, "properties": { "outFeatures": 32 } },
+
+      { "id": "reparam", "type": "ml.structural.reparameterize", "position": { "x": 1700, "y": 200 }, "properties": {} },
+
+      { "id": "dec_linear", "type": "ml.layers.linear", "position": { "x": 1920, "y": 200 }, "properties": { "outFeatures": 392 } },
+      { "id": "reshape", "type": "ml.structural.reshape", "position": { "x": 2100, "y": 200 }, "properties": { "targetShape": "-1, 8, 7, 7" } },
+
+      { "id": "dec_convt1", "type": "ml.layers.conv_transpose2d", "position": { "x": 2300, "y": 200 }, "properties": { "outChannels": 16, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 } },
+      { "id": "dec_relu", "type": "ml.activations.relu", "position": { "x": 2500, "y": 200 }, "properties": {} },
+      { "id": "dec_convt2", "type": "ml.layers.conv_transpose2d", "position": { "x": 2680, "y": 200 }, "properties": { "outChannels": 1, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 } },
+      { "id": "sigmoid", "type": "ml.activations.sigmoid", "position": { "x": 2880, "y": 200 }, "properties": {} },
+
+      { "id": "vae_loss", "type": "ml.loss.vae", "position": { "x": 3060, "y": 300 }, "properties": { "beta": 1.0 } },
+      { "id": "adam", "type": "ml.optimizers.adam", "position": { "x": 3300, "y": 400 }, "properties": { "lr": 0.001, "epochs": 15, "valSplit": 0.1, "seed": 42 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "mnist", "portId": "out" }, "target": { "nodeId": "enc_conv1", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "enc_conv1", "portId": "out" }, "target": { "nodeId": "enc_relu1", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "enc_relu1", "portId": "out" }, "target": { "nodeId": "enc_pool1", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "enc_pool1", "portId": "out" }, "target": { "nodeId": "enc_conv2", "portId": "in" } },
+      { "id": "e5", "source": { "nodeId": "enc_conv2", "portId": "out" }, "target": { "nodeId": "enc_relu2", "portId": "in" } },
+      { "id": "e6", "source": { "nodeId": "enc_relu2", "portId": "out" }, "target": { "nodeId": "enc_pool2", "portId": "in" } },
+      { "id": "e7", "source": { "nodeId": "enc_pool2", "portId": "out" }, "target": { "nodeId": "flatten", "portId": "in" } },
+
+      { "id": "e8a", "source": { "nodeId": "flatten", "portId": "out" }, "target": { "nodeId": "linear_mean", "portId": "in" } },
+      { "id": "e8b", "source": { "nodeId": "flatten", "portId": "out" }, "target": { "nodeId": "linear_logvar", "portId": "in" } },
+
+      { "id": "e9a", "source": { "nodeId": "linear_mean", "portId": "out" }, "target": { "nodeId": "reparam", "portId": "mean" } },
+      { "id": "e9b", "source": { "nodeId": "linear_logvar", "portId": "out" }, "target": { "nodeId": "reparam", "portId": "logvar" } },
+
+      { "id": "e10", "source": { "nodeId": "reparam", "portId": "out" }, "target": { "nodeId": "dec_linear", "portId": "in" } },
+      { "id": "e11", "source": { "nodeId": "dec_linear", "portId": "out" }, "target": { "nodeId": "reshape", "portId": "in" } },
+      { "id": "e12", "source": { "nodeId": "reshape", "portId": "out" }, "target": { "nodeId": "dec_convt1", "portId": "in" } },
+      { "id": "e13", "source": { "nodeId": "dec_convt1", "portId": "out" }, "target": { "nodeId": "dec_relu", "portId": "in" } },
+      { "id": "e14", "source": { "nodeId": "dec_relu", "portId": "out" }, "target": { "nodeId": "dec_convt2", "portId": "in" } },
+      { "id": "e15", "source": { "nodeId": "dec_convt2", "portId": "out" }, "target": { "nodeId": "sigmoid", "portId": "in" } },
+
+      { "id": "e16", "source": { "nodeId": "sigmoid", "portId": "out" }, "target": { "nodeId": "vae_loss", "portId": "reconstruction" } },
+      { "id": "e17", "source": { "nodeId": "mnist", "portId": "out" }, "target": { "nodeId": "vae_loss", "portId": "original" } },
+      { "id": "e18", "source": { "nodeId": "linear_mean", "portId": "out" }, "target": { "nodeId": "vae_loss", "portId": "mean" } },
+      { "id": "e19", "source": { "nodeId": "linear_logvar", "portId": "out" }, "target": { "nodeId": "vae_loss", "portId": "logvar" } },
+
+      { "id": "e20", "source": { "nodeId": "vae_loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}

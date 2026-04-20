@@ -220,6 +220,15 @@
   border-bottom-color: #89b4fa;
 }
 
+.dashboard-tab-divider {
+  width: 1px;
+  height: 16px;
+  background: #45475a;
+  align-self: center;
+  flex-shrink: 0;
+  margin: 0 6px;
+}
+
 /* Epoch slider */
 .dashboard-epoch-slider {
   display: flex;
@@ -552,4 +561,243 @@
   border-radius: 4px;
   color: #f9e2af;
   font-size: 12px;
+}
+
+/* --- Tracked Samples --- */
+
+.tracked-samples-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.tracked-sample-row {
+  display: flex;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #181825;
+  border-radius: 6px;
+}
+
+.tracked-sample-thumb {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 96px;
+}
+
+.tracked-sample-img {
+  width: 80px;
+  height: 80px;
+  image-rendering: pixelated;
+  border-radius: 4px;
+  border: 1px solid #45475a;
+}
+
+.tracked-sample-no-img {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #313244;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #6c7086;
+}
+
+.tracked-sample-label {
+  font-size: 10px;
+  color: #6c7086;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+
+.tracked-sample-timeline {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tracked-sample-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #6c7086;
+}
+
+.tracked-sample-latest {
+  font-family: 'JetBrains Mono', monospace;
+  color: #a6adc8;
+}
+
+.tracked-sample-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  flex: 1;
+  min-height: 48px;
+}
+
+.tracked-sample-bar-col {
+  flex: 1;
+  max-width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tracked-sample-bar-track {
+  width: 100%;
+  height: 80px;
+  background: #313244;
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+.tracked-sample-bar-fill {
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s ease;
+}
+
+.tracked-sample-bar-correct {
+  background: #10b981;
+}
+
+.tracked-sample-bar-wrong {
+  background: #ef4444;
+}
+
+.tracked-sample-bar-loss {
+  background: #f9e2af;
+}
+
+.tracked-sample-bar-epoch {
+  font-size: 8px;
+  color: #585b70;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* --- Test Result View --- */
+
+.test-result-view {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.test-result-summary {
+  display: flex;
+  gap: 16px;
+}
+
+.test-result-metric {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  background: #181825;
+  border-radius: 8px;
+}
+
+.test-result-metric-value {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: #cdd6f4;
+}
+
+.test-result-metric-label {
+  font-size: 11px;
+  color: #6c7086;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.test-result-note {
+  font-size: 12px;
+  color: #a6adc8;
+  line-height: 1.5;
+  padding: 8px 12px;
+  background: rgba(137, 180, 250, 0.08);
+  border-left: 3px solid #89b4fa;
+  border-radius: 3px;
+}
+
+.test-result-note strong {
+  color: #cdd6f4;
+}
+
+.test-result-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a6adc8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.test-result-class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.test-result-class-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.test-result-class-name {
+  width: 80px;
+  color: #a6adc8;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.test-result-class-bar-bg {
+  flex: 1;
+  height: 14px;
+  background: #313244;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.test-result-class-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.test-result-class-val {
+  width: 48px;
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  color: #a6adc8;
+  font-size: 11px;
+}
+
+.test-result-class-count {
+  width: 48px;
+  color: #585b70;
+  font-size: 10px;
 }

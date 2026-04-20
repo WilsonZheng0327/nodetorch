@@ -29,6 +29,7 @@ from graph_builder import (
     get_device,
     _safe_float,
     LOSS_NODES,
+    ALL_LOSS_NODES,
     OPTIMIZER_NODES,
     SUBGRAPH_TYPE,
     SENTINEL_INPUT,
@@ -327,7 +328,7 @@ def _compute_saliency(modules: dict, nodes: dict, edges: list) -> dict | None:
     for nid, n in nodes.items():
         if n["type"] in DATA_LOADERS:
             data_nid = nid
-        if n["type"] in LOSS_NODES:
+        if n["type"] in ALL_LOSS_NODES:
             loss_nid = nid
     if not data_nid or not loss_nid:
         return None
@@ -338,7 +339,8 @@ def _compute_saliency(modules: dict, nodes: dict, edges: list) -> dict | None:
             pred_nid = edge["source"]["nodeId"]
             break
     if not pred_nid:
-        return None
+        # For VAE and other non-classification losses, pred_nid may not exist — that's OK
+        pass
 
     data_node = nodes[data_nid]
     loader = DATA_LOADERS.get(data_node["type"])
@@ -375,7 +377,7 @@ def _compute_saliency(modules: dict, nodes: dict, edges: list) -> dict | None:
             if mod is None:
                 continue
             mod.eval()
-            if ntype in LOSS_NODES:
+            if ntype in ALL_LOSS_NODES:
                 continue  # skip loss — we want raw logits
             inputs = gather_inputs(node_id, edges, results)
             out = execute_node(ntype, mod, inputs)
@@ -472,7 +474,7 @@ def _build_stage(
     output = out_dict.get("out") if isinstance(out_dict, dict) else None
     if output is None or not isinstance(output, torch.Tensor):
         # No output to visualize — skip (but let loss nodes through as scalars)
-        if node_type not in LOSS_NODES:
+        if node_type not in ALL_LOSS_NODES:
             return None
 
     # Get input tensor from upstream via edges (first available input)

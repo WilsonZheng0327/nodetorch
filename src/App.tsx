@@ -105,6 +105,15 @@ export default function App() {
     setSelectedNodeIds(nodes.map((n) => n.id));
   }, []);
 
+  // Explicit node click — ensures selection registers even if onSelectionChange is delayed
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: RF.Node) => {
+    setSelectedNodeIds((prev) => {
+      // If already the only selected node, keep it (avoid unnecessary re-render)
+      if (prev.length === 1 && prev[0] === node.id) return prev;
+      return [node.id];
+    });
+  }, []);
+
   // Right-click an edge to delete it
   const onEdgeContextMenu = useCallback(
     (event: React.MouseEvent, edge: RF.Edge) => {
@@ -354,6 +363,7 @@ export default function App() {
           isValidConnection={graph.isValidConnection}
           onEdgeClick={(_e, _edge) => {/* no-op: right-click only */}}
           onEdgeContextMenu={onEdgeContextMenu}
+          onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDoubleClick}
           onSelectionChange={onSelectionChange}
           onInit={setReactFlowInstance}
@@ -399,7 +409,14 @@ export default function App() {
         {graph.connectionError && (
           <div className="connection-error-toast">{graph.connectionError}</div>
         )}
-        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }} onSimulateBackprop={graph.simulateBackprop} onSaveModel={graph.saveModel} onLoadModel={graph.loadModel} onRun={graph.runForward} onInfer={graph.runInfer} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <Toolbar onSave={graph.saveGraph} onLoad={graph.loadGraph} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }} onSimulateBackprop={graph.simulateBackprop} onSaveModel={graph.saveModel} onLoadModel={graph.loadModel} onInfer={graph.runInfer} onTest={graph.runTest} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <input
+          ref={graph.weightsInputRef}
+          type="file"
+          accept=".pt"
+          style={{ display: 'none' }}
+          onChange={graph.handleWeightsFile}
+        />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
         <TutorialPanel />
         <NodePalette
@@ -421,6 +438,7 @@ export default function App() {
           onSelectEpoch={graph.setSelectedEpoch}
           totalSnapshotEpochs={graph.snapshotHistory.length}
           modelSummary={modelSummary}
+          testResult={graph.testResult}
           open={dashboardOpen}
           onOpenChange={setDashboardOpen}
         />

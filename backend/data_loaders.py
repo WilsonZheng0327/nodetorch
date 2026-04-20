@@ -244,9 +244,15 @@ def load_imdb(props: dict) -> dict[str, torch.Tensor]:
 
 
 class IMDbDataset(torch.utils.data.Dataset):
-    def __init__(self, vocab_size=10000, max_len=256):
-        self.ds = _get_imdb_dataset()
-        self.vocab = _build_vocab(self.ds["text"][:5000], vocab_size, "imdb")
+    def __init__(self, vocab_size=10000, max_len=256, split="train"):
+        if split == "test":
+            from datasets import load_dataset
+            self.ds = load_dataset("imdb", split="test")
+        else:
+            self.ds = _get_imdb_dataset()
+        # Always build vocab from train set for consistency
+        train_ds = _get_imdb_dataset()
+        self.vocab = _build_vocab(train_ds["text"][:5000], vocab_size, "imdb")
         self.max_len = max_len
 
     def __len__(self):
@@ -294,9 +300,14 @@ def load_ag_news(props: dict) -> dict[str, torch.Tensor]:
 
 
 class AGNewsDataset(torch.utils.data.Dataset):
-    def __init__(self, vocab_size=10000, max_len=128):
-        self.ds = _get_agnews_dataset()
-        self.vocab = _build_vocab(self.ds["text"][:5000], vocab_size, "agnews")
+    def __init__(self, vocab_size=10000, max_len=128, split="train"):
+        if split == "test":
+            from datasets import load_dataset
+            self.ds = load_dataset("ag_news", split="test")
+        else:
+            self.ds = _get_agnews_dataset()
+        train_ds = _get_agnews_dataset()
+        self.vocab = _build_vocab(train_ds["text"][:5000], vocab_size, "agnews")
         self.max_len = max_len
 
     def __len__(self):
@@ -558,6 +569,40 @@ CLASS_NAMES: dict[str, list[str]] = {
     "data.cifar100": [str(i) for i in range(100)],  # too many for labels, use indices
     "data.imdb": ["Negative", "Positive"],
     "data.ag_news": ["World", "Sports", "Business", "Sci/Tech"],
+}
+
+
+# --- Test datasets (held-out test split, never seen during training) ---
+
+def test_dataset_mnist() -> torch.utils.data.Dataset:
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+    return torchvision.datasets.MNIST(root="./data", train=False, download=True, transform=transform)
+
+def test_dataset_cifar10(**kwargs) -> torch.utils.data.Dataset:
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))])
+    return torchvision.datasets.CIFAR10(root="./data", train=False, download=True, transform=transform)
+
+def test_dataset_cifar100(**kwargs) -> torch.utils.data.Dataset:
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
+    return torchvision.datasets.CIFAR100(root="./data", train=False, download=True, transform=transform)
+
+def test_dataset_fashion_mnist() -> torch.utils.data.Dataset:
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.2860,), (0.3530,))])
+    return torchvision.datasets.FashionMNIST(root="./data", train=False, download=True, transform=transform)
+
+def test_dataset_imdb(**kwargs) -> torch.utils.data.Dataset:
+    return IMDbDataset(vocab_size=kwargs.get("vocabSize", 10000), max_len=kwargs.get("maxLen", 256), split="test")
+
+def test_dataset_ag_news(**kwargs) -> torch.utils.data.Dataset:
+    return AGNewsDataset(vocab_size=kwargs.get("vocabSize", 10000), max_len=kwargs.get("maxLen", 128), split="test")
+
+TEST_DATASETS: dict[str, callable] = {
+    "data.mnist": test_dataset_mnist,
+    "data.cifar10": test_dataset_cifar10,
+    "data.cifar100": test_dataset_cifar100,
+    "data.fashion_mnist": test_dataset_fashion_mnist,
+    "data.imdb": test_dataset_imdb,
+    "data.ag_news": test_dataset_ag_news,
 }
 
 

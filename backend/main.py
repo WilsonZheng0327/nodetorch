@@ -24,18 +24,19 @@
 import warnings
 warnings.filterwarnings("ignore", message="dtype.*align")
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import asyncio
 import threading
 import logging
 
-from graph_builder import execute_graph, train_graph, infer_graph, get_layer_detail, get_device_name, set_device, save_model, load_model
+from graph_builder import execute_graph, train_graph, infer_graph, evaluate_test_set, get_layer_detail, get_device_name, set_device, save_model, load_model, save_model_bytes, load_model_bytes
 from step_through import run_step_through
 from activation_max import activation_maximization
 from backprop_sim import simulate_backprop, run_backward_step_through
 from loss_landscape import compute_loss_landscape
+from latent_viz import generate_latent_grid
 from runs_store import list_runs, load_run, delete_run
 from data_loaders import DATASET_DETAILS, augmentation_preview
 import os
@@ -133,6 +134,38 @@ async def train(graph_data: dict):
         return {"status": "error", "error": str(e)}
 
 
+@app.post("/evaluate-test")
+async def evaluate_test(request: dict):
+    """Evaluate trained model on the held-out test set."""
+    logger.info("Test set evaluation requested")
+    try:
+        result = evaluate_test_set(request["graph"])
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Test evaluation failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/latent-grid")
+async def latent_grid(request: dict):
+    """Generate a latent space interpolation grid for a trained VAE."""
+    logger.info("Latent grid requested")
+    try:
+        result = generate_latent_grid(
+            request["graph"],
+            grid_size=request.get("gridSize", 10),
+            latent_range=request.get("latentRange", 3.0),
+        )
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Latent grid failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
 @app.post("/infer")
 async def infer(graph_data: dict):
     """Run inference using trained weights on a single sample."""
@@ -162,6 +195,43 @@ async def save_model_endpoint(request: dict):
     except Exception as e:
         logger.error(f"Save model failed: {e}")
         return {"status": "error", "error": str(e)}
+
+
+@app.get("/download-weights")
+async def download_weights():
+    """Download trained weights as a .pt file."""
+    from fastapi.responses import Response
+    data = save_model_bytes()
+    if data is None:
+        return {"status": "error", "error": "No trained model to save"}
+    return Response(content=data, media_type="application/octet-stream",
+                    headers={"Content-Disposition": "attachment; filename=weights.pt"})
+
+
+@app.post("/upload-weights")
+async def upload_weights(file: UploadFile, graph: str = Form(...)):
+    """Upload a .pt file and load weights into the current graph."""
+    logger.info("Upload weights requested")
+    try:
+        data = await file.read()
+        graph_data = json.loads(graph)
+        result = load_model_bytes(graph_data, data)
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return result
+    except Exception as e:
+        logger.error(f"Upload weights failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/saved-models")
+async def list_saved_models():
+    """List saved weight files."""
+    model_dir = Path("saved_models")
+    if not model_dir.exists():
+        return {"status": "ok", "files": []}
+    files = sorted([f.name for f in model_dir.glob("*.pt")])
+    return {"status": "ok", "files": files}
 
 
 @app.post("/load-model")

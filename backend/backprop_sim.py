@@ -26,6 +26,7 @@ from graph_builder import (
     _safe_float,
     OPTIMIZER_NODES,
     LOSS_NODES,
+    ALL_LOSS_NODES,
     SUBGRAPH_TYPE,
     SENTINEL_INPUT,
     SENTINEL_OUTPUT,
@@ -47,7 +48,7 @@ def simulate_backprop(graph_data: dict, batch_size: int = 4) -> dict:
     for nid, n in nodes.items():
         if n["type"] in DATA_LOADERS:
             data_nid = nid
-        if n["type"] in LOSS_NODES:
+        if n["type"] in ALL_LOSS_NODES:
             loss_nid = nid
     if not data_nid or not loss_nid:
         return {"error": "Graph must have a data node and a loss node"}
@@ -88,7 +89,7 @@ def simulate_backprop(graph_data: dict, batch_size: int = 4) -> dict:
         try:
             out = execute_node(ntype, mod, inputs)
         except Exception as e:
-            if ntype in LOSS_NODES:
+            if ntype in ALL_LOSS_NODES:
                 return {"error": f"Loss computation failed: {e}"}
             raise
         if out is not None:
@@ -210,7 +211,7 @@ def run_backward_step_through(graph_data: dict) -> dict:
     for nid, n in nodes.items():
         if n["type"] in DATA_LOADERS:
             data_nid = nid
-        if n["type"] in LOSS_NODES:
+        if n["type"] in ALL_LOSS_NODES:
             loss_nid = nid
     if not data_nid or not loss_nid:
         return {"error": "Graph must have a data node and a loss node"}

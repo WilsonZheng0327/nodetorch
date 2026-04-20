@@ -7,7 +7,7 @@
       {
         "id": "cifar", "type": "data.cifar10",
         "position": { "x": 0, "y": 200 },
-        "properties": { "batchSize": 32, "augHFlip": true, "augRandomCrop": true }
+        "properties": { "batchSize": 64, "augHFlip": true, "augRandomCrop": true }
       },
       {
         "id": "resnet", "type": "ml.layers.pretrained_resnet18",
@@ -17,7 +17,7 @@
       {
         "id": "dropout", "type": "ml.layers.dropout",
         "position": { "x": 600, "y": 200 },
-        "properties": { "p": 0.3 }
+        "properties": { "p": 0.2 }
       },
       {
         "id": "linear", "type": "ml.layers.linear",
@@ -32,7 +32,7 @@
       {
         "id": "adam", "type": "ml.optimizers.adam",
         "position": { "x": 1320, "y": 300 },
-        "properties": { "lr": 0.001, "epochs": 10 }
+        "properties": { "lr": 0.001, "epochs": 20, "scheduler": "cosine" }
       }
     ],
     "edges": [

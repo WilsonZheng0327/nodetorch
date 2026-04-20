@@ -5,3 +5,4 @@ uvicorn[standard]
 websockets
 tqdm
 datasets
+python-multipart
