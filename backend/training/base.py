@@ -481,7 +481,7 @@ def build_epoch_result(epoch, ctx, avg_loss, accuracy, val_loss, val_accuracy,
 
 def run_final_forward(ctx, modules):
     """Post-training forward pass to get display metadata for each node."""
-    from graph_builder import MULTI_INPUT_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE, DIFFUSION_EMBED_TYPE
+    from graph_builder import MULTI_INPUT_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE
 
     final_results: dict = {}
     node_results: dict = {}
@@ -516,32 +516,19 @@ def run_final_forward(ctx, modules):
                 }
                 continue
 
-            # Diffusion noise scheduler: passthrough with extra channel
+            # Diffusion noise scheduler: 3 outputs (noisy, noise, timestep)
             if node_type == DIFFUSION_SCHEDULER_TYPE:
                 inputs = gather_inputs(node_id, ctx.edges, final_results)
                 if "images" in inputs:
                     images = inputs["images"]
-                    t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
-                    noisy_out = torch.cat([images, t_channel], dim=1)
+                    noisy_out = images.clone()
                     noise_dummy = torch.zeros_like(images)
-                    final_results[node_id] = {"out": noisy_out, "noise": noise_dummy}
+                    t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
+                    final_results[node_id] = {"out": noisy_out, "noise": noise_dummy, "timestep": t_channel}
                     node_results[node_id] = {
-                        "outputs": {"out": tensor_info(noisy_out), "noise": tensor_info(noise_dummy)},
+                        "outputs": {"out": tensor_info(noisy_out), "noise": tensor_info(noise_dummy), "timestep": tensor_info(t_channel)},
                         "metadata": {"outputShape": list(noisy_out.shape)},
                     }
-                continue
-
-            # Diffusion timestep embedding: fixed output
-            if node_type == DIFFUSION_EMBED_TYPE:
-                props = node.get("properties", {})
-                embed_dim = props.get("embedDim", 128)
-                dev = get_device()
-                dummy_embed = torch.zeros(1, embed_dim, device=dev)
-                final_results[node_id] = {"out": dummy_embed}
-                node_results[node_id] = {
-                    "outputs": {"out": tensor_info(dummy_embed)},
-                    "metadata": {"outputShape": [1, embed_dim]},
-                }
                 continue
 
             if node_type in OPTIMIZER_NODES:

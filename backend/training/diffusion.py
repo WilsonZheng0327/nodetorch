@@ -137,56 +137,35 @@ def _sample(model_modules, model_order, nodes, edges, scheduler, shape, device, 
 
     x = torch.randn(shape, device=device)
 
+    # Find scheduler node ID
+    scheduler_nid = None
+    for nid, n in nodes.items():
+        if n["type"] == "ml.diffusion.noise_scheduler":
+            scheduler_nid = nid
+            break
+
     for t_val in reversed(range(num_steps)):
         t_tensor = torch.full((shape[0],), t_val, device=device, dtype=torch.long)
 
-        # Build model input: [noisy_image, timestep_channel]
+        # Timestep channel [B, 1, H, W]
         t_normalized = (t_tensor.float() / scheduler.num_timesteps).view(-1, 1, 1, 1)
         t_channel = t_normalized.expand(shape[0], 1, shape[2], shape[3])
-        model_input = torch.cat([x, t_channel], dim=1)
 
         # Run through the model to predict noise
         with torch.no_grad():
-            # Execute model nodes in order
-            results = {"__model_input__": {"out": model_input}}
-            # Find the first model node and set its input to model_input
-            first_model_nid = model_order[0] if model_order else None
-            if first_model_nid is None:
-                break
-
-            # Run forward through model nodes
             batch_results: dict = {}
-            # Find which node the scheduler feeds into
-            for edge in edges:
-                if edge["source"]["nodeId"] == "__scheduler__" or (
-                    edge["source"].get("portId") == "out"
-                    and any(edge["source"]["nodeId"] == nid for nid in nodes
-                            if nodes[nid]["type"] == "ml.diffusion.noise_scheduler")
-                ):
-                    pass  # handled below
-
-            # Simpler approach: use the scheduler_nid as a virtual node in batch_results
-            # so gather_inputs can find the model input
-            scheduler_nid = None
-            for nid, n in nodes.items():
-                if n["type"] == "ml.diffusion.noise_scheduler":
-                    scheduler_nid = nid
-                    break
-
             if scheduler_nid:
-                batch_results[scheduler_nid] = {"out": model_input, "noise": torch.zeros(shape, device=device)}
+                batch_results[scheduler_nid] = {"out": x, "noise": torch.zeros(shape, device=device), "timestep": t_channel}
 
+            from forward_utils import execute_node
             for nid in model_order:
                 mod = model_modules.get(nid)
                 if mod is None:
                     continue
                 inputs = gather_inputs(nid, edges, batch_results)
-                if "in" in inputs:
-                    raw = mod(inputs["in"])
-                    if isinstance(raw, dict):
-                        batch_results[nid] = raw
-                    else:
-                        batch_results[nid] = {"out": raw}
+                result = execute_node(nodes[nid]["type"], mod, inputs)
+                if result is not None:
+                    batch_results[nid] = result
 
             # Get predicted noise from last model node
             last_nid = model_order[-1] if model_order else None
@@ -279,21 +258,16 @@ def diffusion_train(ctx: TrainingContext) -> TrainingResult:
             # 3. Add noise to clean images
             noisy_images = scheduler_module.add_noise(images, noise, t)
 
-            # 4. Create timestep channel and concatenate
+            # 4. Create timestep channel [B, 1, H, W]
             t_normalized = (t.float() / scheduler_module.num_timesteps).view(-1, 1, 1, 1)
             t_channel = t_normalized.expand(batch_size, 1, images.shape[2], images.shape[3])
-            model_input = torch.cat([noisy_images, t_channel], dim=1)  # [B, C+1, H, W]
 
-            # 5. Pre-fill batch results for the scheduler and data nodes
+            # 5. Pre-fill batch results: scheduler outputs noisy images, noise target, and timestep channel
+            #    The graph's Concat node combines noisy + timestep before feeding into the model.
             data_inputs = {
                 ctx.data_node_id: {"out": images, "labels": noise},
-                scheduler_nid: {"out": model_input, "noise": noise},
+                scheduler_nid: {"out": noisy_images, "noise": noise, "timestep": t_channel},
             }
-            if embed_nid is not None:
-                embed_module = ctx.modules.get(embed_nid)
-                if embed_module is not None:
-                    t_embed = embed_module(t)
-                    data_inputs[embed_nid] = {"out": t_embed}
 
             # 6. Run forward pass through the rest of the graph
             batch_results = run_forward_pass(ctx.modules, ctx.nodes, ctx.edges, ctx.order, data_inputs)

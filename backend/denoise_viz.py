@@ -122,24 +122,24 @@ def run_denoise_step_through(graph_data: dict, num_samples: int = 4, capture_eve
         for t_val in reversed(range(num_timesteps)):
             t_tensor = torch.full((num_samples,), t_val, device=dev, dtype=torch.long)
 
-            # Build model input: [image, timestep_channel]
+            # Timestep channel [B, 1, H, W]
             t_normalized = (t_tensor.float() / num_timesteps).view(-1, 1, 1, 1)
             t_channel = t_normalized.expand(num_samples, 1, H, W)
-            model_input = torch.cat([x, t_channel], dim=1)
 
-            # Run model forward
+            # Run model forward — scheduler outputs noisy image + timestep channel separately
             batch_results = {}
             if scheduler_nid:
-                batch_results[scheduler_nid] = {"out": model_input, "noise": torch.zeros(shape, device=dev)}
+                batch_results[scheduler_nid] = {"out": x, "noise": torch.zeros(shape, device=dev), "timestep": t_channel}
 
+            from forward_utils import execute_node
             for nid in model_order:
                 mod = model_modules.get(nid)
                 if mod is None:
                     continue
                 inputs = gather_inputs(nid, edges, batch_results)
-                if "in" in inputs:
-                    raw = mod(inputs["in"])
-                    batch_results[nid] = raw if isinstance(raw, dict) else {"out": raw}
+                result = execute_node(nodes[nid]["type"], mod, inputs)
+                if result is not None:
+                    batch_results[nid] = result
 
             # Get predicted noise
             last_nid = model_order[-1]

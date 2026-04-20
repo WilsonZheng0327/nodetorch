@@ -72,7 +72,15 @@ export const noiseSchedulerNode: NodeDefinition = {
     },
     {
       id: 'noise',
-      name: 'Noise',
+      name: 'Noise Target',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
+    {
+      id: 'timestep',
+      name: 'Timestep Channel',
       direction: 'output',
       dataType: 'tensor',
       allowMultiple: true,
@@ -88,22 +96,25 @@ export const noiseSchedulerNode: NodeDefinition = {
           return { outputs: {} };
         }
 
-        // Input: [B, C, H, W] -> Output: [B, C+1, H, W] (extra timestep channel)
         const [B, C, H, W] = images;
-        const outShape = [B, C + 1, H, W];
-        // Noise output has same shape as input (no timestep channel)
+        // Noisy images: same shape as input
+        const outShape = [B, C, H, W];
+        // Noise target: same shape
         const noiseShape = [B, C, H, W];
+        // Timestep channel: [B, 1, H, W] — to be concatenated with noisy images
+        const timestepShape = [B, 1, H, W];
 
         return {
           outputs: {
             out: outShape,
             noise: noiseShape,
+            timestep: timestepShape,
           },
           metadata: {
             shapes: [
-              { label: 'Input', value: images },
-              { label: 'Noisy Output', value: outShape },
-              { label: 'Noise Target', value: noiseShape },
+              { label: 'Noisy', value: outShape },
+              { label: 'Noise', value: noiseShape },
+              { label: 'Timestep', value: timestepShape },
             ],
             outputShape: outShape,
           },

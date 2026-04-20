@@ -169,8 +169,7 @@ def build_modules(graph_data: dict) -> dict[str, nn.Module]:
                     if "images" in inputs:
                         images = inputs["images"]
                         t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=dev)
-                        noisy_out = torch.cat([images, t_channel], dim=1)
-                        results[node_id] = {"out": noisy_out, "noise": torch.zeros_like(images)}
+                        results[node_id] = {"out": images.clone(), "noise": torch.zeros_like(images), "timestep": t_channel}
                 continue
 
             # Diffusion timestep embedding: no input, fixed output
@@ -531,20 +530,25 @@ def build_and_run_graph(graph_data: dict) -> tuple[
                     modules[node_id] = module.to(get_device())
                     if "images" in inputs:
                         images = inputs["images"]
-                        # Out: add extra timestep channel [B, C+1, H, W]
-                        t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
-                        noisy_out = torch.cat([images, t_channel], dim=1)
-                        # Noise: same shape as input images [B, C, H, W]
+                        # Out: noisy images (same shape as input)
+                        noisy_out = images.clone()
+                        # Noise target: same shape
                         noise_dummy = torch.zeros_like(images)
-                        results[node_id] = {"out": noisy_out, "noise": noise_dummy}
+                        # Timestep channel: [B, 1, H, W]
+                        t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
+                        results[node_id] = {"out": noisy_out, "noise": noise_dummy, "timestep": t_channel}
                         node_results[node_id] = {
-                            "outputs": {"out": tensor_info(noisy_out), "noise": tensor_info(noise_dummy)},
+                            "outputs": {
+                                "out": tensor_info(noisy_out),
+                                "noise": tensor_info(noise_dummy),
+                                "timestep": tensor_info(t_channel),
+                            },
                             "metadata": {
                                 "outputShape": list(noisy_out.shape),
                                 "shapes": [
-                                    {"label": "Input", "value": list(images.shape)},
-                                    {"label": "Noisy Output", "value": list(noisy_out.shape)},
-                                    {"label": "Noise Target", "value": list(noise_dummy.shape)},
+                                    {"label": "Noisy", "value": list(noisy_out.shape)},
+                                    {"label": "Noise", "value": list(noise_dummy.shape)},
+                                    {"label": "Timestep", "value": list(t_channel.shape)},
                                 ],
                             },
                         }

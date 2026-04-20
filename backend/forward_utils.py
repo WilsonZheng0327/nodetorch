@@ -22,8 +22,6 @@ from graph_builder import (
     SUBGRAPH_TYPE,
     OPTIMIZER_NODES,
     GAN_NOISE_TYPE,
-    DIFFUSION_SCHEDULER_TYPE,
-    DIFFUSION_EMBED_TYPE,
     gather_inputs,
 )
 from data_loaders import DATA_LOADERS
@@ -101,7 +99,7 @@ def run_forward_pass(
         node = nodes[node_id]
         ntype = node["type"]
 
-        if ntype in OPTIMIZER_NODES or ntype in DATA_LOADERS or ntype == GAN_NOISE_TYPE or ntype == DIFFUSION_EMBED_TYPE:
+        if ntype in OPTIMIZER_NODES or ntype in DATA_LOADERS or ntype == GAN_NOISE_TYPE:
             continue
 
         # Diffusion noise scheduler: needs special multi-output handling
