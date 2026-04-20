@@ -32,6 +32,7 @@ import threading
 import logging
 
 from graph_builder import execute_graph, train_graph, infer_graph, evaluate_test_set, get_layer_detail, get_device_name, set_device, save_model, load_model, save_model_bytes, load_model_bytes
+from export_python import export_to_python
 from step_through import run_step_through
 from activation_max import activation_maximization
 from backprop_sim import simulate_backprop, run_backward_step_through
@@ -529,6 +530,24 @@ async def delete_block(filename: str):
         filepath.unlink()
         logger.info(f"Block deleted: {filepath}")
     return {"status": "ok"}
+
+
+@app.post("/export-python")
+async def export_python_endpoint(request: dict):
+    """Generate a standalone Python training script from the graph."""
+    from fastapi.responses import Response
+    logger.info("Export Python requested")
+    try:
+        code = export_to_python(request["graph"])
+        graph_name = request["graph"].get("graph", {}).get("name", "model").replace(" ", "_").lower()
+        return Response(
+            content=code,
+            media_type="text/x-python",
+            headers={"Content-Disposition": f'attachment; filename="{graph_name}.py"'}
+        )
+    except Exception as e:
+        logger.error(f"Export Python failed: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 @app.websocket("/ws")

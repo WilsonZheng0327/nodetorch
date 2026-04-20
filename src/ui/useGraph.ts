@@ -819,6 +819,32 @@ export function useGraph(domain: DomainContext) {
     }
   }, []);
 
+  const exportPython = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:8000/export-python', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Export failed' }));
+        setStatus({ type: 'error', message: err.error ?? 'Export failed' });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (graphRef.current.name?.replace(/\s+/g, '_').toLowerCase() || 'model') + '.py';
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus({ type: 'success', message: 'Python code exported' });
+      setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
+    } catch {
+      setStatus({ type: 'error', message: 'Cannot connect to backend' });
+    }
+  }, [saveGraph]);
+
   const saveModel = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:8000/download-weights');
@@ -1306,6 +1332,7 @@ export function useGraph(domain: DomainContext) {
     setSelectedEpoch,
     backpropAnim,
     simulateBackprop,
+    exportPython,
     pinnedVizNodes,
     toggleVizPin,
     showAllViz,

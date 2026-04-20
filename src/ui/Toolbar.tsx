@@ -1,7 +1,7 @@
 // Toolbar — save/load graph, run forward pass, train.
 
 import { useRef, useState, useEffect } from 'react';
-import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, HardDriveDownload, HardDriveUpload, GraduationCap } from 'lucide-react';
+import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, HardDriveDownload, HardDriveUpload, GraduationCap, FileCode } from 'lucide-react';
 import { tutorialEvent } from './tutorial/TutorialPanel';
 import './Toolbar.css';
 
@@ -20,12 +20,13 @@ interface Props {
   onSimulateBackprop: () => void;
   onSaveModel: () => Promise<void>;
   onLoadModel: () => Promise<void>;
+  onExportPython: () => Promise<void>;
   status: { type: 'idle' | 'running' | 'success' | 'error'; message?: string };
   modelTrained: boolean;
   modelStale: boolean;
 }
 
-export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, onSaveModel, onLoadModel, status, modelTrained, modelStale }: Props) {
+export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, onSaveModel, onLoadModel, onExportPython, status, modelTrained, modelStale }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [presets, setPresets] = useState<{filename: string; name: string}[]>([]);
@@ -211,6 +212,9 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
         </button>
         <button className="toolbar-btn toolbar-btn-icon" onClick={() => handleAction(onLoadModel)} disabled={busy} title="Load trained weights from disk">
           <HardDriveUpload size={15} />
+        </button>
+        <button className="toolbar-btn toolbar-btn-icon" onClick={() => handleAction(onExportPython)} disabled={busy} title="Export as standalone Python file">
+          <FileCode size={15} />
         </button>
         <div className="toolbar-separator" />
         <button className="toolbar-btn toolbar-btn-icon" onClick={() => window.dispatchEvent(new Event('nodetorch-tutorial-reopen'))} title="Open tutorial">
