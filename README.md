@@ -29,7 +29,9 @@ Build neural networks by dragging nodes onto a canvas and connecting them. Shape
 | Image Classification | MNIST, Fashion-MNIST, CIFAR-10, CIFAR-100 | MLP, LeNet-5, VGG, ResNet-34 |
 | Text Classification | IMDb, AG News | LSTM, Self-Attention |
 | Transfer Learning | CIFAR-10 | Pretrained ResNet-18 |
-| Reconstruction | MNIST | Convolutional Autoencoder |
+| Reconstruction | MNIST | Convolutional Autoencoder, VAE |
+| Generative (GAN) | MNIST | DCGAN |
+| Generative (Diffusion) | MNIST | Diffusion, Diffusion U-Net |
 
 ## Available Nodes
 
@@ -41,9 +43,13 @@ Build neural networks by dragging nodes onto a canvas and connecting them. Shape
 
 **Pooling**: MaxPool2d/1d, AvgPool2d, AdaptiveAvgPool2d
 
-**Structural**: Add (residual), Concat, Reshape, Permute, SequencePool, Subgraph Blocks
+**Structural**: Add (residual), Concat, Reshape, Permute, SequencePool, Reparameterize, Subgraph Blocks
 
-**Loss**: CrossEntropy, MSE
+**Loss**: CrossEntropy, MSE, VAE Loss, GAN Loss
+
+**GAN**: Noise Input
+
+**Diffusion**: Noise Scheduler
 
 **Optimizers**: SGD, Adam, AdamW — with schedulers (cosine, step, warmup), early stopping, gradient clipping
 

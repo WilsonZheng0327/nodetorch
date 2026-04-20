@@ -47,19 +47,32 @@ Backend mirrors the engine: `backend/graph_builder.py` does the same topological
 - `src/ui/EngineNode.tsx` — generic node renderer (reads NodeDefinition + lastResult.metadata)
 - `src/ui/step-through/` — forward + backward step-through UI (StepThroughPanel, StageDetail, ExtraPanels)
 - `src/ui/dashboard/TrainingDashboard.tsx` — training dashboard with charts, metrics, system info
-- `backend/graph_builder.py` — graph→PyTorch execution, training loop, inference, model store
+- `backend/graph_builder.py` — graph→PyTorch execution, inference, model store
 - `backend/node_builders.py` — per-node-type `nn.Module` builder functions
 - `backend/node_viz.py` — per-node-type visualization registry (forward + backward step-through)
 - `backend/data_loaders.py` — per-dataset loader functions
+- `backend/training/` — training loop plugin system (standard, GAN, diffusion)
 - `backend/step_through.py` — forward step-through orchestration (uses node_viz.py for viz)
 - `backend/backprop_sim.py` — backward step-through + simple backprop animation
+- `backend/denoise_viz.py` — diffusion denoising step-through visualization
+- `backend/gan_generate.py` — GAN image generation on demand
+- `backend/latent_viz.py` — VAE latent space grid visualization
 
 ### Execution modes
 
 - **"shape"** — eager, TypeScript math, no backend. Runs on every edit.
-- **"forward"** — manual, sends graph to backend, returns activations.
-- **"train"** — manual, WebSocket streaming, epoch-by-epoch progress.
+- **"train"** — manual, WebSocket streaming, epoch-by-epoch progress. Auto-detects paradigm (standard, GAN, diffusion).
+- **"test"** — evaluates on held-out test set (classification models only).
 - **"infer"** — manual, uses trained weights stored in backend memory.
+
+### Training paradigms (backend/training/)
+
+The training loop is a plugin system. `train_graph()` auto-detects which paradigm to use:
+- **standard** — single forward → loss → backward → update. Handles classification, reconstruction, VAEs.
+- **gan** — alternating generator/discriminator updates with two optimizers.
+- **diffusion** — noise-conditioned denoising with timestep injection.
+
+See `docs/training-plugins.md` for the full architecture documentation.
 
 ### Adding a new node type
 

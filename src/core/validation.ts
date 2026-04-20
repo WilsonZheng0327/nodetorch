@@ -65,7 +65,7 @@ const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse', 'ml.loss.vae', 'ml.l
 const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam', 'ml.optimizers.adamw'];
 const DATA_TYPES = ['data.mnist', 'data.cifar10', 'data.cifar100', 'data.fashion_mnist', 'data.imdb', 'data.ag_news'];
 const GAN_INPUT_TYPES = ['ml.gan.noise_input'];
-const DIFFUSION_TYPES = ['ml.diffusion.noise_scheduler', 'ml.diffusion.timestep_embed'];
+const DIFFUSION_TYPES = ['ml.diffusion.noise_scheduler'];
 
 export function validateTraining(graph: Graph, registry: NodeRegistry): ValidationError[] {
   // Start with forward validation
