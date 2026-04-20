@@ -15,10 +15,12 @@ Adding a new training paradigm:
 from .base import TrainingContext, TrainingResult, build_training_context, save_training_results
 from .standard import standard_train
 from .gan import gan_train
+from .diffusion import diffusion_train
 
 TRAINING_LOOPS: dict[str, callable] = {
     "standard": standard_train,
     "gan": gan_train,
+    "diffusion": diffusion_train,
 }
 
 
@@ -28,9 +30,8 @@ def detect_training_mode(nodes: dict) -> str:
         ntype = n.get("type", "")
         if ntype in ("ml.gan.noise_input", "ml.loss.gan"):
             return "gan"
-        # Future: Diffusion detection
-        # if ntype == "ml.diffusion.noise_scheduler":
-        #     return "diffusion"
+        if ntype == "ml.diffusion.noise_scheduler":
+            return "diffusion"
     return "standard"
 
 

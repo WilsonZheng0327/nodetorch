@@ -280,6 +280,67 @@ def build_vae_loss(props: dict, input_shapes: dict) -> nn.Module:
 
 # --- Structural (all need wrappers — none are native nn.Modules) ---
 
+class NoiseSchedulerModule(nn.Module):
+    """Stores the diffusion noise schedule (beta, alpha, alpha_bar).
+    During training, the loop uses add_noise() to corrupt clean images.
+    forward() is a passthrough for shape inference."""
+    def __init__(self, num_timesteps=100, beta_start=0.0001, beta_end=0.02, schedule_type='linear'):
+        super().__init__()
+        if schedule_type == 'cosine':
+            steps = torch.arange(num_timesteps + 1, dtype=torch.float64) / num_timesteps
+            alpha_bar = torch.cos((steps + 0.008) / 1.008 * 3.14159265 / 2) ** 2
+            alpha_bar = alpha_bar / alpha_bar[0]
+            betas = 1 - (alpha_bar[1:] / alpha_bar[:-1])
+            betas = torch.clamp(betas, 0.0001, 0.999).float()
+        else:
+            betas = torch.linspace(beta_start, beta_end, num_timesteps)
+
+        alphas = 1.0 - betas
+        alpha_cumprod = torch.cumprod(alphas, dim=0)
+
+        self.register_buffer('betas', betas)
+        self.register_buffer('alphas', alphas)
+        self.register_buffer('alpha_cumprod', alpha_cumprod)
+        self.num_timesteps = num_timesteps
+
+    def add_noise(self, x, noise, t):
+        """Add noise at timestep t: x_t = sqrt(alpha_bar_t) * x + sqrt(1-alpha_bar_t) * noise"""
+        sqrt_alpha = self.alpha_cumprod[t].sqrt().view(-1, 1, 1, 1)
+        sqrt_one_minus = (1 - self.alpha_cumprod[t]).sqrt().view(-1, 1, 1, 1)
+        return sqrt_alpha * x + sqrt_one_minus * noise
+
+    def forward(self, images):
+        """Passthrough for shape inference — actual noising happens in training loop."""
+        return images
+
+
+def build_noise_scheduler(props: dict, input_shapes: dict) -> nn.Module:
+    return NoiseSchedulerModule(
+        num_timesteps=props.get("numTimesteps", 100),
+        beta_start=props.get("betaStart", 0.0001),
+        beta_end=props.get("betaEnd", 0.02),
+        schedule_type=props.get("scheduleType", "linear"),
+    )
+
+
+class TimestepEmbedModule(nn.Module):
+    """Sinusoidal timestep embedding (like positional encoding in transformers)."""
+    def __init__(self, embed_dim=128):
+        super().__init__()
+        self.embed_dim = embed_dim
+
+    def forward(self, t):
+        """t: integer timestep tensor [B]. Returns [B, embed_dim]."""
+        half = self.embed_dim // 2
+        freqs = torch.exp(-torch.arange(half, device=t.device).float() * (2.0 * 3.14159265 / half))
+        args = t.float().unsqueeze(1) * freqs.unsqueeze(0)
+        return torch.cat([torch.sin(args), torch.cos(args)], dim=1)
+
+
+def build_timestep_embed(props: dict, input_shapes: dict) -> nn.Module:
+    return TimestepEmbedModule(embed_dim=props.get("embedDim", 128))
+
+
 class NoiseInputModule(nn.Module):
     """Placeholder module for GAN noise input. During training, the GAN loop
     injects actual noise tensors. The forward() here returns a dummy sample
@@ -541,6 +602,9 @@ NODE_BUILDERS: dict[str, callable] = {
     "ml.loss.gan": build_gan_loss,
     # GAN
     "ml.gan.noise_input": build_noise_input,
+    # Diffusion
+    "ml.diffusion.noise_scheduler": build_noise_scheduler,
+    "ml.diffusion.timestep_embed": build_timestep_embed,
     # Structural (all wrapped)
     "ml.structural.reparameterize": build_reparameterize,
     "ml.structural.add": build_add,

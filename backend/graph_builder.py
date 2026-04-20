@@ -37,6 +37,9 @@ MULTI_INPUT_NODES = {"ml.structural.add", "ml.structural.concat", "ml.layers.mul
 ALL_LOSS_NODES = LOSS_NODES | {"ml.loss.vae", "ml.loss.gan"}
 # GAN-specific node types (noise input generates noise, not dataset)
 GAN_NOISE_TYPE = "ml.gan.noise_input"
+# Diffusion-specific node types
+DIFFUSION_SCHEDULER_TYPE = "ml.diffusion.noise_scheduler"
+DIFFUSION_EMBED_TYPE = "ml.diffusion.timestep_embed"
 SUBGRAPH_TYPE = "subgraph.block"
 SENTINEL_INPUT = "subgraph.input"
 SENTINEL_OUTPUT = "subgraph.output"
@@ -153,6 +156,31 @@ def build_modules(graph_data: dict) -> dict[str, nn.Module]:
                     batch_size = props.get("batchSize", 64)
                     latent_dim = props.get("latentDim", 100)
                     results[node_id] = {"out": torch.randn(batch_size, latent_dim, device=dev)}
+                continue
+
+            # Diffusion noise scheduler: build module and produce dummy output
+            if node_type == DIFFUSION_SCHEDULER_TYPE:
+                inputs = gather_inputs(node_id, edges, results)
+                builder = NODE_BUILDERS.get(node_type)
+                if builder:
+                    input_shapes = {k: list(v.shape) for k, v in inputs.items() if isinstance(v, torch.Tensor)}
+                    module = builder(props, input_shapes)
+                    modules[node_id] = module.to(dev)
+                    if "images" in inputs:
+                        images = inputs["images"]
+                        t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=dev)
+                        noisy_out = torch.cat([images, t_channel], dim=1)
+                        results[node_id] = {"out": noisy_out, "noise": torch.zeros_like(images)}
+                continue
+
+            # Diffusion timestep embedding: no input, fixed output
+            if node_type == DIFFUSION_EMBED_TYPE:
+                builder = NODE_BUILDERS.get(node_type)
+                if builder:
+                    module = builder(props, {})
+                    modules[node_id] = module.to(dev)
+                    embed_dim = props.get("embedDim", 128)
+                    results[node_id] = {"out": torch.zeros(1, embed_dim, device=dev)}
                 continue
 
             inputs = gather_inputs(node_id, edges, results)
@@ -484,6 +512,67 @@ def build_and_run_graph(graph_data: dict) -> tuple[
                     node_results[node_id] = {
                         "outputs": {"out": tensor_info(dummy_noise)},
                         "metadata": {"outputShape": [batch_size, latent_dim]},
+                    }
+                except Exception as e:
+                    node_results[node_id] = {
+                        "outputs": {},
+                        "metadata": {"error": str(e)},
+                    }
+            continue
+
+        # --- Diffusion noise scheduler: passthrough + extra timestep channel ---
+        if node_type == DIFFUSION_SCHEDULER_TYPE:
+            inputs = gather_inputs(node_id, edges, results)
+            builder = NODE_BUILDERS.get(node_type)
+            if builder:
+                try:
+                    input_shapes = {k: list(v.shape) for k, v in inputs.items() if isinstance(v, torch.Tensor)}
+                    module = builder(props, input_shapes)
+                    modules[node_id] = module.to(get_device())
+                    if "images" in inputs:
+                        images = inputs["images"]
+                        # Out: add extra timestep channel [B, C+1, H, W]
+                        t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
+                        noisy_out = torch.cat([images, t_channel], dim=1)
+                        # Noise: same shape as input images [B, C, H, W]
+                        noise_dummy = torch.zeros_like(images)
+                        results[node_id] = {"out": noisy_out, "noise": noise_dummy}
+                        node_results[node_id] = {
+                            "outputs": {"out": tensor_info(noisy_out), "noise": tensor_info(noise_dummy)},
+                            "metadata": {
+                                "outputShape": list(noisy_out.shape),
+                                "shapes": [
+                                    {"label": "Input", "value": list(images.shape)},
+                                    {"label": "Noisy Output", "value": list(noisy_out.shape)},
+                                    {"label": "Noise Target", "value": list(noise_dummy.shape)},
+                                ],
+                            },
+                        }
+                    else:
+                        node_results[node_id] = {
+                            "outputs": {},
+                            "metadata": {"error": "No images input connected"},
+                        }
+                except Exception as e:
+                    node_results[node_id] = {
+                        "outputs": {},
+                        "metadata": {"error": str(e)},
+                    }
+            continue
+
+        # --- Diffusion timestep embedding: no input, fixed output shape ---
+        if node_type == DIFFUSION_EMBED_TYPE:
+            builder = NODE_BUILDERS.get(node_type)
+            if builder:
+                try:
+                    module = builder(props, {})
+                    modules[node_id] = module.to(get_device())
+                    embed_dim = props.get("embedDim", 128)
+                    dummy_embed = torch.zeros(1, embed_dim, device=get_device())
+                    results[node_id] = {"out": dummy_embed}
+                    node_results[node_id] = {
+                        "outputs": {"out": tensor_info(dummy_embed)},
+                        "metadata": {"outputShape": [1, embed_dim]},
                     }
                 except Exception as e:
                     node_results[node_id] = {

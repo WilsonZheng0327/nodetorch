@@ -481,7 +481,7 @@ def build_epoch_result(epoch, ctx, avg_loss, accuracy, val_loss, val_accuracy,
 
 def run_final_forward(ctx, modules):
     """Post-training forward pass to get display metadata for each node."""
-    from graph_builder import MULTI_INPUT_NODES, GAN_NOISE_TYPE
+    from graph_builder import MULTI_INPUT_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE, DIFFUSION_EMBED_TYPE
 
     final_results: dict = {}
     node_results: dict = {}
@@ -513,6 +513,34 @@ def run_final_forward(ctx, modules):
                 node_results[node_id] = {
                     "outputs": {"out": tensor_info(dummy_noise)},
                     "metadata": {"outputShape": [batch_size, latent_dim]},
+                }
+                continue
+
+            # Diffusion noise scheduler: passthrough with extra channel
+            if node_type == DIFFUSION_SCHEDULER_TYPE:
+                inputs = gather_inputs(node_id, ctx.edges, final_results)
+                if "images" in inputs:
+                    images = inputs["images"]
+                    t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
+                    noisy_out = torch.cat([images, t_channel], dim=1)
+                    noise_dummy = torch.zeros_like(images)
+                    final_results[node_id] = {"out": noisy_out, "noise": noise_dummy}
+                    node_results[node_id] = {
+                        "outputs": {"out": tensor_info(noisy_out), "noise": tensor_info(noise_dummy)},
+                        "metadata": {"outputShape": list(noisy_out.shape)},
+                    }
+                continue
+
+            # Diffusion timestep embedding: fixed output
+            if node_type == DIFFUSION_EMBED_TYPE:
+                props = node.get("properties", {})
+                embed_dim = props.get("embedDim", 128)
+                dev = get_device()
+                dummy_embed = torch.zeros(1, embed_dim, device=dev)
+                final_results[node_id] = {"out": dummy_embed}
+                node_results[node_id] = {
+                    "outputs": {"out": tensor_info(dummy_embed)},
+                    "metadata": {"outputShape": [1, embed_dim]},
                 }
                 continue
 

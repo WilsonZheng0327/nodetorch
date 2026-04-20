@@ -16,6 +16,7 @@ import { optimizerNodes } from './nodes/optimizers';
 import { structuralNodes } from './nodes/structural';
 import { subgraphNodes } from './nodes/subgraph';
 import { ganNodes } from './nodes/gan';
+import { diffusionNodes } from './nodes/diffusion';
 
 const allNodes = [
   ...dataNodes,
@@ -26,6 +27,7 @@ const allNodes = [
   ...structuralNodes,
   ...subgraphNodes,
   ...ganNodes,
+  ...diffusionNodes,
 ];
 
 export interface DomainContext {

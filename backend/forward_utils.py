@@ -22,6 +22,8 @@ from graph_builder import (
     SUBGRAPH_TYPE,
     OPTIMIZER_NODES,
     GAN_NOISE_TYPE,
+    DIFFUSION_SCHEDULER_TYPE,
+    DIFFUSION_EMBED_TYPE,
     gather_inputs,
 )
 from data_loaders import DATA_LOADERS
@@ -99,7 +101,20 @@ def run_forward_pass(
         node = nodes[node_id]
         ntype = node["type"]
 
-        if ntype in OPTIMIZER_NODES or ntype in DATA_LOADERS or ntype == GAN_NOISE_TYPE:
+        if ntype in OPTIMIZER_NODES or ntype in DATA_LOADERS or ntype == GAN_NOISE_TYPE or ntype == DIFFUSION_EMBED_TYPE:
+            continue
+
+        # Diffusion noise scheduler: needs special multi-output handling
+        if ntype == DIFFUSION_SCHEDULER_TYPE:
+            mod = modules.get(node_id)
+            if mod is not None:
+                inputs = gather_inputs(node_id, edges, batch_results)
+                if "images" in inputs:
+                    images = inputs["images"]
+                    # Passthrough with extra timestep channel
+                    t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
+                    noisy_out = torch.cat([images, t_channel], dim=1)
+                    batch_results[node_id] = {"out": noisy_out, "noise": torch.zeros_like(images)}
             continue
 
         mod = modules.get(node_id)
