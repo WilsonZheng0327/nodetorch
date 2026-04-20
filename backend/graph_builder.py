@@ -926,13 +926,19 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
 
 
 def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=None) -> dict:
+    """Run a training loop. Delegates to the training plugin system.
+
+    Auto-detects the training paradigm (standard, GAN, diffusion) from node
+    types and runs the appropriate loop. See backend/training/ for details.
     """
-    Run a training loop. Finds the optimizer node, builds modules with
-    gradient tracking, and trains for the specified number of epochs.
+    from training import run_training
+    return run_training(graph_data, on_epoch, on_batch, cancel_event)
 
-    cancel_event: optional threading.Event — if set, training stops after the current epoch.
 
-    on_epoch: optional callback(epoch, loss, accuracy) for streaming progress.
+def _train_graph_legacy_unused():
+    """Original training loop — replaced by training plugin system.
+    Kept as reference during transition. Will be removed once GAN/diffusion
+    are implemented and all edge cases are verified.
     """
     graph = graph_data["graph"]
     nodes_list = graph["nodes"]

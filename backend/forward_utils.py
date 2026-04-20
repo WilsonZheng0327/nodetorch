@@ -13,13 +13,17 @@ Kept independent of graph_builder so it can be imported without circular deps.
 """
 
 from __future__ import annotations
+import torch
 import torch.nn as nn
 
 from graph_builder import (
     LOSS_NODES,
     MULTI_INPUT_NODES,
     SUBGRAPH_TYPE,
+    OPTIMIZER_NODES,
+    gather_inputs,
 )
+from data_loaders import DATA_LOADERS
 
 
 def execute_node(node_type: str, module: nn.Module, inputs: dict) -> dict | None:
@@ -60,3 +64,50 @@ def execute_node(node_type: str, module: nn.Module, inputs: dict) -> dict | None
         return {"out": raw}
 
     return None
+
+
+def run_forward_pass(
+    modules: dict[str, nn.Module],
+    nodes: dict,
+    edges: list,
+    order: list[str],
+    data_inputs: dict[str, dict],
+) -> dict[str, dict]:
+    """Run a full forward pass through the graph in topological order.
+
+    This is the canonical "execute the whole graph" function. It replaces the
+    many inline dispatch loops that were duplicated across train, validate,
+    evaluate, and probe code paths.
+
+    Args:
+        modules: node_id → nn.Module (from build_and_run_graph or trained)
+        nodes: node_id → node dict
+        edges: edge list
+        order: topological order of node IDs
+        data_inputs: pre-filled results for data nodes, e.g.
+                     {data_nid: {"out": images, "labels": labels}}
+
+    Returns:
+        batch_results: node_id → {port_id: tensor} for all executed nodes
+    """
+    batch_results: dict[str, dict] = dict(data_inputs)
+
+    for node_id in order:
+        if node_id in batch_results:
+            continue
+        node = nodes[node_id]
+        ntype = node["type"]
+
+        if ntype in OPTIMIZER_NODES or ntype in DATA_LOADERS:
+            continue
+
+        mod = modules.get(node_id)
+        if mod is None:
+            continue
+
+        inputs = gather_inputs(node_id, edges, batch_results)
+        result = execute_node(ntype, mod, inputs)
+        if result is not None:
+            batch_results[node_id] = result
+
+    return batch_results
