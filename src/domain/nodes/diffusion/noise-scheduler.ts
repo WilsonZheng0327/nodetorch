@@ -11,6 +11,7 @@ export const noiseSchedulerNode: NodeDefinition = {
   description: 'Diffusion noise schedule — adds noise at random timesteps during training',
   category: ['ML', 'Diffusion'],
   color: '#8b5cf6',
+  learnMore: 'Controls how noise is added during training and removed during generation. The beta schedule determines how quickly noise increases \u2014 linear is simple, cosine preserves more detail at early timesteps. During training, the model learns to predict the noise at each level. During generation, it removes noise step by step.',
 
   getProperties: () => [
     {

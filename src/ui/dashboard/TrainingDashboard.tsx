@@ -29,6 +29,10 @@ export interface EpochData {
   gradientFlow?: { name: string; norm: number }[];
   perClassAccuracy?: { cls: number; accuracy: number }[];
   trackedSamples?: TrackedSampleProbe[];
+  generatedSamples?: (number[][] | number[][][])[];
+  dLoss?: number;
+  gLoss?: number;
+  trainingMode?: string;
 }
 
 interface SystemInfo {
@@ -211,7 +215,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
             />
             <span className="dashboard-progress-label">
               Epoch {latest.epoch} / {latest.totalEpochs}
-              {eta && <span className="dashboard-eta"> — ~{eta} remaining</span>}
+              {eta && <span className="dashboard-eta">{' '}(~{eta} remaining)</span>}
             </span>
           </div>
         );
@@ -984,6 +988,12 @@ function PerClassChart({ data }: { data: { cls: number; accuracy: number }[] }) 
 // --- Tracked Samples View ---
 
 function TrackedSamplesView({ progress }: { progress: EpochData[] }) {
+  // For GAN/diffusion, show generated samples instead of tracked samples
+  const isGenerative = progress.some(ep => ep.generatedSamples?.length);
+  if (isGenerative) {
+    return <GeneratedSamplesView progress={progress} />;
+  }
+
   if (progress.length === 0 || !progress[0].trackedSamples?.length) {
     return <div className="dashboard-chart-placeholder">No tracked samples — train to see results</div>;
   }
@@ -1117,6 +1127,69 @@ function TrackedSampleRow({ sampleIdx, sample, probes, epochs }: {
       </div>
     </div>
   );
+}
+
+
+// --- Generated Samples View (GAN / Diffusion) ---
+
+function GeneratedSamplesView({ progress }: { progress: EpochData[] }) {
+  // Find epochs that have generated samples
+  const epochsWithSamples = progress.filter(ep => ep.generatedSamples?.length);
+
+  if (epochsWithSamples.length === 0) {
+    return (
+      <div className="dashboard-chart-placeholder">
+        No generated samples yet. Samples are generated every 5 epochs — keep training.
+      </div>
+    );
+  }
+
+  return (
+    <div className="generated-samples-view">
+      {epochsWithSamples.map(ep => (
+        <div key={ep.epoch} className="generated-samples-epoch">
+          <div className="generated-samples-epoch-label">Epoch {ep.epoch}</div>
+          <div className="generated-samples-grid">
+            {ep.generatedSamples!.map((pixels, i) => (
+              <GeneratedSampleImage key={i} pixels={pixels} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GeneratedSampleImage({ pixels }: { pixels: number[][] | number[][][] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || pixels.length === 0) return;
+    const h = pixels.length;
+    const firstRow = pixels[0];
+    const isRGB = Array.isArray(firstRow[0]);
+    const w = isRGB ? (firstRow as number[][]).length : (firstRow as number[]).length;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const data = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        if (isRGB) {
+          const px = (pixels as number[][][])[y][x];
+          data.data[idx] = px[0]; data.data[idx + 1] = px[1]; data.data[idx + 2] = px[2];
+        } else {
+          const v = (pixels as number[][])[y][x];
+          data.data[idx] = v; data.data[idx + 1] = v; data.data[idx + 2] = v;
+        }
+        data.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(data, 0, 0);
+  }, [pixels]);
+  return <canvas ref={canvasRef} className="generated-sample-img" />;
 }
 
 

@@ -8,13 +8,13 @@
         "id": "noise",
         "type": "ml.gan.noise_input",
         "position": { "x": 0, "y": 0 },
-        "properties": { "latentDim": 100, "batchSize": 64 }
+        "properties": { "latentDim": 100, "batchSize": 128 }
       },
       {
         "id": "mnist",
         "type": "data.mnist",
         "position": { "x": 0, "y": 500 },
-        "properties": { "batchSize": 64 }
+        "properties": { "batchSize": 128 }
       },
       {
         "id": "generator",
@@ -25,70 +25,35 @@
           "id": "generator-inner",
           "name": "Generator",
           "nodes": [
-            {
-              "id": "input",
-              "type": "subgraph.input",
-              "position": { "x": 0, "y": 200 },
-              "properties": { "portCount": 1, "portNames": "in" }
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": { "x": 2200, "y": 200 },
-              "properties": { "portCount": 1, "portNames": "out" }
-            },
-            {
-              "id": "g_linear",
-              "type": "ml.layers.linear",
-              "position": { "x": 250, "y": 200 },
-              "properties": { "outFeatures": 6272 }
-            },
-            {
-              "id": "g_reshape",
-              "type": "ml.structural.reshape",
-              "position": { "x": 500, "y": 200 },
-              "properties": { "targetShape": "-1, 128, 7, 7" }
-            },
-            {
-              "id": "g_convt1",
-              "type": "ml.layers.conv_transpose2d",
-              "position": { "x": 750, "y": 200 },
-              "properties": { "outChannels": 64, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 }
-            },
-            {
-              "id": "g_bn1",
-              "type": "ml.layers.batchnorm2d",
-              "position": { "x": 1000, "y": 200 },
-              "properties": {}
-            },
-            {
-              "id": "g_relu",
-              "type": "ml.activations.relu",
-              "position": { "x": 1250, "y": 200 },
-              "properties": {}
-            },
-            {
-              "id": "g_convt2",
-              "type": "ml.layers.conv_transpose2d",
-              "position": { "x": 1500, "y": 200 },
-              "properties": { "outChannels": 1, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 }
-            },
-            {
-              "id": "g_tanh",
-              "type": "ml.activations.tanh",
-              "position": { "x": 1750, "y": 200 },
-              "properties": {}
-            }
+            { "id": "input", "type": "subgraph.input", "position": { "x": 0, "y": 200 }, "properties": { "portCount": 1, "portNames": "in" } },
+            { "id": "output", "type": "subgraph.output", "position": { "x": 2800, "y": 200 }, "properties": { "portCount": 1, "portNames": "out" } },
+            { "id": "g_linear", "type": "ml.layers.linear", "position": { "x": 200, "y": 200 }, "properties": { "outFeatures": 12544 } },
+            { "id": "g_reshape", "type": "ml.structural.reshape", "position": { "x": 420, "y": 200 }, "properties": { "targetShape": "-1, 256, 7, 7" } },
+            { "id": "g_bn0", "type": "ml.layers.batchnorm2d", "position": { "x": 620, "y": 200 }, "properties": {} },
+            { "id": "g_relu0", "type": "ml.activations.relu", "position": { "x": 800, "y": 200 }, "properties": {} },
+            { "id": "g_convt1", "type": "ml.layers.conv_transpose2d", "position": { "x": 980, "y": 200 }, "properties": { "outChannels": 128, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 } },
+            { "id": "g_bn1", "type": "ml.layers.batchnorm2d", "position": { "x": 1180, "y": 200 }, "properties": {} },
+            { "id": "g_relu1", "type": "ml.activations.relu", "position": { "x": 1360, "y": 200 }, "properties": {} },
+            { "id": "g_convt2", "type": "ml.layers.conv_transpose2d", "position": { "x": 1540, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 } },
+            { "id": "g_bn2", "type": "ml.layers.batchnorm2d", "position": { "x": 1740, "y": 200 }, "properties": {} },
+            { "id": "g_relu2", "type": "ml.activations.relu", "position": { "x": 1920, "y": 200 }, "properties": {} },
+            { "id": "g_conv_out", "type": "ml.layers.conv2d", "position": { "x": 2100, "y": 200 }, "properties": { "outChannels": 1, "kernelSize": 3, "stride": 1, "padding": 1 } },
+            { "id": "g_tanh", "type": "ml.activations.tanh", "position": { "x": 2300, "y": 200 }, "properties": {} }
           ],
           "edges": [
             { "id": "ge1", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "g_linear", "portId": "in" } },
             { "id": "ge2", "source": { "nodeId": "g_linear", "portId": "out" }, "target": { "nodeId": "g_reshape", "portId": "in" } },
-            { "id": "ge3", "source": { "nodeId": "g_reshape", "portId": "out" }, "target": { "nodeId": "g_convt1", "portId": "in" } },
-            { "id": "ge4", "source": { "nodeId": "g_convt1", "portId": "out" }, "target": { "nodeId": "g_bn1", "portId": "in" } },
-            { "id": "ge5", "source": { "nodeId": "g_bn1", "portId": "out" }, "target": { "nodeId": "g_relu", "portId": "in" } },
-            { "id": "ge6", "source": { "nodeId": "g_relu", "portId": "out" }, "target": { "nodeId": "g_convt2", "portId": "in" } },
-            { "id": "ge7", "source": { "nodeId": "g_convt2", "portId": "out" }, "target": { "nodeId": "g_tanh", "portId": "in" } },
-            { "id": "ge8", "source": { "nodeId": "g_tanh", "portId": "out" }, "target": { "nodeId": "output", "portId": "out" } }
+            { "id": "ge3", "source": { "nodeId": "g_reshape", "portId": "out" }, "target": { "nodeId": "g_bn0", "portId": "in" } },
+            { "id": "ge4", "source": { "nodeId": "g_bn0", "portId": "out" }, "target": { "nodeId": "g_relu0", "portId": "in" } },
+            { "id": "ge5", "source": { "nodeId": "g_relu0", "portId": "out" }, "target": { "nodeId": "g_convt1", "portId": "in" } },
+            { "id": "ge6", "source": { "nodeId": "g_convt1", "portId": "out" }, "target": { "nodeId": "g_bn1", "portId": "in" } },
+            { "id": "ge7", "source": { "nodeId": "g_bn1", "portId": "out" }, "target": { "nodeId": "g_relu1", "portId": "in" } },
+            { "id": "ge8", "source": { "nodeId": "g_relu1", "portId": "out" }, "target": { "nodeId": "g_convt2", "portId": "in" } },
+            { "id": "ge9", "source": { "nodeId": "g_convt2", "portId": "out" }, "target": { "nodeId": "g_bn2", "portId": "in" } },
+            { "id": "ge10", "source": { "nodeId": "g_bn2", "portId": "out" }, "target": { "nodeId": "g_relu2", "portId": "in" } },
+            { "id": "ge11", "source": { "nodeId": "g_relu2", "portId": "out" }, "target": { "nodeId": "g_conv_out", "portId": "in" } },
+            { "id": "ge12", "source": { "nodeId": "g_conv_out", "portId": "out" }, "target": { "nodeId": "g_tanh", "portId": "in" } },
+            { "id": "ge13", "source": { "nodeId": "g_tanh", "portId": "out" }, "target": { "nodeId": "output", "portId": "out" } }
           ]
         }
       },
@@ -101,70 +66,35 @@
           "id": "discriminator-inner",
           "name": "Discriminator",
           "nodes": [
-            {
-              "id": "input",
-              "type": "subgraph.input",
-              "position": { "x": 0, "y": 200 },
-              "properties": { "portCount": 1, "portNames": "in" }
-            },
-            {
-              "id": "output",
-              "type": "subgraph.output",
-              "position": { "x": 2200, "y": 200 },
-              "properties": { "portCount": 1, "portNames": "out" }
-            },
-            {
-              "id": "d_conv1",
-              "type": "ml.layers.conv2d",
-              "position": { "x": 250, "y": 200 },
-              "properties": { "outChannels": 32, "kernelSize": 4, "stride": 2, "padding": 1 }
-            },
-            {
-              "id": "d_lrelu1",
-              "type": "ml.activations.leaky_relu",
-              "position": { "x": 500, "y": 200 },
-              "properties": { "negativeSlope": 0.2 }
-            },
-            {
-              "id": "d_conv2",
-              "type": "ml.layers.conv2d",
-              "position": { "x": 750, "y": 200 },
-              "properties": { "outChannels": 64, "kernelSize": 4, "stride": 2, "padding": 1 }
-            },
-            {
-              "id": "d_bn",
-              "type": "ml.layers.batchnorm2d",
-              "position": { "x": 1000, "y": 200 },
-              "properties": {}
-            },
-            {
-              "id": "d_lrelu2",
-              "type": "ml.activations.leaky_relu",
-              "position": { "x": 1250, "y": 200 },
-              "properties": { "negativeSlope": 0.2 }
-            },
-            {
-              "id": "d_flatten",
-              "type": "ml.layers.flatten",
-              "position": { "x": 1500, "y": 200 },
-              "properties": {}
-            },
-            {
-              "id": "d_linear",
-              "type": "ml.layers.linear",
-              "position": { "x": 1750, "y": 200 },
-              "properties": { "outFeatures": 1 }
-            }
+            { "id": "input", "type": "subgraph.input", "position": { "x": 0, "y": 200 }, "properties": { "portCount": 1, "portNames": "in" } },
+            { "id": "output", "type": "subgraph.output", "position": { "x": 2600, "y": 200 }, "properties": { "portCount": 1, "portNames": "out" } },
+            { "id": "d_conv1", "type": "ml.layers.conv2d", "position": { "x": 200, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 4, "stride": 2, "padding": 1 } },
+            { "id": "d_lrelu1", "type": "ml.activations.leaky_relu", "position": { "x": 420, "y": 200 }, "properties": { "negativeSlope": 0.2 } },
+            { "id": "d_drop1", "type": "ml.layers.dropout2d", "position": { "x": 620, "y": 200 }, "properties": { "p": 0.25 } },
+            { "id": "d_conv2", "type": "ml.layers.conv2d", "position": { "x": 800, "y": 200 }, "properties": { "outChannels": 128, "kernelSize": 4, "stride": 2, "padding": 1 } },
+            { "id": "d_bn2", "type": "ml.layers.batchnorm2d", "position": { "x": 1000, "y": 200 }, "properties": {} },
+            { "id": "d_lrelu2", "type": "ml.activations.leaky_relu", "position": { "x": 1200, "y": 200 }, "properties": { "negativeSlope": 0.2 } },
+            { "id": "d_drop2", "type": "ml.layers.dropout2d", "position": { "x": 1400, "y": 200 }, "properties": { "p": 0.25 } },
+            { "id": "d_conv3", "type": "ml.layers.conv2d", "position": { "x": 1580, "y": 200 }, "properties": { "outChannels": 256, "kernelSize": 3, "stride": 2, "padding": 1 } },
+            { "id": "d_bn3", "type": "ml.layers.batchnorm2d", "position": { "x": 1780, "y": 200 }, "properties": {} },
+            { "id": "d_lrelu3", "type": "ml.activations.leaky_relu", "position": { "x": 1980, "y": 200 }, "properties": { "negativeSlope": 0.2 } },
+            { "id": "d_flatten", "type": "ml.layers.flatten", "position": { "x": 2160, "y": 200 }, "properties": {} },
+            { "id": "d_linear", "type": "ml.layers.linear", "position": { "x": 2360, "y": 200 }, "properties": { "outFeatures": 1 } }
           ],
           "edges": [
             { "id": "de1", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "d_conv1", "portId": "in" } },
             { "id": "de2", "source": { "nodeId": "d_conv1", "portId": "out" }, "target": { "nodeId": "d_lrelu1", "portId": "in" } },
-            { "id": "de3", "source": { "nodeId": "d_lrelu1", "portId": "out" }, "target": { "nodeId": "d_conv2", "portId": "in" } },
-            { "id": "de4", "source": { "nodeId": "d_conv2", "portId": "out" }, "target": { "nodeId": "d_bn", "portId": "in" } },
-            { "id": "de5", "source": { "nodeId": "d_bn", "portId": "out" }, "target": { "nodeId": "d_lrelu2", "portId": "in" } },
-            { "id": "de6", "source": { "nodeId": "d_lrelu2", "portId": "out" }, "target": { "nodeId": "d_flatten", "portId": "in" } },
-            { "id": "de7", "source": { "nodeId": "d_flatten", "portId": "out" }, "target": { "nodeId": "d_linear", "portId": "in" } },
-            { "id": "de8", "source": { "nodeId": "d_linear", "portId": "out" }, "target": { "nodeId": "output", "portId": "out" } }
+            { "id": "de3", "source": { "nodeId": "d_lrelu1", "portId": "out" }, "target": { "nodeId": "d_drop1", "portId": "in" } },
+            { "id": "de4", "source": { "nodeId": "d_drop1", "portId": "out" }, "target": { "nodeId": "d_conv2", "portId": "in" } },
+            { "id": "de5", "source": { "nodeId": "d_conv2", "portId": "out" }, "target": { "nodeId": "d_bn2", "portId": "in" } },
+            { "id": "de6", "source": { "nodeId": "d_bn2", "portId": "out" }, "target": { "nodeId": "d_lrelu2", "portId": "in" } },
+            { "id": "de7", "source": { "nodeId": "d_lrelu2", "portId": "out" }, "target": { "nodeId": "d_drop2", "portId": "in" } },
+            { "id": "de8", "source": { "nodeId": "d_drop2", "portId": "out" }, "target": { "nodeId": "d_conv3", "portId": "in" } },
+            { "id": "de9", "source": { "nodeId": "d_conv3", "portId": "out" }, "target": { "nodeId": "d_bn3", "portId": "in" } },
+            { "id": "de10", "source": { "nodeId": "d_bn3", "portId": "out" }, "target": { "nodeId": "d_lrelu3", "portId": "in" } },
+            { "id": "de11", "source": { "nodeId": "d_lrelu3", "portId": "out" }, "target": { "nodeId": "d_flatten", "portId": "in" } },
+            { "id": "de12", "source": { "nodeId": "d_flatten", "portId": "out" }, "target": { "nodeId": "d_linear", "portId": "in" } },
+            { "id": "de13", "source": { "nodeId": "d_linear", "portId": "out" }, "target": { "nodeId": "output", "portId": "out" } }
           ]
         }
       },
@@ -172,19 +102,19 @@
         "id": "gan_loss",
         "type": "ml.loss.gan",
         "position": { "x": 800, "y": 250 },
-        "properties": { "labelSmoothing": 0.1 }
+        "properties": { "labelSmoothing": 0.05 }
       },
       {
         "id": "adam_g",
         "type": "ml.optimizers.adam",
         "position": { "x": 1150, "y": 150 },
-        "properties": { "lr": 0.0002, "beta1": 0.5, "beta2": 0.999, "epochs": 10, "valSplit": 0, "seed": 42 }
+        "properties": { "lr": 0.0002, "beta1": 0.5, "beta2": 0.999, "epochs": 100, "valSplit": 0, "seed": 42, "scheduler": "cosine" }
       },
       {
         "id": "adam_d",
         "type": "ml.optimizers.adam",
         "position": { "x": 1150, "y": 400 },
-        "properties": { "lr": 0.0002, "beta1": 0.5, "beta2": 0.999, "epochs": 10, "valSplit": 0, "seed": 42 }
+        "properties": { "lr": 0.0001, "beta1": 0.5, "beta2": 0.999, "epochs": 100, "valSplit": 0, "seed": 42, "scheduler": "cosine" }
       }
     ],
     "edges": [

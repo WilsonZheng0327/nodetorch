@@ -6,6 +6,7 @@ export const maxPool1dNode: NodeDefinition = {
   displayName: 'MaxPool1d',
   description: '1D max pooling',
   category: ['ML', 'Layers', 'Pooling'],
+  learnMore: 'The 1D version of MaxPool \u2014 reduces sequence length by keeping the maximum value in each window. Used in 1D convolutional networks for text or time series.',
 
   getProperties: () => [
     { id: 'kernelSize', name: 'Kernel Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 2, affects: 'execution' },

@@ -6,6 +6,7 @@ export const imdbNode: NodeDefinition = {
   displayName: 'IMDb',
   description: 'Movie review sentiment, binary (positive/negative)',
   category: ['Data', 'Text'],
+  learnMore: 'Movie reviews labeled as positive or negative sentiment. A standard benchmark for text classification. Reviews are tokenized into word indices \u2014 the model must learn which words and patterns indicate positive vs negative sentiment.',
 
   getProperties: () => [
     { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 32, affects: 'execution', help: 'Number of samples per training step. Larger = faster but more memory. Common: 32, 64, 128.' },

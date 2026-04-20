@@ -30,6 +30,7 @@ from graph_builder import (
     SUBGRAPH_TYPE,
     SENTINEL_INPUT,
     SENTINEL_OUTPUT,
+    DIFFUSION_SCHEDULER_TYPE,
     SubGraphModule,
 )
 from data_loaders import DATA_LOADERS, DENORMALIZERS
@@ -367,6 +368,21 @@ def _forward_pass(modules: dict, nodes: dict, edges: list) -> dict:
         if ntype in OPTIMIZER_NODES:
             continue
 
+        # Diffusion scheduler: produce 3-port output (noisy, noise, timestep)
+        if ntype == DIFFUSION_SCHEDULER_TYPE:
+            inputs = gather_inputs(nid, edges, results)
+            mod = modules.get(nid)
+            if mod is not None and "images" in inputs:
+                images = inputs["images"]
+                noisy = images.clone().requires_grad_(True)
+                noise_dummy = torch.zeros_like(images).requires_grad_(True)
+                t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=dev).requires_grad_(True)
+                results[nid] = {"out": noisy, "noise": noise_dummy, "timestep": t_channel}
+                for v in results[nid].values():
+                    if isinstance(v, torch.Tensor) and v.requires_grad:
+                        v.retain_grad()
+            continue
+
         mod = modules.get(nid)
         if mod is None:
             continue
@@ -414,6 +430,23 @@ def _build_with_trained(graph_data: dict) -> tuple:
             continue
 
         if node_type in OPTIMIZER_NODES:
+            continue
+
+        # Diffusion scheduler: produce 3-port output
+        if node_type == DIFFUSION_SCHEDULER_TYPE:
+            module = trained.get(node_id)
+            if module is not None:
+                modules[node_id] = module
+                inputs = gather_inputs(node_id, edges, results)
+                if "images" in inputs:
+                    images = inputs["images"]
+                    noisy = images.clone().requires_grad_(True)
+                    noise_dummy = torch.zeros_like(images).requires_grad_(True)
+                    t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=dev).requires_grad_(True)
+                    results[node_id] = {"out": noisy, "noise": noise_dummy, "timestep": t_channel}
+                    for v in results[node_id].values():
+                        if isinstance(v, torch.Tensor) and v.requires_grad:
+                            v.retain_grad()
             continue
 
         module = trained.get(node_id)

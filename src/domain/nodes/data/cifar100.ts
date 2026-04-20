@@ -10,6 +10,7 @@ export const cifar100Node: NodeDefinition = {
   displayName: 'CIFAR-100',
   description: '100-class color images, 32x32 RGB',
   category: ['Data', 'Image'],
+  learnMore: 'Like CIFAR-10 but with 100 fine-grained classes (maple tree, oak tree, palm tree instead of just "tree"). Much harder because there are fewer examples per class and the visual differences between similar classes are subtle.',
 
   getProperties: () => [
     {

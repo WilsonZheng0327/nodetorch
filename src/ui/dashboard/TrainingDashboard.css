@@ -801,3 +801,40 @@
   color: #585b70;
   font-size: 10px;
 }
+
+/* --- Generated Samples (GAN / Diffusion) --- */
+
+.generated-samples-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.generated-samples-epoch {
+  padding: 8px 12px;
+  background: #181825;
+  border-radius: 6px;
+}
+
+.generated-samples-epoch-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a6adc8;
+  margin-bottom: 8px;
+}
+
+.generated-samples-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.generated-sample-img {
+  width: 56px;
+  height: 56px;
+  image-rendering: pixelated;
+  border-radius: 4px;
+  border: 1px solid #45475a;
+  background: #11111b;
+}

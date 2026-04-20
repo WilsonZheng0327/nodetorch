@@ -9,6 +9,7 @@ export const reluNode: NodeDefinition = {
   displayName: 'ReLU',
   description: 'Rectified Linear Unit activation',
   category: ['ML', 'Activations'],
+  learnMore: 'The most common activation function. Outputs the input if positive, zero if negative. Simple and fast, but can cause "dying neurons" \u2014 if a neuron always gets negative input, it permanently outputs zero and stops learning.',
 
   getProperties: () => [],
 

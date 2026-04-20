@@ -9,6 +9,7 @@ export const conv2dNode: NodeDefinition = {
   displayName: 'Conv2d',
   description: '2D convolution layer',
   category: ['ML', 'Layers', 'Convolution'],
+  learnMore: 'Slides small filters across the image to detect patterns like edges, textures, and shapes. Early layers learn simple patterns (edges), deeper layers learn complex ones (eyes, wheels). The key building block of all image models. Use padding=1 with kernel=3 to keep the spatial size unchanged.',
 
   getProperties: () => [
     {

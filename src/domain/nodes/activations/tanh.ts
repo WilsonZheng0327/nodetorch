@@ -6,6 +6,7 @@ export const tanhNode: NodeDefinition = {
   displayName: 'Tanh',
   description: 'Hyperbolic tangent activation (outputs -1 to 1)',
   category: ['ML', 'Activations'],
+  learnMore: 'Squashes values to (-1, 1). Similar to Sigmoid but centered at zero, which often helps training. Commonly used as the final activation in GAN generators to produce images in the [-1, 1] range.',
 
   getProperties: () => [],
 

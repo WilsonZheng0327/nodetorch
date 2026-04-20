@@ -7,6 +7,7 @@ export const adamwNode: NodeDefinition = {
   description: 'AdamW optimizer (decoupled weight decay)',
   category: ['ML', 'Optimizers'],
   color: '#8b5cf6',
+  learnMore: 'A corrected version of Adam where weight decay is applied separately from the gradient update. This "decoupled" weight decay is mathematically more correct and often produces better generalization. Preferred over Adam when using weight decay regularization.',
 
   getProperties: () => [
     {

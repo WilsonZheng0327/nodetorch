@@ -12,6 +12,7 @@ export const gruNode: NodeDefinition = {
   displayName: 'GRU',
   description: 'Gated Recurrent Unit layer',
   category: ['ML', 'Layers', 'Recurrent'],
+  learnMore: 'A simplified version of LSTM with only two gates (reset, update) instead of three. Slightly faster to train with comparable performance. Good for shorter sequences or when training speed matters.',
 
   getProperties: () => [
     { id: 'hiddenSize', name: 'Hidden Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 128, affects: 'execution', help: 'Size of the hidden state vector. Larger = more capacity to remember patterns. Common: 64, 128, 256.' },

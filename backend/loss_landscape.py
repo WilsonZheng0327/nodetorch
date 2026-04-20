@@ -53,6 +53,13 @@ def compute_loss_landscape(
     """
     graph_data = copy.deepcopy(graph_data)
 
+    # GAN and diffusion models don't support loss landscape visualization
+    for n in graph_data["graph"]["nodes"]:
+        if n["type"] in ("ml.gan.noise_input", "ml.loss.gan"):
+            return {"error": "Loss landscape is not available for GAN models — the adversarial loss requires running both generator and discriminator"}
+        if n["type"] == "ml.diffusion.noise_scheduler":
+            return {"error": "Loss landscape is not available for diffusion models — the loss depends on random timestep sampling"}
+
     # Use trained modules if available
     if has_trained_model():
         modules = get_trained_modules()

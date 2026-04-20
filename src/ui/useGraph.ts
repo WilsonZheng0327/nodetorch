@@ -973,6 +973,10 @@ export function useGraph(domain: DomainContext) {
             gradientFlow: msg.gradientFlow,
             perClassAccuracy: msg.perClassAccuracy,
             trackedSamples: msg.trackedSamples,
+            generatedSamples: msg.generatedSamples,
+            dLoss: msg.dLoss,
+            gLoss: msg.gLoss,
+            trainingMode: msg.trainingMode,
           }]);
           // Accumulate visualization snapshots per epoch
           if (msg.nodeSnapshots) {

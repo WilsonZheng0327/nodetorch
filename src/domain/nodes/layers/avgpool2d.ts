@@ -6,6 +6,7 @@ export const avgPool2dNode: NodeDefinition = {
   displayName: 'AvgPool2d',
   description: '2D average pooling',
   category: ['ML', 'Layers', 'Pooling'],
+  learnMore: 'Takes the average value in each pooling window instead of the maximum. Smoother than MaxPool but can lose sharp features. Sometimes used in the final layer before classification.',
 
   getProperties: () => [
     { id: 'kernelSize', name: 'Kernel Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 2, affects: 'execution' },

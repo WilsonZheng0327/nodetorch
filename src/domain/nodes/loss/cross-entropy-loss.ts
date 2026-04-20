@@ -11,6 +11,7 @@ export const crossEntropyLossNode: NodeDefinition = {
   description: 'Cross-entropy loss (includes softmax)',
   category: ['ML', 'Loss'],
   color: '#ef4444',
+  learnMore: 'Measures how wrong the model\'s class predictions are. Combines softmax and negative log-likelihood in one efficient computation. Output of 0 means perfect predictions. The standard loss for classification tasks (image classification, text classification, etc.).',
 
   getProperties: () => [],
 

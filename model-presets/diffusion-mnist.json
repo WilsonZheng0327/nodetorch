@@ -9,40 +9,58 @@
 
       { "id": "concat", "type": "ml.structural.concat", "position": { "x": 500, "y": 200 }, "properties": { "dim": 1 } },
 
-      { "id": "conv1", "type": "ml.layers.conv2d", "position": { "x": 700, "y": 200 }, "properties": { "outChannels": 32, "kernelSize": 3, "stride": 1, "padding": 1 } },
-      { "id": "bn1", "type": "ml.layers.batchnorm2d", "position": { "x": 900, "y": 200 }, "properties": {} },
-      { "id": "relu1", "type": "ml.activations.relu", "position": { "x": 1080, "y": 200 }, "properties": {} },
+      { "id": "proj", "type": "ml.layers.conv2d", "position": { "x": 700, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 1, "stride": 1, "padding": 0 } },
 
-      { "id": "conv2", "type": "ml.layers.conv2d", "position": { "x": 1250, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 3, "stride": 1, "padding": 1 } },
-      { "id": "bn2", "type": "ml.layers.batchnorm2d", "position": { "x": 1450, "y": 200 }, "properties": {} },
-      { "id": "relu2", "type": "ml.activations.relu", "position": { "x": 1630, "y": 200 }, "properties": {} },
+      { "id": "conv1a", "type": "ml.layers.conv2d", "position": { "x": 920, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn1a", "type": "ml.layers.batchnorm2d", "position": { "x": 1100, "y": 200 }, "properties": {} },
+      { "id": "relu1a", "type": "ml.activations.relu", "position": { "x": 1260, "y": 200 }, "properties": {} },
+      { "id": "conv1b", "type": "ml.layers.conv2d", "position": { "x": 1420, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn1b", "type": "ml.layers.batchnorm2d", "position": { "x": 1600, "y": 200 }, "properties": {} },
+      { "id": "add1", "type": "ml.structural.add", "position": { "x": 1780, "y": 200 }, "properties": {} },
+      { "id": "relu1b", "type": "ml.activations.relu", "position": { "x": 1940, "y": 200 }, "properties": {} },
 
-      { "id": "conv3", "type": "ml.layers.conv2d", "position": { "x": 1800, "y": 200 }, "properties": { "outChannels": 32, "kernelSize": 3, "stride": 1, "padding": 1 } },
-      { "id": "bn3", "type": "ml.layers.batchnorm2d", "position": { "x": 2000, "y": 200 }, "properties": {} },
-      { "id": "relu3", "type": "ml.activations.relu", "position": { "x": 2180, "y": 200 }, "properties": {} },
+      { "id": "conv2a", "type": "ml.layers.conv2d", "position": { "x": 2120, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn2a", "type": "ml.layers.batchnorm2d", "position": { "x": 2300, "y": 200 }, "properties": {} },
+      { "id": "relu2a", "type": "ml.activations.relu", "position": { "x": 2460, "y": 200 }, "properties": {} },
+      { "id": "conv2b", "type": "ml.layers.conv2d", "position": { "x": 2620, "y": 200 }, "properties": { "outChannels": 64, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "bn2b", "type": "ml.layers.batchnorm2d", "position": { "x": 2800, "y": 200 }, "properties": {} },
+      { "id": "add2", "type": "ml.structural.add", "position": { "x": 2980, "y": 200 }, "properties": {} },
+      { "id": "relu2b", "type": "ml.activations.relu", "position": { "x": 3140, "y": 200 }, "properties": {} },
 
-      { "id": "conv4", "type": "ml.layers.conv2d", "position": { "x": 2350, "y": 200 }, "properties": { "outChannels": 1, "kernelSize": 3, "stride": 1, "padding": 1 } },
+      { "id": "conv_out", "type": "ml.layers.conv2d", "position": { "x": 3320, "y": 200 }, "properties": { "outChannels": 1, "kernelSize": 3, "stride": 1, "padding": 1 } },
 
-      { "id": "loss", "type": "ml.loss.mse", "position": { "x": 2600, "y": 250 }, "properties": {} },
-      { "id": "adam", "type": "ml.optimizers.adam", "position": { "x": 2820, "y": 300 }, "properties": { "lr": 0.001, "epochs": 20, "valSplit": 0, "seed": 42 } }
+      { "id": "loss", "type": "ml.loss.mse", "position": { "x": 3560, "y": 250 }, "properties": {} },
+      { "id": "adam", "type": "ml.optimizers.adam", "position": { "x": 3780, "y": 300 }, "properties": { "lr": 0.001, "epochs": 50, "valSplit": 0, "seed": 42, "scheduler": "cosine" } }
     ],
     "edges": [
       { "id": "e1", "source": { "nodeId": "mnist", "portId": "out" }, "target": { "nodeId": "scheduler", "portId": "images" } },
       { "id": "e2a", "source": { "nodeId": "scheduler", "portId": "out" }, "target": { "nodeId": "concat", "portId": "in_0" } },
       { "id": "e2b", "source": { "nodeId": "scheduler", "portId": "timestep" }, "target": { "nodeId": "concat", "portId": "in_1" } },
-      { "id": "e3", "source": { "nodeId": "concat", "portId": "out" }, "target": { "nodeId": "conv1", "portId": "in" } },
-      { "id": "e4", "source": { "nodeId": "conv1", "portId": "out" }, "target": { "nodeId": "bn1", "portId": "in" } },
-      { "id": "e5", "source": { "nodeId": "bn1", "portId": "out" }, "target": { "nodeId": "relu1", "portId": "in" } },
-      { "id": "e6", "source": { "nodeId": "relu1", "portId": "out" }, "target": { "nodeId": "conv2", "portId": "in" } },
-      { "id": "e7", "source": { "nodeId": "conv2", "portId": "out" }, "target": { "nodeId": "bn2", "portId": "in" } },
-      { "id": "e8", "source": { "nodeId": "bn2", "portId": "out" }, "target": { "nodeId": "relu2", "portId": "in" } },
-      { "id": "e9", "source": { "nodeId": "relu2", "portId": "out" }, "target": { "nodeId": "conv3", "portId": "in" } },
-      { "id": "e10", "source": { "nodeId": "conv3", "portId": "out" }, "target": { "nodeId": "bn3", "portId": "in" } },
-      { "id": "e11", "source": { "nodeId": "bn3", "portId": "out" }, "target": { "nodeId": "relu3", "portId": "in" } },
-      { "id": "e12", "source": { "nodeId": "relu3", "portId": "out" }, "target": { "nodeId": "conv4", "portId": "in" } },
-      { "id": "e13", "source": { "nodeId": "conv4", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
-      { "id": "e14", "source": { "nodeId": "scheduler", "portId": "noise" }, "target": { "nodeId": "loss", "portId": "labels" } },
-      { "id": "e15", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+      { "id": "e3", "source": { "nodeId": "concat", "portId": "out" }, "target": { "nodeId": "proj", "portId": "in" } },
+
+      { "id": "e4", "source": { "nodeId": "proj", "portId": "out" }, "target": { "nodeId": "conv1a", "portId": "in" } },
+      { "id": "e5", "source": { "nodeId": "conv1a", "portId": "out" }, "target": { "nodeId": "bn1a", "portId": "in" } },
+      { "id": "e6", "source": { "nodeId": "bn1a", "portId": "out" }, "target": { "nodeId": "relu1a", "portId": "in" } },
+      { "id": "e7", "source": { "nodeId": "relu1a", "portId": "out" }, "target": { "nodeId": "conv1b", "portId": "in" } },
+      { "id": "e8", "source": { "nodeId": "conv1b", "portId": "out" }, "target": { "nodeId": "bn1b", "portId": "in" } },
+      { "id": "e9", "source": { "nodeId": "bn1b", "portId": "out" }, "target": { "nodeId": "add1", "portId": "a" } },
+      { "id": "e10", "source": { "nodeId": "proj", "portId": "out" }, "target": { "nodeId": "add1", "portId": "b" } },
+      { "id": "e11", "source": { "nodeId": "add1", "portId": "out" }, "target": { "nodeId": "relu1b", "portId": "in" } },
+
+      { "id": "e12", "source": { "nodeId": "relu1b", "portId": "out" }, "target": { "nodeId": "conv2a", "portId": "in" } },
+      { "id": "e13", "source": { "nodeId": "conv2a", "portId": "out" }, "target": { "nodeId": "bn2a", "portId": "in" } },
+      { "id": "e14", "source": { "nodeId": "bn2a", "portId": "out" }, "target": { "nodeId": "relu2a", "portId": "in" } },
+      { "id": "e15", "source": { "nodeId": "relu2a", "portId": "out" }, "target": { "nodeId": "conv2b", "portId": "in" } },
+      { "id": "e16", "source": { "nodeId": "conv2b", "portId": "out" }, "target": { "nodeId": "bn2b", "portId": "in" } },
+      { "id": "e17", "source": { "nodeId": "bn2b", "portId": "out" }, "target": { "nodeId": "add2", "portId": "a" } },
+      { "id": "e18", "source": { "nodeId": "relu1b", "portId": "out" }, "target": { "nodeId": "add2", "portId": "b" } },
+      { "id": "e19", "source": { "nodeId": "add2", "portId": "out" }, "target": { "nodeId": "relu2b", "portId": "in" } },
+
+      { "id": "e20", "source": { "nodeId": "relu2b", "portId": "out" }, "target": { "nodeId": "conv_out", "portId": "in" } },
+
+      { "id": "e21", "source": { "nodeId": "conv_out", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e22", "source": { "nodeId": "scheduler", "portId": "noise" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e23", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
     ]
   }
 }

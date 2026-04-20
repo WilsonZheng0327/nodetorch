@@ -336,8 +336,25 @@ export default function App() {
   // CIFAR-adapted stem: 3×3 conv stride 1 (no 7×7 stride 2, no maxpool)
   // Default demo graph disabled — users start with an empty canvas and the tutorial.
   // To restore, uncomment the block below.
-  // const demoBuilt = useRef(false);
-  // useEffect(() => { ... }, []);
+  // Load a preset on startup
+  const demoLoaded = useRef(false);
+  useEffect(() => {
+    if (demoLoaded.current) return;
+    demoLoaded.current = true;
+    fetch('http://localhost:8000/presets/load', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: 'diffusion-mnist.json' }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok') {
+          graph.loadGraph(JSON.stringify(data.data));
+          setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200);
+        }
+      })
+      .catch(() => { /* backend not running yet */ });
+  }, []);
 
   // Fit view when navigating into/out of subgraphs
   useEffect(() => {

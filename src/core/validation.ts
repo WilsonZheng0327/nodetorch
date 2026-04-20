@@ -116,6 +116,14 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
     errors.push({ message: 'Multiple optimizer nodes — only one is supported' });
   }
 
+  // If multiple optimizers, their epoch counts must match
+  if (optimizerNodes.length >= 2) {
+    const epochs = optimizerNodes.map((n) => n.properties.epochs ?? n.properties.epoch ?? 5);
+    if (new Set(epochs).size > 1) {
+      errors.push({ message: `Optimizer epoch counts don't match (${epochs.join(' vs ')}) — all optimizers must train for the same number of epochs` });
+    }
+  }
+
   // Loss node must have required inputs connected
   for (const lossNode of lossNodes) {
     const lossName = registry.get(lossNode.type)?.displayName ?? lossNode.type;

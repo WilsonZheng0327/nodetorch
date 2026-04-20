@@ -261,6 +261,12 @@ def gan_train(ctx: TrainingContext) -> TrainingResult:
     opt_d = build_optimizer(ctx.optimizer_nodes[0], disc_params)
     opt_g = build_optimizer(ctx.optimizer_nodes[1], gen_params)
 
+    # LR schedulers
+    d_props = ctx.optimizer_nodes[0].get("properties", {})
+    g_props = ctx.optimizer_nodes[1].get("properties", {})
+    sched_d = build_scheduler(opt_d, d_props.get("scheduler", "none"), ctx.epochs)
+    sched_g = build_scheduler(opt_g, g_props.get("scheduler", "none"), ctx.epochs)
+
     # Use primary optimizer for epoch count
     epochs = ctx.epochs
     total_batches = len(ctx.train_loader)
@@ -418,6 +424,12 @@ def gan_train(ctx: TrainingContext) -> TrainingResult:
 
         if generated_samples:
             epoch_result["generatedSamples"] = generated_samples
+
+        # Step LR schedulers
+        if sched_d is not None:
+            sched_d.step()
+        if sched_g is not None:
+            sched_g.step()
 
         epoch_results.append(epoch_result)
 

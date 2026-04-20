@@ -12,6 +12,7 @@ export const multiHeadAttentionNode: NodeDefinition = {
   displayName: 'MultiHeadAttention',
   description: 'Multi-head attention (self or cross)',
   category: ['ML', 'Layers', 'Attention'],
+  learnMore: 'The core of transformer models. Each "head" learns to attend to different aspects of the input \u2014 one might focus on syntax, another on meaning. For self-attention, connect the same input to all three ports (Query, Key, Value). This lets each position in the sequence look at every other position.',
 
   getProperties: () => [
     {

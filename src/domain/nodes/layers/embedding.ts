@@ -10,6 +10,7 @@ export const embeddingNode: NodeDefinition = {
   displayName: 'Embedding',
   description: 'Token embedding lookup (maps indices to vectors)',
   category: ['ML', 'Layers'],
+  learnMore: 'Converts integer token IDs into dense vectors. Each word/token gets its own learned vector that captures its meaning. The foundation of all NLP models. Similar words end up with similar vectors after training.',
 
   getProperties: () => [
     {

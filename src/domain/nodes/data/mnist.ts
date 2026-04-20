@@ -9,6 +9,7 @@ export const mnistNode: NodeDefinition = {
   displayName: 'MNIST',
   description: 'Handwritten digits, 28x28 grayscale',
   category: ['Data', 'Image'],
+  learnMore: 'The "hello world" of machine learning \u2014 70,000 handwritten digit images (0-9). Grayscale, 28\u00d728 pixels. Small enough to train quickly, complex enough to be interesting. If your model can\'t learn MNIST, something is fundamentally wrong.',
 
   getProperties: () => [
     {

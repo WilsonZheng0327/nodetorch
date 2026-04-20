@@ -6,6 +6,7 @@ export const adaptiveAvgPool2dNode: NodeDefinition = {
   displayName: 'AdaptiveAvgPool2d',
   description: 'Adaptive average pooling (specify output size)',
   category: ['ML', 'Layers', 'Pooling'],
+  learnMore: 'Pools to a fixed output size regardless of input size. Commonly used as the last pooling layer to produce a consistent size before the classifier, no matter what the input resolution is.',
 
   getProperties: () => [
     { id: 'outputH', name: 'Output Height', type: { kind: 'number', min: 1, integer: true }, defaultValue: 1, affects: 'execution' },

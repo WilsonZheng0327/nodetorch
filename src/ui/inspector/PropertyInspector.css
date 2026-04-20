@@ -51,11 +51,23 @@
   padding: 8px 16px;
   font-size: 13px;
   color: #a6adc8;
+}
+
+.inspector-learn-more {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #7f849c;
+  line-height: 1.55;
   border-bottom: 1px solid #313244;
 }
 
 .inspector-section {
   padding: 12px 16px;
+  border-bottom: 1px solid #313244;
+}
+
+.inspector-section:last-child {
+  border-bottom: none;
 }
 
 .inspector-section-title {

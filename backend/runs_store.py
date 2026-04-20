@@ -17,8 +17,8 @@ import json
 import time
 from pathlib import Path
 
-RUNS_DIR = Path("./runs")
-RUNS_DIR.mkdir(exist_ok=True)
+RUNS_DIR = Path("./storage/runs")
+RUNS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def save_run(record: dict) -> str:

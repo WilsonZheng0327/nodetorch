@@ -7,6 +7,7 @@ export const adamNode: NodeDefinition = {
   description: 'Adam optimizer (adaptive learning rate)',
   category: ['ML', 'Optimizers'],
   color: '#8b5cf6',
+  learnMore: 'Adapts the learning rate for each parameter individually based on past gradients. Combines the benefits of momentum (gradient smoothing) and RMSprop (per-parameter scaling). Works well out of the box for most problems \u2014 the go-to optimizer when you don\'t want to tune much.',
 
   getProperties: () => [
     {

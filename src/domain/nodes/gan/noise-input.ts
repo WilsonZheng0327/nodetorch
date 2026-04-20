@@ -11,6 +11,7 @@ export const noiseInputNode: NodeDefinition = {
   description: 'Random noise vector for generator input',
   category: ['ML', 'GAN'],
   color: '#f59e0b',
+  learnMore: 'Generates random noise vectors that the generator transforms into fake images. Each noise vector maps to a different generated image. The latent dimension controls how much "creative freedom" the generator has \u2014 too small and outputs lack variety, too large and training becomes harder.',
 
   getProperties: () => [
     {

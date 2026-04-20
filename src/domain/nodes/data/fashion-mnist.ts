@@ -6,6 +6,7 @@ export const fashionMnistNode: NodeDefinition = {
   displayName: 'FashionMNIST',
   description: 'Fashion items, 28x28 grayscale, 10 classes',
   category: ['Data', 'Image'],
+  learnMore: 'A harder drop-in replacement for MNIST with the same format (28\u00d728 grayscale, 10 classes). Contains clothing items instead of digits. More challenging because the visual differences between classes are subtler (shirts vs coats, sneakers vs boots).',
 
   getProperties: () => [
     { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 32, affects: 'execution', help: 'Number of samples per training step. Larger = faster but more memory. Common: 32, 64, 128.' },

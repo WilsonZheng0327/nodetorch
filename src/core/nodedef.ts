@@ -97,6 +97,8 @@ export interface NodeDefinition {
   icon?: string;
   /** Optional header color override */
   color?: string;
+  /** Educational explanation — shown in the inspector when a node is selected */
+  learnMore?: string;
 
   /**
    * Returns the property definitions for this node type.

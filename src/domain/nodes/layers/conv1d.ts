@@ -6,6 +6,7 @@ export const conv1dNode: NodeDefinition = {
   displayName: 'Conv1d',
   description: '1D convolution (for sequences/signals)',
   category: ['ML', 'Layers', 'Convolution'],
+  learnMore: 'The 1D version of Conv2d \u2014 slides filters along a sequence (text, audio, time series) instead of an image. Useful for detecting local patterns in sequential data without the overhead of recurrent networks.',
 
   getProperties: () => [
     { id: 'outChannels', name: 'Out Channels', type: { kind: 'number', min: 1, integer: true }, defaultValue: 64, affects: 'both' },

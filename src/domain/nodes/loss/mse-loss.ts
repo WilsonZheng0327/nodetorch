@@ -7,6 +7,7 @@ export const mseLossNode: NodeDefinition = {
   description: 'Mean Squared Error loss (regression)',
   category: ['ML', 'Loss'],
   color: '#ef4444',
+  learnMore: 'Measures the average squared difference between predictions and targets. Used for regression tasks and reconstruction (autoencoders, diffusion). Penalizes large errors more than small ones because of the squaring.',
 
   getProperties: () => [],
 

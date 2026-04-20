@@ -284,6 +284,79 @@
   background: #f9e2af;
 }
 
+.step-through-compare-timelines {
+  overflow-x: auto;
+  border-bottom: 1px solid #313244;
+  flex-shrink: 0;
+  padding: 8px 14px;
+}
+
+.step-through-compare-timelines::-webkit-scrollbar {
+  height: 10px;
+}
+
+.step-through-compare-timelines::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.step-through-compare-timelines::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 5px;
+}
+
+.step-through-compare-timelines::-webkit-scrollbar-thumb:hover {
+  background: #89b4fa;
+}
+
+.step-through-compare-timelines-inner {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.step-through-compare-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.step-through-compare-col-cell {
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+}
+
+.step-through-compare-card-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step-through-compare-row-label {
+  font-weight: 700;
+  font-size: 11px;
+  color: #89b4fa;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.step-through-compare-col-cell:nth-child(2) .step-through-compare-row-label {
+  color: #f9e2af;
+}
+
+.step-through-compare-arrow {
+  color: #45475a;
+  font-size: 12px;
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 .step-through-compare-details {
   display: flex;
   flex: 1;

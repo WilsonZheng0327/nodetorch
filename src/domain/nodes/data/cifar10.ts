@@ -6,6 +6,7 @@ export const cifar10Node: NodeDefinition = {
   displayName: 'CIFAR-10',
   description: '10-class color images, 32x32 RGB',
   category: ['Data', 'Image'],
+  learnMore: 'Ten classes of small color photographs (airplane, car, bird, cat, deer, dog, frog, horse, ship, truck). 32\u00d732 RGB images \u2014 much harder than MNIST because of complex backgrounds, varying poses, and color. A standard benchmark for CNN architectures.',
 
   getProperties: () => [
     { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 32, affects: 'execution', help: 'Number of samples per training step. Larger = faster but more memory. Common: 32, 64, 128.' },

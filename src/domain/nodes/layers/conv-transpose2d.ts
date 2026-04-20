@@ -6,6 +6,7 @@ export const convTranspose2dNode: NodeDefinition = {
   displayName: 'ConvTranspose2d',
   description: 'Transposed 2D convolution (deconvolution)',
   category: ['ML', 'Layers', 'Convolution'],
+  learnMore: 'The "reverse" of Conv2d \u2014 increases spatial resolution instead of decreasing it. Used in decoder networks (autoencoders, GANs, segmentation) to upsample feature maps back to image size. Also called "deconvolution" though that term is technically incorrect.',
 
   getProperties: () => [
     { id: 'outChannels', name: 'Out Channels', type: { kind: 'number', min: 1, integer: true }, defaultValue: 64, affects: 'both', help: 'Number of output channels.' },

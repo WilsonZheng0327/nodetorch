@@ -11,6 +11,7 @@ export const pretrainedResnet18Node: NodeDefinition = {
   displayName: 'ResNet18 (pretrained)',
   description: 'Pretrained ResNet-18 from torchvision. Good for transfer learning.',
   category: ['ML', 'Pretrained'],
+  learnMore: 'A ResNet-18 model pre-trained on 1.2 million ImageNet images. Already knows how to detect edges, textures, shapes, and objects. In "features" mode, it outputs a 512-dimensional feature vector you can classify with a simple Linear layer \u2014 this is transfer learning. Much faster than training from scratch.',
 
   getProperties: () => [
     {

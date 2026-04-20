@@ -4,6 +4,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import type { StepThroughResult, BackwardStepThroughResult, StepThroughMode, DenoiseStepThroughResult } from './types';
 import { StageTimeline } from './StageTimeline';
+import { StageCard } from './StageCard';
 import { StageDetail } from './StageDetail';
 import { PerturbCanvas } from './PerturbCanvas';
 import './StepThroughPanel.css';
@@ -87,24 +88,53 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const loadDenoise = () => {
     setLoading(true);
     setError(null);
-    // Capture every 5th step to keep response size reasonable
-    const captureEvery = Math.max(1, Math.floor(100 / 50));
-    fetch('http://localhost:8000/denoise-step-through', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ graph: JSON.parse(graphJson), numSamples: 4, captureEvery }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.status === 'ok') {
-          setDenoiseResult(data.result);
-          setCurrentIdx(0);
-        } else {
-          setError(data.error ?? 'Failed to run denoising');
-        }
+
+    if (isGANGraph) {
+      // GAN: generate images directly (no timestep stepping)
+      fetch('http://localhost:8000/gan-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ graph: JSON.parse(graphJson), numSamples: 8 }),
       })
-      .catch(() => setError('Cannot connect to backend'))
-      .finally(() => setLoading(false));
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.status === 'ok') {
+            // Wrap in a single-step denoise result so the UI can display it
+            setDenoiseResult({
+              steps: [{ timestep: 0, pixels: data.result.images }],
+              numTimesteps: 1,
+              numSamples: data.result.numSamples,
+              imageH: data.result.imageH,
+              imageW: data.result.imageW,
+              channels: data.result.channels,
+            });
+            setCurrentIdx(0);
+          } else {
+            setError(data.error ?? 'Failed to generate images');
+          }
+        })
+        .catch(() => setError('Cannot connect to backend'))
+        .finally(() => setLoading(false));
+    } else {
+      // Diffusion: run full denoising step-through
+      const captureEvery = Math.max(1, Math.floor(100 / 50));
+      fetch('http://localhost:8000/denoise-step-through', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ graph: JSON.parse(graphJson), numSamples: 4, captureEvery }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.status === 'ok') {
+            setDenoiseResult(data.result);
+            setCurrentIdx(0);
+          } else {
+            setError(data.error ?? 'Failed to run denoising');
+          }
+        })
+        .catch(() => setError('Cannot connect to backend'))
+        .finally(() => setLoading(false));
+    }
   };
 
   const exitCompare = () => setResultB(null);
@@ -133,6 +163,15 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
       return g.graph?.nodes?.some((n: any) => n.type === 'ml.diffusion.noise_scheduler') ?? false;
     } catch { return false; }
   })();
+
+  const isGANGraph = (() => {
+    try {
+      const g = JSON.parse(graphJson);
+      return g.graph?.nodes?.some((n: any) => n.type === 'ml.gan.noise_input' || n.type === 'ml.loss.gan') ?? false;
+    } catch { return false; }
+  })();
+
+  const isGenerativeGraph = isDiffusionGraph || isGANGraph;
 
   // The active result and stages depend on the mode
   const activeResult = mode === 'forward' ? result : backwardResult;
@@ -190,12 +229,12 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
             >
               Backward
             </button>
-            {isDiffusionGraph && (
+            {isGenerativeGraph && (
               <button
                 className={`step-through-mode-tab ${mode === 'denoise' ? 'step-through-mode-tab-active step-through-mode-tab-denoise' : ''}`}
                 onClick={() => switchMode('denoise')}
               >
-                Denoise
+                {isGANGraph ? 'Generate' : 'Denoise'}
               </button>
             )}
           </span>
@@ -229,6 +268,11 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
           {mode === 'backward' && (
             <button className="step-through-btn" onClick={loadBackward} disabled={loading}>
               Re-run Backward
+            </button>
+          )}
+          {mode === 'denoise' && (
+            <button className="step-through-btn" onClick={loadDenoise} disabled={loading}>
+              Regenerate
             </button>
           )}
           <button className="step-through-close" onClick={onClose}>&times;</button>
@@ -339,12 +383,21 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
 
           {mode !== 'denoise' && (
             <>
-              <StageTimeline
-                stages={activeStages}
-                currentIdx={currentIdx}
-                onSelect={setCurrentIdx}
-                direction={mode}
-              />
+              {mode === 'forward' && compareMode && resultB ? (
+                <CompareTimeline
+                  stagesA={activeStages}
+                  stagesB={resultB.stages}
+                  currentIdx={currentIdx}
+                  onSelect={setCurrentIdx}
+                />
+              ) : (
+                <StageTimeline
+                  stages={activeStages}
+                  currentIdx={currentIdx}
+                  onSelect={setCurrentIdx}
+                  direction={mode}
+                />
+              )}
 
               {stage && (
                 mode === 'forward' && compareMode && resultB ? (
@@ -375,6 +428,56 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
 }
 
 // --- Sample preview header ---
+
+// --- Compare timeline (two rows, one scrollbar) ---
+
+function CompareTimeline({ stagesA, stagesB, currentIdx, onSelect }: {
+  stagesA: any[];
+  stagesB: any[];
+  currentIdx: number;
+  onSelect: (idx: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const active = container.querySelector('.stage-card-active') as HTMLElement | null;
+    if (active) {
+      active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [currentIdx]);
+
+  const maxLen = Math.max(stagesA.length, stagesB.length);
+
+  return (
+    <div className="step-through-compare-timelines" ref={containerRef}>
+      <div className="step-through-compare-timelines-inner">
+        {Array.from({ length: maxLen }, (_, i) => (
+          <div key={i} className="step-through-compare-col">
+            <div className="step-through-compare-col-cell">
+              {stagesA[i] && (
+                <div className="step-through-compare-card-wrap">
+                  {i === 0 && <span className="step-through-compare-row-label">A</span>}
+                  <StageCard stage={stagesA[i]} active={i === currentIdx} onClick={() => onSelect(i)} />
+                </div>
+              )}
+            </div>
+            <div className="step-through-compare-col-cell">
+              {stagesB[i] && (
+                <div className="step-through-compare-card-wrap">
+                  {i === 0 && <span className="step-through-compare-row-label">B</span>}
+                  <StageCard stage={stagesB[i]} active={i === currentIdx} onClick={() => onSelect(i)} />
+                </div>
+              )}
+            </div>
+            {i < maxLen - 1 && <div className="step-through-compare-arrow">→</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // --- Denoise view (diffusion step-through) ---
 

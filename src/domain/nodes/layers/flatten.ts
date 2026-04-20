@@ -10,6 +10,7 @@ export const flattenNode: NodeDefinition = {
   displayName: 'Flatten',
   description: 'Flatten all dimensions after batch into one',
   category: ['ML', 'Layers'],
+  learnMore: 'Collapses spatial dimensions into a single vector. Needed between convolutional layers (which output 3D feature maps) and linear layers (which expect 1D vectors). For example, [batch, 64, 7, 7] becomes [batch, 3136].',
 
   getProperties: () => [],
 

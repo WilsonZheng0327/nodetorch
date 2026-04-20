@@ -9,6 +9,7 @@ export const permuteNode: NodeDefinition = {
   displayName: 'Permute',
   description: 'Reorder tensor dimensions',
   category: ['ML', 'Structural'],
+  learnMore: 'Reorders the dimensions of a tensor. For example, converting [batch, sequence, features] to [batch, features, sequence] for Conv1d layers which expect channels before sequence length.',
 
   getProperties: () => [
     {

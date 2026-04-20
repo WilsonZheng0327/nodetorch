@@ -28,10 +28,10 @@ __pycache__/
 *.pyc
 .venv/
 
-# Dataset files
-backend/data/
-backend/blocks/
-
-# Training run records
-backend/runs/
-saved_models/
+# Ephemeral storage (datasets, weights, runs, blocks)
+backend/storage/datasets/
+backend/storage/weights/
+backend/storage/runs/
+backend/storage/blocks/
+data/
+test_diffusion_output/

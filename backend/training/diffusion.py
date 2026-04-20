@@ -185,7 +185,7 @@ def _sample(model_modules, model_order, nodes, edges, scheduler, shape, device, 
 
         x = (1 / alpha.sqrt()) * (x - (beta / (1 - alpha_bar).sqrt()) * predicted_noise) + beta.sqrt() * noise
 
-    return x.clamp(-1, 1)
+    return x  # values are in the dataset's normalized space, not necessarily [-1, 1]
 
 
 def diffusion_train(ctx: TrainingContext) -> TrainingResult:
@@ -313,14 +313,20 @@ def diffusion_train(ctx: TrainingContext) -> TrainingResult:
                         scheduler_module, sample_shape, dev,
                     )
                     if sample_images is not None:
-                        imgs = sample_images.detach().cpu()
-                        imgs = (imgs - imgs.min()) / (imgs.max() - imgs.min() + 1e-8)
+                        from data_loaders import DENORMALIZERS
+                        denorm = DENORMALIZERS.get(ctx.dataset_type)
                         generated_samples = []
-                        for i in range(min(8, imgs.size(0))):
-                            img = imgs[i]
-                            if img.dim() == 3:
-                                img = img[0]  # Take first channel for grayscale
-                            pixels = (img * 255).clamp(0, 255).byte().tolist()
+                        for i in range(min(8, sample_images.size(0))):
+                            img = sample_images[i].detach().cpu()
+                            if denorm:
+                                img = denorm(img)
+                            else:
+                                img = (img - img.min()) / (img.max() - img.min() + 1e-8)
+                            img = (img.clamp(0, 1) * 255).byte()
+                            if img.dim() == 3 and img.shape[0] == 1:
+                                pixels = img[0].tolist()
+                            else:
+                                pixels = img.permute(1, 2, 0).tolist() if img.dim() == 3 else img.tolist()
                             generated_samples.append(pixels)
             except Exception:
                 pass

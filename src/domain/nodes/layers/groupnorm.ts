@@ -6,6 +6,7 @@ export const groupNormNode: NodeDefinition = {
   displayName: 'GroupNorm',
   description: 'Group normalization — normalizes across groups of channels',
   category: ['ML', 'Layers', 'Normalization'],
+  learnMore: 'Divides channels into groups and normalizes within each group. A middle ground between BatchNorm (normalize across batch) and InstanceNorm (normalize per channel). Works well with small batch sizes where BatchNorm is unstable.',
 
   getProperties: () => [
     { id: 'numGroups', name: 'Num Groups', type: { kind: 'number', min: 1, integer: true }, defaultValue: 8, affects: 'execution' },

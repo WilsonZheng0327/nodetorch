@@ -16,6 +16,9 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
+# All downloaded datasets go here
+DATASETS_DIR = "./storage/datasets"
+
 
 # --- MNIST ---
 
@@ -27,7 +30,7 @@ def load_mnist(props: dict) -> dict[str, torch.Tensor]:
         transforms.Normalize((0.1307,), (0.3081,)),
     ])
     dataset = torchvision.datasets.MNIST(
-        root="./data", train=True, download=True, transform=transform,
+        root=DATASETS_DIR, train=True, download=True, transform=transform,
     )
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     images, labels = next(iter(loader))
@@ -41,7 +44,7 @@ def train_dataset_mnist() -> torch.utils.data.Dataset:
         transforms.Normalize((0.1307,), (0.3081,)),
     ])
     return torchvision.datasets.MNIST(
-        root="./data", train=True, download=True, transform=transform,
+        root=DATASETS_DIR, train=True, download=True, transform=transform,
     )
 
 
@@ -63,7 +66,7 @@ def load_cifar100(props: dict) -> dict[str, torch.Tensor]:
         ),
     ])
     dataset = torchvision.datasets.CIFAR100(
-        root="./data", train=True, download=True, transform=transform,
+        root=DATASETS_DIR, train=True, download=True, transform=transform,
     )
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     images, labels = next(iter(loader))
@@ -88,7 +91,7 @@ def train_dataset_cifar100(augHFlip: bool = False, augRandomCrop: bool = False, 
         ),
     ])
     return torchvision.datasets.CIFAR100(
-        root="./data", train=True, download=True, transform=transform,
+        root=DATASETS_DIR, train=True, download=True, transform=transform,
     )
 
 
@@ -108,7 +111,7 @@ def load_cifar10(props: dict) -> dict[str, torch.Tensor]:
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     ])
     dataset = torchvision.datasets.CIFAR10(
-        root="./data", train=True, download=True, transform=transform,
+        root=DATASETS_DIR, train=True, download=True, transform=transform,
     )
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     images, labels = next(iter(loader))
@@ -129,7 +132,7 @@ def train_dataset_cifar10(augHFlip: bool = False, augRandomCrop: bool = False, a
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     ])
     return torchvision.datasets.CIFAR10(
-        root="./data", train=True, download=True, transform=transform,
+        root=DATASETS_DIR, train=True, download=True, transform=transform,
     )
 
 
@@ -148,7 +151,7 @@ def load_fashion_mnist(props: dict) -> dict[str, torch.Tensor]:
         transforms.Normalize((0.2860,), (0.3530,)),
     ])
     dataset = torchvision.datasets.FashionMNIST(
-        root="./data", train=True, download=True, transform=transform,
+        root=DATASETS_DIR, train=True, download=True, transform=transform,
     )
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     images, labels = next(iter(loader))
@@ -161,7 +164,7 @@ def train_dataset_fashion_mnist() -> torch.utils.data.Dataset:
         transforms.Normalize((0.2860,), (0.3530,)),
     ])
     return torchvision.datasets.FashionMNIST(
-        root="./data", train=True, download=True, transform=transform,
+        root=DATASETS_DIR, train=True, download=True, transform=transform,
     )
 
 
@@ -376,7 +379,7 @@ def _tensor_to_pixels(img: torch.Tensor, denorm) -> list:
 def detail_mnist() -> dict:
     labels = [str(i) for i in range(10)]
     dataset = torchvision.datasets.MNIST(
-        root="./data", train=True, download=True,
+        root=DATASETS_DIR, train=True, download=True,
         transform=transforms.ToTensor(),
     )
     # Get 4 samples per class
@@ -428,7 +431,7 @@ def detail_cifar100() -> dict:
         'small_mammals', 'trees', 'vehicles_1', 'vehicles_2',
     ]
     dataset = torchvision.datasets.CIFAR100(
-        root="./data", train=True, download=True,
+        root=DATASETS_DIR, train=True, download=True,
         transform=transforms.ToTensor(),
     )
     # Get 4 samples for first 20 classes (all 100 would be too heavy)
@@ -460,7 +463,7 @@ def detail_cifar100() -> dict:
 def detail_cifar10() -> dict:
     labels = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
     dataset = torchvision.datasets.CIFAR10(
-        root="./data", train=True, download=True, transform=transforms.ToTensor(),
+        root=DATASETS_DIR, train=True, download=True, transform=transforms.ToTensor(),
     )
     samples: dict[int, list] = {i: [] for i in range(10)}
     for img, label in dataset:
@@ -485,7 +488,7 @@ def detail_cifar10() -> dict:
 def detail_fashion_mnist() -> dict:
     labels = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
     dataset = torchvision.datasets.FashionMNIST(
-        root="./data", train=True, download=True, transform=transforms.ToTensor(),
+        root=DATASETS_DIR, train=True, download=True, transform=transforms.ToTensor(),
     )
     samples: dict[int, list] = {i: [] for i in range(10)}
     for img, label in dataset:
@@ -576,19 +579,19 @@ CLASS_NAMES: dict[str, list[str]] = {
 
 def test_dataset_mnist() -> torch.utils.data.Dataset:
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-    return torchvision.datasets.MNIST(root="./data", train=False, download=True, transform=transform)
+    return torchvision.datasets.MNIST(root=DATASETS_DIR, train=False, download=True, transform=transform)
 
 def test_dataset_cifar10(**kwargs) -> torch.utils.data.Dataset:
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))])
-    return torchvision.datasets.CIFAR10(root="./data", train=False, download=True, transform=transform)
+    return torchvision.datasets.CIFAR10(root=DATASETS_DIR, train=False, download=True, transform=transform)
 
 def test_dataset_cifar100(**kwargs) -> torch.utils.data.Dataset:
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
-    return torchvision.datasets.CIFAR100(root="./data", train=False, download=True, transform=transform)
+    return torchvision.datasets.CIFAR100(root=DATASETS_DIR, train=False, download=True, transform=transform)
 
 def test_dataset_fashion_mnist() -> torch.utils.data.Dataset:
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.2860,), (0.3530,))])
-    return torchvision.datasets.FashionMNIST(root="./data", train=False, download=True, transform=transform)
+    return torchvision.datasets.FashionMNIST(root=DATASETS_DIR, train=False, download=True, transform=transform)
 
 def test_dataset_imdb(**kwargs) -> torch.utils.data.Dataset:
     return IMDbDataset(vocab_size=kwargs.get("vocabSize", 10000), max_len=kwargs.get("maxLen", 256), split="test")
@@ -611,16 +614,16 @@ TEST_DATASETS: dict[str, callable] = {
 def _get_raw_image(dataset_type: str):
     """Get the first raw sample (PIL image) from a dataset, no transforms."""
     if dataset_type == "data.cifar10":
-        ds = torchvision.datasets.CIFAR10(root="./data", train=True, download=True)
+        ds = torchvision.datasets.CIFAR10(root=DATASETS_DIR, train=True, download=True)
         return ds[0][0]  # PIL image
     if dataset_type == "data.cifar100":
-        ds = torchvision.datasets.CIFAR100(root="./data", train=True, download=True)
+        ds = torchvision.datasets.CIFAR100(root=DATASETS_DIR, train=True, download=True)
         return ds[0][0]
     if dataset_type == "data.mnist":
-        ds = torchvision.datasets.MNIST(root="./data", train=True, download=True)
+        ds = torchvision.datasets.MNIST(root=DATASETS_DIR, train=True, download=True)
         return ds[0][0]
     if dataset_type == "data.fashion_mnist":
-        ds = torchvision.datasets.FashionMNIST(root="./data", train=True, download=True)
+        ds = torchvision.datasets.FashionMNIST(root=DATASETS_DIR, train=True, download=True)
         return ds[0][0]
     return None
 

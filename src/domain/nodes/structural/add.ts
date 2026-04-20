@@ -20,6 +20,7 @@ export const addNode: NodeDefinition = {
   displayName: 'Add',
   description: 'Element-wise addition (for skip/residual connections)',
   category: ['ML', 'Structural'],
+  learnMore: 'Element-wise addition of two tensors \u2014 the building block of residual/skip connections. In ResNets, the input skips over a block of layers and is added back to the output. This lets gradients flow directly through the skip path, making very deep networks trainable.',
 
   getProperties: () => [],
 

@@ -74,6 +74,10 @@ export function PropertyInspector({ node, selectedCount, onPropertyChange, onSav
       <div className="inspector-header">{def.displayName}</div>
       <div className="inspector-desc">{def.description}</div>
 
+      {def.learnMore && (
+        <div className="inspector-learn-more">{def.learnMore}</div>
+      )}
+
       {properties.length > 0 && (
         <div className="inspector-section">
           <div className="inspector-section-title">Properties</div>

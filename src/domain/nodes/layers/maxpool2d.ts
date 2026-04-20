@@ -6,6 +6,7 @@ export const maxPool2dNode: NodeDefinition = {
   displayName: 'MaxPool2d',
   description: '2D max pooling',
   category: ['ML', 'Layers', 'Pooling'],
+  learnMore: 'Takes the maximum value in each pooling window, reducing spatial size while keeping the strongest features. A kernel of 2 with stride 2 halves the image dimensions. Provides translation invariance \u2014 the exact position of a feature matters less.',
 
   getProperties: () => [
     {

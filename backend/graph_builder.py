@@ -79,7 +79,7 @@ def get_trained_modules() -> dict[str, nn.Module]:
     return _model_store.get("current", {})
 
 
-def save_model(filepath: str = "saved_models/current.pt") -> dict:
+def save_model(filepath: str = "storage/weights/current.pt") -> dict:
     """Save trained module state dicts to disk."""
     if "current" not in _model_store:
         return {"error": "No trained model to save"}
@@ -218,7 +218,7 @@ def build_modules(graph_data: dict) -> dict[str, nn.Module]:
     return modules
 
 
-def load_model(graph_data: dict, filepath: str = "saved_models/current.pt") -> dict:
+def load_model(graph_data: dict, filepath: str = "storage/weights/current.pt") -> dict:
     """Load saved state dicts into freshly built modules from the graph."""
     if not os.path.exists(filepath):
         return {"error": f"No saved model at {filepath}"}
@@ -1804,6 +1804,14 @@ def evaluate_test_set(graph_data: dict) -> dict:
     if not has_trained_model():
         return {"error": "No trained model — train first"}
 
+    # Diffusion and GAN models don't support standard test evaluation
+    graph = graph_data["graph"]
+    for n in graph["nodes"]:
+        if n["type"] == DIFFUSION_SCHEDULER_TYPE:
+            return {"error": "Diffusion models don't use test set evaluation — use Step Through > Denoise to generate samples"}
+        if n["type"] == GAN_NOISE_TYPE:
+            return {"error": "GAN models don't use test set evaluation — check generated samples in the training dashboard"}
+
     trained_modules = get_trained_modules()
     graph = graph_data["graph"]
     nodes = {n["id"]: n for n in graph["nodes"]}
@@ -1968,6 +1976,14 @@ def infer_graph(graph_data: dict) -> dict:
     """
     if not has_trained_model():
         return {"error": "No trained model — train first"}
+
+    # Diffusion and GAN models don't support standard inference
+    graph = graph_data["graph"]
+    for n in graph["nodes"]:
+        if n["type"] == DIFFUSION_SCHEDULER_TYPE:
+            return {"error": "Diffusion models generate images via denoising — use Step Through > Denoise tab"}
+        if n["type"] == GAN_NOISE_TYPE:
+            return {"error": "GAN inference generates images from noise — use Step Through > Denoise or check training dashboard for generated samples"}
 
     trained_modules = get_trained_modules()
     graph = graph_data["graph"]

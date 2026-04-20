@@ -10,6 +10,7 @@ export const reshapeNode: NodeDefinition = {
   displayName: 'Reshape',
   description: 'Reshape tensor (use -1 for inferred dim)',
   category: ['ML', 'Structural'],
+  learnMore: 'Changes the shape of a tensor without changing its data. Use -1 for one dimension to let PyTorch infer it from the total number of elements. Common use: converting a flat vector back to spatial dimensions in decoder networks.',
 
   getProperties: () => [
     {

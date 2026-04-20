@@ -2,7 +2,7 @@
   "version": "1.0",
   "graph": {
     "id": "main",
-    "name": "Main Graph",
+    "name": "ResNet — CIFAR-100",
     "nodes": [
       {
         "id": "data.cifar100-1776398131130-e1sq",

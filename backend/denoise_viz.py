@@ -158,7 +158,7 @@ def run_denoise_step_through(graph_data: dict, num_samples: int = 4, capture_eve
             if t_val % capture_every == 0 or t_val == 0:
                 steps.append({
                     "timestep": t_val,
-                    "pixels": _tensor_to_pixels_batch(x.clamp(-1, 1), data_node["type"] if data_node else None),
+                    "pixels": _tensor_to_pixels_batch(x, data_node["type"] if data_node else None),
                 })
 
     # Set back to train mode
@@ -177,11 +177,18 @@ def run_denoise_step_through(graph_data: dict, num_samples: int = 4, capture_eve
 
 def _tensor_to_pixels_batch(images: torch.Tensor, dataset_type: str | None) -> list:
     """Convert [B, C, H, W] tensor to list of pixel arrays for JSON."""
+    from data_loaders import DENORMALIZERS
+    denorm = DENORMALIZERS.get(dataset_type) if dataset_type else None
+
     result = []
     for i in range(images.shape[0]):
         img = images[i].detach().cpu()
-        # Map from [-1, 1] to [0, 1]
-        img = (img + 1) / 2
+        # Undo dataset normalization if available
+        if denorm:
+            img = denorm(img)
+        else:
+            # Fallback: assume [-1, 1] range
+            img = (img + 1) / 2
         img = (img.clamp(0, 1) * 255).byte()
         C = img.shape[0]
         if C == 1:

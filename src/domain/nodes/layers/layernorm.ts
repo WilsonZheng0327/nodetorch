@@ -10,6 +10,7 @@ export const layerNormNode: NodeDefinition = {
   displayName: 'LayerNorm',
   description: 'Layer normalization (used in transformers)',
   category: ['ML', 'Layers', 'Normalization'],
+  learnMore: 'Normalizes across features within each sample (unlike BatchNorm which normalizes across the batch). The standard normalization for transformer models because it works well with variable-length sequences and small batches.',
 
   getProperties: () => [
     {

@@ -6,6 +6,7 @@ export const upsampleNode: NodeDefinition = {
   displayName: 'Upsample',
   description: 'Upsamples input by scale factor (nearest/bilinear)',
   category: ['ML', 'Layers', 'Pooling'],
+  learnMore: 'Increases spatial resolution by repeating or interpolating pixel values. Simpler than ConvTranspose2d (no learnable parameters) but less expressive. Common in decoder networks and U-Nets.',
 
   getProperties: () => [
     { id: 'scaleFactor', name: 'Scale Factor', type: { kind: 'number', min: 1, integer: true }, defaultValue: 2, affects: 'execution' },

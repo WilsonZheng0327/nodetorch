@@ -12,6 +12,7 @@ export const ganLossNode: NodeDefinition = {
   description: 'Adversarial loss for GAN training (handles both G and D losses internally)',
   category: ['ML', 'Loss'],
   color: '#ef4444',
+  learnMore: 'The adversarial loss that drives GAN training. The discriminator tries to maximize this loss (correctly classify real vs fake), while the generator tries to minimize it (fool the discriminator). Label smoothing reduces the real label from 1.0 to help stabilize training.',
 
   getProperties: () => [
     {

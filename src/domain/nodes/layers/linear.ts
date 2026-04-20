@@ -9,6 +9,7 @@ export const linearNode: NodeDefinition = {
   displayName: 'Linear',
   description: 'Fully connected layer',
   category: ['ML', 'Layers'],
+  learnMore: 'A fully connected layer \u2014 every input neuron connects to every output neuron. Used at the end of networks for classification (outFeatures = number of classes) and in bottleneck layers. The simplest trainable layer but uses many parameters.',
 
   getProperties: () => [
     {

@@ -11,6 +11,7 @@ export const vaeLossNode: NodeDefinition = {
   description: 'Reconstruction + KL divergence loss for VAEs',
   category: ['ML', 'Loss'],
   color: '#ef4444',
+  learnMore: 'Combines reconstruction loss (how well the decoder recreates the input) with KL divergence (how close the latent distribution is to a standard normal). The \u03B2 parameter controls the trade-off \u2014 higher \u03B2 forces a more organized latent space but may sacrifice reconstruction quality.',
 
   getProperties: () => [
     {

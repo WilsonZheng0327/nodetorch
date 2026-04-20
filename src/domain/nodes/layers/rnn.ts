@@ -6,6 +6,7 @@ export const rnnNode: NodeDefinition = {
   displayName: 'RNN',
   description: 'Basic recurrent neural network',
   category: ['ML', 'Layers', 'Recurrent'],
+  learnMore: 'The simplest recurrent layer \u2014 processes sequences by passing a hidden state from one timestep to the next. Struggles with long sequences due to vanishing gradients. In practice, LSTM or GRU are almost always preferred.',
 
   getProperties: () => [
     { id: 'hiddenSize', name: 'Hidden Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 128, affects: 'both' },

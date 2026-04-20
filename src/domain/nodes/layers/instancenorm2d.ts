@@ -6,6 +6,7 @@ export const instanceNorm2dNode: NodeDefinition = {
   displayName: 'InstanceNorm2d',
   description: 'Instance normalization — normalizes each sample independently',
   category: ['ML', 'Layers', 'Normalization'],
+  learnMore: 'Normalizes each sample and each channel independently. Popular in style transfer and image generation where you want to normalize spatial statistics without mixing information across samples.',
 
   getProperties: () => [],
 

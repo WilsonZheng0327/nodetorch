@@ -12,6 +12,7 @@ export const attentionNode: NodeDefinition = {
   displayName: 'Attention',
   description: 'Scaled dot-product attention (QK^TV)',
   category: ['ML', 'Layers', 'Attention'],
+  learnMore: 'Scaled dot-product attention \u2014 computes how much each position should attend to every other position. The attention weight between positions i and j is based on how similar their Query and Key vectors are. The foundation of all transformer architectures.',
 
   getProperties: () => [
     {

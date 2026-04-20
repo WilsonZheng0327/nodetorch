@@ -38,14 +38,17 @@ from backprop_sim import simulate_backprop, run_backward_step_through
 from loss_landscape import compute_loss_landscape
 from latent_viz import generate_latent_grid
 from denoise_viz import run_denoise_step_through
+from gan_generate import generate_gan_images
 from runs_store import list_runs, load_run, delete_run
 from data_loaders import DATASET_DETAILS, augmentation_preview
 import os
 from pathlib import Path
 
-BLOCKS_DIR = Path("./blocks")
+STORAGE_DIR = Path("./storage")
+STORAGE_DIR.mkdir(exist_ok=True)
+BLOCKS_DIR = STORAGE_DIR / "blocks"
 BLOCKS_DIR.mkdir(exist_ok=True)
-PRESETS_DIR = Path("./presets")  # shipped block templates, read-only
+PRESETS_DIR = STORAGE_DIR / "presets"  # shipped block templates, read-only
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nodetorch")
@@ -149,6 +152,23 @@ async def evaluate_test(request: dict):
         return {"status": "error", "error": str(e)}
 
 
+@app.post("/gan-generate")
+async def gan_generate(request: dict):
+    """Generate images from a trained GAN."""
+    logger.info("GAN generate requested")
+    try:
+        result = generate_gan_images(
+            request["graph"],
+            num_samples=request.get("numSamples", 8),
+        )
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"GAN generate failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
 @app.post("/denoise-step-through")
 async def denoise_step_through(request: dict):
     """Run DDPM denoising and return images at each timestep."""
@@ -246,7 +266,7 @@ async def upload_weights(file: UploadFile, graph: str = Form(...)):
 @app.get("/saved-models")
 async def list_saved_models():
     """List saved weight files."""
-    model_dir = Path("saved_models")
+    model_dir = STORAGE_DIR / "weights"
     if not model_dir.exists():
         return {"status": "ok", "files": []}
     files = sorted([f.name for f in model_dir.glob("*.pt")])

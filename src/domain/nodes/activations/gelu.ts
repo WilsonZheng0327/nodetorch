@@ -6,6 +6,7 @@ export const geluNode: NodeDefinition = {
   displayName: 'GELU',
   description: 'Gaussian Error Linear Unit (used in transformers)',
   category: ['ML', 'Activations'],
+  learnMore: 'A smooth approximation of ReLU used in modern transformers (BERT, GPT). Unlike ReLU which has a hard cutoff at zero, GELU allows small negative values through. Slightly better than ReLU for NLP tasks.',
 
   getProperties: () => [],
 

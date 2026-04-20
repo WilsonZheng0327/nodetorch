@@ -6,6 +6,7 @@ export const leakyReluNode: NodeDefinition = {
   displayName: 'LeakyReLU',
   description: 'Leaky ReLU (small slope for negatives)',
   category: ['ML', 'Activations'],
+  learnMore: 'Like ReLU but allows a small gradient for negative values instead of zero. Prevents the "dying ReLU" problem where neurons permanently stop learning. The negative slope is typically 0.01 or 0.2.',
 
   getProperties: () => [
     {

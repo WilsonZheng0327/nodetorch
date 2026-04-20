@@ -11,6 +11,7 @@ export const sgdNode: NodeDefinition = {
   description: 'Stochastic Gradient Descent optimizer',
   category: ['ML', 'Optimizers'],
   color: '#8b5cf6',
+  learnMore: 'The classic optimizer \u2014 updates weights by subtracting the gradient scaled by the learning rate. With momentum, it also considers past gradients to smooth the updates and escape local minima. Simple, well-understood, and often the best choice for CNNs with careful learning rate tuning.',
 
   getProperties: () => [
     {

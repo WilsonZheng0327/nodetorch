@@ -13,6 +13,7 @@ export const lstmNode: NodeDefinition = {
   displayName: 'LSTM',
   description: 'Long Short-Term Memory recurrent layer',
   category: ['ML', 'Layers', 'Recurrent'],
+  learnMore: 'Processes sequences one step at a time while maintaining a memory cell. Uses gates (input, forget, output) to control what information to keep or discard. Better than simple RNNs at capturing long-range dependencies. The go-to architecture for sequence tasks before transformers.',
 
   getProperties: () => [
     { id: 'hiddenSize', name: 'Hidden Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 128, affects: 'execution', help: 'Size of the hidden state vector. Larger = more capacity to remember patterns. Common: 64, 128, 256.' },

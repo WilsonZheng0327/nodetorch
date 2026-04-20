@@ -4,8 +4,9 @@ export const sequencePoolNode: NodeDefinition = {
   type: 'ml.structural.sequence_pool',
   version: 1,
   displayName: 'SeqPool',
-  description: 'Pool over sequence dimension: [B, seq, H] → [B, H]',
+  description: 'Pool over sequence dimension: [B, seq, H] \u2192 [B, H]',
   category: ['ML', 'Structural'],
+  learnMore: 'Reduces a sequence to a single vector. "last" takes the final timestep (captures the full sequence context in LSTMs). "mean" averages all timesteps (gives equal weight to each position). "max" takes the element-wise maximum across timesteps.',
 
   getProperties: () => [
     {
