@@ -32,9 +32,11 @@ from data_loaders import DATA_LOADERS, TRAIN_DATASETS, DENORMALIZERS
 LOSS_NODES = {"ml.loss.cross_entropy", "ml.loss.mse"}
 OPTIMIZER_NODES = {"ml.optimizers.sgd", "ml.optimizers.adam", "ml.optimizers.adamw"}
 # Structural nodes with multiple named inputs (passed as **kwargs)
-MULTI_INPUT_NODES = {"ml.structural.add", "ml.structural.concat", "ml.layers.multihead_attention", "ml.layers.attention", "ml.structural.reparameterize", "ml.loss.vae"}
+MULTI_INPUT_NODES = {"ml.structural.add", "ml.structural.concat", "ml.layers.multihead_attention", "ml.layers.attention", "ml.structural.reparameterize", "ml.loss.vae", "ml.loss.gan"}
 # All node types recognized as loss functions (for training loop loss detection)
-ALL_LOSS_NODES = LOSS_NODES | {"ml.loss.vae"}
+ALL_LOSS_NODES = LOSS_NODES | {"ml.loss.vae", "ml.loss.gan"}
+# GAN-specific node types (noise input generates noise, not dataset)
+GAN_NOISE_TYPE = "ml.gan.noise_input"
 SUBGRAPH_TYPE = "subgraph.block"
 SENTINEL_INPUT = "subgraph.input"
 SENTINEL_OUTPUT = "subgraph.output"
@@ -140,6 +142,17 @@ def build_modules(graph_data: dict) -> dict[str, nn.Module]:
                 continue
 
             if node_type in OPTIMIZER_NODES:
+                continue
+
+            # GAN noise input: produce dummy noise for shape inference
+            if node_type == GAN_NOISE_TYPE:
+                builder = NODE_BUILDERS.get(node_type)
+                if builder:
+                    module = builder(props, {})
+                    modules[node_id] = module.to(dev)
+                    batch_size = props.get("batchSize", 64)
+                    latent_dim = props.get("latentDim", 100)
+                    results[node_id] = {"out": torch.randn(batch_size, latent_dim, device=dev)}
                 continue
 
             inputs = gather_inputs(node_id, edges, results)
@@ -455,6 +468,28 @@ def build_and_run_graph(graph_data: dict) -> tuple[
                 "outputs": {},
                 "metadata": {},
             }
+            continue
+
+        # --- GAN noise input: produce dummy noise for shape inference ---
+        if node_type == GAN_NOISE_TYPE:
+            builder = NODE_BUILDERS.get(node_type)
+            if builder:
+                try:
+                    module = builder(props, {})
+                    modules[node_id] = module.to(get_device())
+                    batch_size = props.get("batchSize", 64)
+                    latent_dim = props.get("latentDim", 100)
+                    dummy_noise = torch.randn(batch_size, latent_dim, device=get_device())
+                    results[node_id] = {"out": dummy_noise}
+                    node_results[node_id] = {
+                        "outputs": {"out": tensor_info(dummy_noise)},
+                        "metadata": {"outputShape": [batch_size, latent_dim]},
+                    }
+                except Exception as e:
+                    node_results[node_id] = {
+                        "outputs": {},
+                        "metadata": {"error": str(e)},
+                    }
             continue
 
         # --- Loss nodes: take named inputs (predictions + labels) ---

@@ -21,6 +21,7 @@ from graph_builder import (
     MULTI_INPUT_NODES,
     SUBGRAPH_TYPE,
     OPTIMIZER_NODES,
+    GAN_NOISE_TYPE,
     gather_inputs,
 )
 from data_loaders import DATA_LOADERS
@@ -98,7 +99,7 @@ def run_forward_pass(
         node = nodes[node_id]
         ntype = node["type"]
 
-        if ntype in OPTIMIZER_NODES or ntype in DATA_LOADERS:
+        if ntype in OPTIMIZER_NODES or ntype in DATA_LOADERS or ntype == GAN_NOISE_TYPE:
             continue
 
         mod = modules.get(node_id)

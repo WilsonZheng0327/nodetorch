@@ -61,14 +61,19 @@ export function validateForward(graph: Graph, registry: NodeRegistry): Validatio
 
 // --- Training checks (includes all forward checks + training-specific) ---
 
-const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse', 'ml.loss.vae'];
+const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse', 'ml.loss.vae', 'ml.loss.gan'];
 const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam', 'ml.optimizers.adamw'];
 const DATA_TYPES = ['data.mnist', 'data.cifar10', 'data.cifar100', 'data.fashion_mnist', 'data.imdb', 'data.ag_news'];
+const GAN_INPUT_TYPES = ['ml.gan.noise_input'];
 
 export function validateTraining(graph: Graph, registry: NodeRegistry): ValidationError[] {
   // Start with forward validation
   const errors = validateForward(graph, registry);
   if (errors.length > 0) return errors;
+
+  // Detect GAN mode
+  const ganLossNodes = [...graph.nodes.values()].filter((n) => n.type === 'ml.loss.gan');
+  const isGanMode = ganLossNodes.length > 0;
 
   // Must have exactly one data node
   const dataNodes = [...graph.nodes.values()].filter((n) => DATA_TYPES.includes(n.type));
@@ -85,12 +90,24 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
     errors.push({ message: 'No loss node — add a loss function (e.g. CrossEntropyLoss)' });
   }
 
-  // Must have exactly one optimizer node
+  // Must have optimizer node(s) — GAN requires exactly 2
   const optimizerNodes = [...graph.nodes.values()].filter((n) => OPTIMIZER_TYPES.includes(n.type));
   if (optimizerNodes.length === 0) {
     errors.push({ message: 'No optimizer node — add an optimizer (e.g. SGD)' });
   }
-  if (optimizerNodes.length > 1) {
+  if (isGanMode) {
+    if (optimizerNodes.length !== 2) {
+      errors.push({ message: 'GAN requires exactly 2 optimizer nodes — one for Generator, one for Discriminator' });
+    }
+    // GAN requires a noise input node
+    const noiseInputNodes = [...graph.nodes.values()].filter((n) => GAN_INPUT_TYPES.includes(n.type));
+    if (noiseInputNodes.length === 0) {
+      errors.push({ message: 'GAN requires a Noise Input node for the generator' });
+    }
+    if (noiseInputNodes.length > 1) {
+      errors.push({ message: 'Multiple Noise Input nodes — only one is supported per GAN' });
+    }
+  } else if (optimizerNodes.length > 1) {
     errors.push({ message: 'Multiple optimizer nodes — only one is supported' });
   }
 
@@ -101,6 +118,17 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
     if (lossNode.type === 'ml.loss.vae') {
       // VAE loss has 4 required inputs: reconstruction, original, mean, logvar
       const requiredPorts = ['reconstruction', 'original', 'mean', 'logvar'];
+      for (const portId of requiredPorts) {
+        const connected = graph.edges.some(
+          (e) => e.target.nodeId === lossNode.id && e.target.portId === portId,
+        );
+        if (!connected) {
+          errors.push({ nodeId: lossNode.id, message: `${lossName}: ${portId} port not connected` });
+        }
+      }
+    } else if (lossNode.type === 'ml.loss.gan') {
+      // GAN loss has 2 required inputs: real_scores and fake_scores
+      const requiredPorts = ['real_scores', 'fake_scores'];
       for (const portId of requiredPorts) {
         const connected = graph.edges.some(
           (e) => e.target.nodeId === lossNode.id && e.target.portId === portId,
@@ -186,10 +214,18 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
   }
 
   // Check there's a path from data → loss (model layers exist in between)
+  // For GAN mode, also check reachability from noise input
   if (dataNodes.length > 0 && lossNodes.length > 0) {
+    const sourceNodes = [...dataNodes];
+    // In GAN mode, also include noise input as a source
+    if (isGanMode) {
+      const noiseNodes = [...graph.nodes.values()].filter((n) => GAN_INPUT_TYPES.includes(n.type));
+      sourceNodes.push(...noiseNodes);
+    }
+
     const reachable = new Set<string>();
-    const queue = dataNodes.map((n) => n.id);
-    reachable.add(queue[0]);
+    const queue = sourceNodes.map((n) => n.id);
+    for (const id of queue) reachable.add(id);
 
     while (queue.length > 0) {
       const current = queue.shift()!;

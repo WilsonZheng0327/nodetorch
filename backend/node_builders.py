@@ -241,6 +241,25 @@ def build_mse_loss(props: dict, input_shapes: dict) -> nn.Module:
     return nn.MSELoss()
 
 
+class GANLossModule(nn.Module):
+    """GAN discriminator loss: BCE with logits on real and fake scores.
+    real_labels are smoothed from 1.0 to (1-smoothing) to stabilize training."""
+    def __init__(self, label_smoothing: float = 0.1):
+        super().__init__()
+        self.label_smoothing = label_smoothing
+
+    def forward(self, real_scores: torch.Tensor, fake_scores: torch.Tensor) -> torch.Tensor:
+        real_labels = torch.ones_like(real_scores) * (1.0 - self.label_smoothing)
+        fake_labels = torch.zeros_like(fake_scores)
+        d_loss_real = nn.functional.binary_cross_entropy_with_logits(real_scores, real_labels)
+        d_loss_fake = nn.functional.binary_cross_entropy_with_logits(fake_scores, fake_labels)
+        return d_loss_real + d_loss_fake
+
+
+def build_gan_loss(props: dict, input_shapes: dict) -> nn.Module:
+    return GANLossModule(label_smoothing=props.get("labelSmoothing", 0.1))
+
+
 class VAELossModule(nn.Module):
     """VAE loss: reconstruction (MSE) + beta * KL divergence.
     Takes 4 named inputs: reconstruction, original, mean, logvar."""
@@ -260,6 +279,22 @@ def build_vae_loss(props: dict, input_shapes: dict) -> nn.Module:
 
 
 # --- Structural (all need wrappers — none are native nn.Modules) ---
+
+class NoiseInputModule(nn.Module):
+    """Placeholder module for GAN noise input. During training, the GAN loop
+    injects actual noise tensors. The forward() here returns a dummy sample
+    so downstream nodes can determine their input shapes during build."""
+    def __init__(self, latent_dim: int):
+        super().__init__()
+        self.latent_dim = latent_dim
+
+    def forward(self) -> torch.Tensor:
+        return torch.randn(1, self.latent_dim)
+
+
+def build_noise_input(props: dict, input_shapes: dict) -> nn.Module:
+    return NoiseInputModule(latent_dim=props.get("latentDim", 100))
+
 
 class ReparameterizeModule(nn.Module):
     """VAE reparameterization trick: z = mean + exp(0.5 * logvar) * noise.
@@ -503,6 +538,9 @@ NODE_BUILDERS: dict[str, callable] = {
     "ml.loss.cross_entropy": build_cross_entropy_loss,
     "ml.loss.mse": build_mse_loss,
     "ml.loss.vae": build_vae_loss,
+    "ml.loss.gan": build_gan_loss,
+    # GAN
+    "ml.gan.noise_input": build_noise_input,
     # Structural (all wrapped)
     "ml.structural.reparameterize": build_reparameterize,
     "ml.structural.add": build_add,

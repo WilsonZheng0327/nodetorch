@@ -1,0 +1,199 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "DCGAN — MNIST",
+    "nodes": [
+      {
+        "id": "noise",
+        "type": "ml.gan.noise_input",
+        "position": { "x": 0, "y": 0 },
+        "properties": { "latentDim": 100, "batchSize": 64 }
+      },
+      {
+        "id": "mnist",
+        "type": "data.mnist",
+        "position": { "x": 0, "y": 500 },
+        "properties": { "batchSize": 64 }
+      },
+      {
+        "id": "generator",
+        "type": "subgraph.block",
+        "position": { "x": 350, "y": 0 },
+        "properties": { "blockName": "Generator" },
+        "subgraph": {
+          "id": "generator-inner",
+          "name": "Generator",
+          "nodes": [
+            {
+              "id": "input",
+              "type": "subgraph.input",
+              "position": { "x": 0, "y": 200 },
+              "properties": { "portCount": 1, "portNames": "in" }
+            },
+            {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": { "x": 2200, "y": 200 },
+              "properties": { "portCount": 1, "portNames": "out" }
+            },
+            {
+              "id": "g_linear",
+              "type": "ml.layers.linear",
+              "position": { "x": 250, "y": 200 },
+              "properties": { "outFeatures": 6272 }
+            },
+            {
+              "id": "g_reshape",
+              "type": "ml.structural.reshape",
+              "position": { "x": 500, "y": 200 },
+              "properties": { "targetShape": "-1, 128, 7, 7" }
+            },
+            {
+              "id": "g_convt1",
+              "type": "ml.layers.conv_transpose2d",
+              "position": { "x": 750, "y": 200 },
+              "properties": { "outChannels": 64, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 }
+            },
+            {
+              "id": "g_bn1",
+              "type": "ml.layers.batchnorm2d",
+              "position": { "x": 1000, "y": 200 },
+              "properties": {}
+            },
+            {
+              "id": "g_relu",
+              "type": "ml.activations.relu",
+              "position": { "x": 1250, "y": 200 },
+              "properties": {}
+            },
+            {
+              "id": "g_convt2",
+              "type": "ml.layers.conv_transpose2d",
+              "position": { "x": 1500, "y": 200 },
+              "properties": { "outChannels": 1, "kernelSize": 4, "stride": 2, "padding": 1, "outputPadding": 0 }
+            },
+            {
+              "id": "g_tanh",
+              "type": "ml.activations.tanh",
+              "position": { "x": 1750, "y": 200 },
+              "properties": {}
+            }
+          ],
+          "edges": [
+            { "id": "ge1", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "g_linear", "portId": "in" } },
+            { "id": "ge2", "source": { "nodeId": "g_linear", "portId": "out" }, "target": { "nodeId": "g_reshape", "portId": "in" } },
+            { "id": "ge3", "source": { "nodeId": "g_reshape", "portId": "out" }, "target": { "nodeId": "g_convt1", "portId": "in" } },
+            { "id": "ge4", "source": { "nodeId": "g_convt1", "portId": "out" }, "target": { "nodeId": "g_bn1", "portId": "in" } },
+            { "id": "ge5", "source": { "nodeId": "g_bn1", "portId": "out" }, "target": { "nodeId": "g_relu", "portId": "in" } },
+            { "id": "ge6", "source": { "nodeId": "g_relu", "portId": "out" }, "target": { "nodeId": "g_convt2", "portId": "in" } },
+            { "id": "ge7", "source": { "nodeId": "g_convt2", "portId": "out" }, "target": { "nodeId": "g_tanh", "portId": "in" } },
+            { "id": "ge8", "source": { "nodeId": "g_tanh", "portId": "out" }, "target": { "nodeId": "output", "portId": "out" } }
+          ]
+        }
+      },
+      {
+        "id": "discriminator",
+        "type": "subgraph.block",
+        "position": { "x": 350, "y": 500 },
+        "properties": { "blockName": "Discriminator" },
+        "subgraph": {
+          "id": "discriminator-inner",
+          "name": "Discriminator",
+          "nodes": [
+            {
+              "id": "input",
+              "type": "subgraph.input",
+              "position": { "x": 0, "y": 200 },
+              "properties": { "portCount": 1, "portNames": "in" }
+            },
+            {
+              "id": "output",
+              "type": "subgraph.output",
+              "position": { "x": 2200, "y": 200 },
+              "properties": { "portCount": 1, "portNames": "out" }
+            },
+            {
+              "id": "d_conv1",
+              "type": "ml.layers.conv2d",
+              "position": { "x": 250, "y": 200 },
+              "properties": { "outChannels": 32, "kernelSize": 4, "stride": 2, "padding": 1 }
+            },
+            {
+              "id": "d_lrelu1",
+              "type": "ml.activations.leaky_relu",
+              "position": { "x": 500, "y": 200 },
+              "properties": { "negativeSlope": 0.2 }
+            },
+            {
+              "id": "d_conv2",
+              "type": "ml.layers.conv2d",
+              "position": { "x": 750, "y": 200 },
+              "properties": { "outChannels": 64, "kernelSize": 4, "stride": 2, "padding": 1 }
+            },
+            {
+              "id": "d_bn",
+              "type": "ml.layers.batchnorm2d",
+              "position": { "x": 1000, "y": 200 },
+              "properties": {}
+            },
+            {
+              "id": "d_lrelu2",
+              "type": "ml.activations.leaky_relu",
+              "position": { "x": 1250, "y": 200 },
+              "properties": { "negativeSlope": 0.2 }
+            },
+            {
+              "id": "d_flatten",
+              "type": "ml.layers.flatten",
+              "position": { "x": 1500, "y": 200 },
+              "properties": {}
+            },
+            {
+              "id": "d_linear",
+              "type": "ml.layers.linear",
+              "position": { "x": 1750, "y": 200 },
+              "properties": { "outFeatures": 1 }
+            }
+          ],
+          "edges": [
+            { "id": "de1", "source": { "nodeId": "input", "portId": "in" }, "target": { "nodeId": "d_conv1", "portId": "in" } },
+            { "id": "de2", "source": { "nodeId": "d_conv1", "portId": "out" }, "target": { "nodeId": "d_lrelu1", "portId": "in" } },
+            { "id": "de3", "source": { "nodeId": "d_lrelu1", "portId": "out" }, "target": { "nodeId": "d_conv2", "portId": "in" } },
+            { "id": "de4", "source": { "nodeId": "d_conv2", "portId": "out" }, "target": { "nodeId": "d_bn", "portId": "in" } },
+            { "id": "de5", "source": { "nodeId": "d_bn", "portId": "out" }, "target": { "nodeId": "d_lrelu2", "portId": "in" } },
+            { "id": "de6", "source": { "nodeId": "d_lrelu2", "portId": "out" }, "target": { "nodeId": "d_flatten", "portId": "in" } },
+            { "id": "de7", "source": { "nodeId": "d_flatten", "portId": "out" }, "target": { "nodeId": "d_linear", "portId": "in" } },
+            { "id": "de8", "source": { "nodeId": "d_linear", "portId": "out" }, "target": { "nodeId": "output", "portId": "out" } }
+          ]
+        }
+      },
+      {
+        "id": "gan_loss",
+        "type": "ml.loss.gan",
+        "position": { "x": 800, "y": 250 },
+        "properties": { "labelSmoothing": 0.1 }
+      },
+      {
+        "id": "adam_g",
+        "type": "ml.optimizers.adam",
+        "position": { "x": 1150, "y": 150 },
+        "properties": { "lr": 0.0002, "beta1": 0.5, "beta2": 0.999, "epochs": 10, "valSplit": 0, "seed": 42 }
+      },
+      {
+        "id": "adam_d",
+        "type": "ml.optimizers.adam",
+        "position": { "x": 1150, "y": 400 },
+        "properties": { "lr": 0.0002, "beta1": 0.5, "beta2": 0.999, "epochs": 10, "valSplit": 0, "seed": 42 }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "noise", "portId": "out" }, "target": { "nodeId": "generator", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "mnist", "portId": "out" }, "target": { "nodeId": "discriminator", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "discriminator", "portId": "out" }, "target": { "nodeId": "gan_loss", "portId": "real_scores" } },
+      { "id": "e4", "source": { "nodeId": "generator", "portId": "out" }, "target": { "nodeId": "gan_loss", "portId": "fake_scores" } },
+      { "id": "e5", "source": { "nodeId": "gan_loss", "portId": "out" }, "target": { "nodeId": "adam_g", "portId": "loss" } },
+      { "id": "e6", "source": { "nodeId": "gan_loss", "portId": "out" }, "target": { "nodeId": "adam_d", "portId": "loss" } }
+    ]
+  }
+}

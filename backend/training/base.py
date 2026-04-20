@@ -481,7 +481,7 @@ def build_epoch_result(epoch, ctx, avg_loss, accuracy, val_loss, val_accuracy,
 
 def run_final_forward(ctx, modules):
     """Post-training forward pass to get display metadata for each node."""
-    from graph_builder import MULTI_INPUT_NODES
+    from graph_builder import MULTI_INPUT_NODES, GAN_NOISE_TYPE
 
     final_results: dict = {}
     node_results: dict = {}
@@ -499,6 +499,20 @@ def run_final_forward(ctx, modules):
                 node_results[node_id] = {
                     "outputs": outputs,
                     "metadata": {"outputShape": list(first_tensor.shape)},
+                }
+                continue
+
+            # GAN noise input: produce dummy noise
+            if node_type == GAN_NOISE_TYPE:
+                props = node.get("properties", {})
+                batch_size = props.get("batchSize", 64)
+                latent_dim = props.get("latentDim", 100)
+                dev = get_device()
+                dummy_noise = torch.randn(batch_size, latent_dim, device=dev)
+                final_results[node_id] = {"out": dummy_noise}
+                node_results[node_id] = {
+                    "outputs": {"out": tensor_info(dummy_noise)},
+                    "metadata": {"outputShape": [batch_size, latent_dim]},
                 }
                 continue
 

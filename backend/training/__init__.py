@@ -14,9 +14,11 @@ Adding a new training paradigm:
 
 from .base import TrainingContext, TrainingResult, build_training_context, save_training_results
 from .standard import standard_train
+from .gan import gan_train
 
 TRAINING_LOOPS: dict[str, callable] = {
     "standard": standard_train,
+    "gan": gan_train,
 }
 
 
@@ -24,9 +26,8 @@ def detect_training_mode(nodes: dict) -> str:
     """Auto-detect which training loop to use based on node types in graph."""
     for n in nodes.values():
         ntype = n.get("type", "")
-        # Future: GAN detection
-        # if ntype in ("ml.gan.noise_input", "ml.gan.discriminator_loss"):
-        #     return "gan"
+        if ntype in ("ml.gan.noise_input", "ml.loss.gan"):
+            return "gan"
         # Future: Diffusion detection
         # if ntype == "ml.diffusion.noise_scheduler":
         #     return "diffusion"

@@ -614,6 +614,7 @@ for _lt in ALL_LOSS_NODES:
     FORWARD_VIZ[_lt] = forward_viz_loss
 for _dt in DATA_LOADERS:
     FORWARD_VIZ[_dt] = forward_viz_data
+FORWARD_VIZ["ml.gan.noise_input"] = forward_viz_data
 
 
 def get_forward_viz(node_type: str, module, input_tensor, output, inputs, out_dict) -> dict:
