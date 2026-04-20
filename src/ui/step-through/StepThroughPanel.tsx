@@ -1,8 +1,8 @@
 // StepThroughPanel — bottom drawer that shows the forward pass as a timeline.
 // Loads a sample from the dataset and walks through each layer's transformation.
 
-import { useEffect, useState, useRef } from 'react';
-import type { StepThroughResult, BackwardStepThroughResult, StepThroughMode } from './types';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import type { StepThroughResult, BackwardStepThroughResult, StepThroughMode, DenoiseStepThroughResult } from './types';
 import { StageTimeline } from './StageTimeline';
 import { StageDetail } from './StageDetail';
 import { PerturbCanvas } from './PerturbCanvas';
@@ -19,6 +19,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const [result, setResult] = useState<StepThroughResult | null>(null);
   const [resultB, setResultB] = useState<StepThroughResult | null>(null);  // second sample for compare
   const [backwardResult, setBackwardResult] = useState<BackwardStepThroughResult | null>(null);
+  const [denoiseResult, setDenoiseResult] = useState<DenoiseStepThroughResult | null>(null);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +83,30 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
       .finally(() => setLoading(false));
   };
 
+  // Load denoise step-through (diffusion models)
+  const loadDenoise = () => {
+    setLoading(true);
+    setError(null);
+    // Capture every 5th step to keep response size reasonable
+    const captureEvery = Math.max(1, Math.floor(100 / 50));
+    fetch('http://localhost:8000/denoise-step-through', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ graph: JSON.parse(graphJson), numSamples: 4, captureEvery }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok') {
+          setDenoiseResult(data.result);
+          setCurrentIdx(0);
+        } else {
+          setError(data.error ?? 'Failed to run denoising');
+        }
+      })
+      .catch(() => setError('Cannot connect to backend'))
+      .finally(() => setLoading(false));
+  };
+
   const exitCompare = () => setResultB(null);
   const compareMode = resultB !== null;
 
@@ -101,17 +126,27 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
+  // Detect if this is a diffusion graph
+  const isDiffusionGraph = (() => {
+    try {
+      const g = JSON.parse(graphJson);
+      return g.graph?.nodes?.some((n: any) => n.type === 'ml.diffusion.noise_scheduler') ?? false;
+    } catch { return false; }
+  })();
+
   // The active result and stages depend on the mode
   const activeResult = mode === 'forward' ? result : backwardResult;
   const activeStages = activeResult?.stages ?? [];
+  const denoiseSteps = denoiseResult?.steps ?? [];
+  const totalSteps = mode === 'denoise' ? denoiseSteps.length : activeStages.length;
 
   // Auto-play logic
   const playTimerRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!isPlaying || activeStages.length === 0) return;
+    if (!isPlaying || totalSteps === 0) return;
     playTimerRef.current = window.setInterval(() => {
       setCurrentIdx((i) => {
-        if (i >= activeStages.length - 1) {
+        if (i >= totalSteps - 1) {
           setIsPlaying(false);
           return i;
         }
@@ -121,16 +156,15 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     return () => {
       if (playTimerRef.current) window.clearInterval(playTimerRef.current);
     };
-  }, [isPlaying, activeStages.length]);
+  }, [isPlaying, totalSteps]);
 
-  // When switching to backward mode, auto-load if needed
+  // When switching modes, auto-load if needed
   const switchMode = (m: StepThroughMode) => {
     setMode(m);
     setCurrentIdx(0);
     setIsPlaying(false);
-    if (m === 'backward' && !backwardResult && !loading) {
-      loadBackward();
-    }
+    if (m === 'backward' && !backwardResult && !loading) loadBackward();
+    if (m === 'denoise' && !denoiseResult && !loading) loadDenoise();
   };
 
   if (!open) return null;
@@ -156,6 +190,14 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
             >
               Backward
             </button>
+            {isDiffusionGraph && (
+              <button
+                className={`step-through-mode-tab ${mode === 'denoise' ? 'step-through-mode-tab-active step-through-mode-tab-denoise' : ''}`}
+                onClick={() => switchMode('denoise')}
+              >
+                Denoise
+              </button>
+            )}
           </span>
           {modelState && (
             <span
@@ -200,7 +242,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
       )}
       {error && <div className="step-through-error">{error}</div>}
 
-      {activeStages.length > 0 && !loading && (
+      {totalSteps > 0 && !loading && (
         <>
           {/* Sample header — forward mode only */}
           {mode === 'forward' && result && (
@@ -274,8 +316,8 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
             </button>
             <button
               className="step-through-ctrl"
-              onClick={() => setCurrentIdx((i) => Math.min(activeStages.length - 1, i + 1))}
-              disabled={currentIdx >= activeStages.length - 1}
+              onClick={() => setCurrentIdx((i) => Math.min(totalSteps - 1, i + 1))}
+              disabled={currentIdx >= totalSteps - 1}
               title="Next step"
             >
               ⏭
@@ -283,38 +325,48 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
             <input
               type="range"
               min={0}
-              max={activeStages.length - 1}
+              max={totalSteps - 1}
               value={currentIdx}
               onChange={(e) => setCurrentIdx(parseInt(e.target.value, 10))}
               className="step-through-slider"
             />
             <span className="step-through-counter">
-              {currentIdx + 1} / {activeStages.length}
+              {mode === 'denoise' && denoiseSteps[currentIdx]
+                ? `t=${denoiseSteps[currentIdx].timestep}`
+                : `${currentIdx + 1} / ${totalSteps}`}
             </span>
           </div>
 
-          <StageTimeline
-            stages={activeStages}
-            currentIdx={currentIdx}
-            onSelect={setCurrentIdx}
-            direction={mode}
-          />
+          {mode !== 'denoise' && (
+            <>
+              <StageTimeline
+                stages={activeStages}
+                currentIdx={currentIdx}
+                onSelect={setCurrentIdx}
+                direction={mode}
+              />
 
-          {stage && (
-            mode === 'forward' && compareMode && resultB ? (
-              <div className="step-through-compare-details">
-                <div className="step-through-compare-pane">
-                  <div className="step-through-compare-label">A</div>
+              {stage && (
+                mode === 'forward' && compareMode && resultB ? (
+                  <div className="step-through-compare-details">
+                    <div className="step-through-compare-pane">
+                      <div className="step-through-compare-label">A</div>
+                      <StageDetail stage={stage} />
+                    </div>
+                    <div className="step-through-compare-pane">
+                      <div className="step-through-compare-label">B</div>
+                      {resultB.stages[currentIdx] && <StageDetail stage={resultB.stages[currentIdx]} />}
+                    </div>
+                  </div>
+                ) : (
                   <StageDetail stage={stage} />
-                </div>
-                <div className="step-through-compare-pane">
-                  <div className="step-through-compare-label">B</div>
-                  {resultB.stages[currentIdx] && <StageDetail stage={resultB.stages[currentIdx]} />}
-                </div>
-              </div>
-            ) : (
-              <StageDetail stage={stage} />
-            )
+                )
+              )}
+            </>
+          )}
+
+          {mode === 'denoise' && denoiseResult && denoiseSteps[currentIdx] && (
+            <DenoiseView step={denoiseSteps[currentIdx]} channels={denoiseResult.channels} />
           )}
         </>
       )}
@@ -323,6 +375,59 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
 }
 
 // --- Sample preview header ---
+
+// --- Denoise view (diffusion step-through) ---
+
+function DenoiseView({ step, channels }: { step: { timestep: number; pixels: (number[][] | number[][][])[] }; channels: number }) {
+  return (
+    <div className="denoise-view">
+      <div className="denoise-info">
+        <span className="denoise-timestep">Timestep {step.timestep}</span>
+        <span className="denoise-hint">
+          {step.timestep > 0 ? 'Denoising in progress — noise is being predicted and removed' : 'Fully denoised — final generated image'}
+        </span>
+      </div>
+      <div className="denoise-samples">
+        {step.pixels.map((pixels, i) => (
+          <DenoiseImage key={i} pixels={pixels} channels={channels} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DenoiseImage({ pixels, channels }: { pixels: number[][] | number[][][]; channels: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || pixels.length === 0) return;
+    const h = pixels.length;
+    const firstRow = pixels[0];
+    const isRGB = Array.isArray(firstRow[0]);
+    const w = isRGB ? (firstRow as number[][]).length : (firstRow as number[]).length;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const data = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        if (isRGB) {
+          const px = (pixels as number[][][])[y][x];
+          data.data[idx] = px[0]; data.data[idx + 1] = px[1]; data.data[idx + 2] = px[2];
+        } else {
+          const v = (pixels as number[][])[y][x];
+          data.data[idx] = v; data.data[idx + 1] = v; data.data[idx + 2] = v;
+        }
+        data.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(data, 0, 0);
+  }, [pixels, channels]);
+  return <canvas ref={canvasRef} className="denoise-sample-img" />;
+}
+
 
 function SampleHeader({ sample, label, onStartPerturb }: {
   sample: StepThroughResult['sample'];

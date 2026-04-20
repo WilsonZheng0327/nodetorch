@@ -120,4 +120,20 @@ export interface BackwardStepThroughResult {
   modelState?: ModelState;
 }
 
-export type StepThroughMode = 'forward' | 'backward';
+export type StepThroughMode = 'forward' | 'backward' | 'denoise';
+
+// --- Diffusion denoising step-through ---
+
+export interface DenoiseStep {
+  timestep: number;
+  pixels: (number[][] | number[][][])[];  // one image per sample
+}
+
+export interface DenoiseStepThroughResult {
+  steps: DenoiseStep[];
+  numTimesteps: number;
+  numSamples: number;
+  imageH: number;
+  imageW: number;
+  channels: number;
+}

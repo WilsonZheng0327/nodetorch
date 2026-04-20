@@ -69,6 +69,10 @@
   color: #f9e2af;
 }
 
+.step-through-mode-tab-denoise.step-through-mode-tab-active {
+  color: #c4b5fd;
+}
+
 .step-through-model-state {
   font-size: 11px;
   font-weight: 600;
@@ -968,4 +972,49 @@
   image-rendering: pixelated;
   width: 224px;
   height: 224px;
+}
+
+/* --- Denoise step-through (diffusion) --- */
+
+.denoise-view {
+  padding: 16px 20px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.denoise-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.denoise-timestep {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #c4b5fd;
+}
+
+.denoise-hint {
+  font-size: 13px;
+  color: #6c7086;
+}
+
+.denoise-samples {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.denoise-sample-img {
+  width: 112px;
+  height: 112px;
+  image-rendering: pixelated;
+  border-radius: 6px;
+  border: 1px solid #45475a;
+  background: #181825;
 }

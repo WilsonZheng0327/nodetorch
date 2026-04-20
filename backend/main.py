@@ -37,6 +37,7 @@ from activation_max import activation_maximization
 from backprop_sim import simulate_backprop, run_backward_step_through
 from loss_landscape import compute_loss_landscape
 from latent_viz import generate_latent_grid
+from denoise_viz import run_denoise_step_through
 from runs_store import list_runs, load_run, delete_run
 from data_loaders import DATASET_DETAILS, augmentation_preview
 import os
@@ -145,6 +146,24 @@ async def evaluate_test(request: dict):
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Test evaluation failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/denoise-step-through")
+async def denoise_step_through(request: dict):
+    """Run DDPM denoising and return images at each timestep."""
+    logger.info("Denoise step-through requested")
+    try:
+        result = run_denoise_step_through(
+            request["graph"],
+            num_samples=request.get("numSamples", 4),
+            capture_every=request.get("captureEvery", 1),
+        )
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Denoise step-through failed: {e}")
         return {"status": "error", "error": str(e)}
 
 
