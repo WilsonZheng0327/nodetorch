@@ -63,7 +63,7 @@ export function validateForward(graph: Graph, registry: NodeRegistry): Validatio
 
 const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse', 'ml.loss.vae', 'ml.loss.gan'];
 const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam', 'ml.optimizers.adamw'];
-const DATA_TYPES = ['data.mnist', 'data.cifar10', 'data.cifar100', 'data.fashion_mnist', 'data.imdb', 'data.ag_news'];
+const DATA_TYPES = ['data.mnist', 'data.cifar10', 'data.cifar100', 'data.fashion_mnist', 'data.imdb', 'data.ag_news', 'data.tiny_shakespeare'];
 const GAN_INPUT_TYPES = ['ml.gan.noise_input'];
 const DIFFUSION_TYPES = ['ml.diffusion.noise_scheduler'];
 

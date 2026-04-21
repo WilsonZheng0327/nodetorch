@@ -35,13 +35,13 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
 
   useEffect(() => {
     if (!presetsOpen) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: PointerEvent | MouseEvent) => {
       if (presetsRef.current && !presetsRef.current.contains(e.target as Node)) {
         setPresetsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
   }, [presetsOpen]);
 
   async function openPresets() {

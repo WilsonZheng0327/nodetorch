@@ -1161,6 +1161,10 @@ def evaluate_test_set(graph_data: dict) -> dict:
             return {"error": "Diffusion models don't use test set evaluation — use Step Through > Denoise to generate samples"}
         if n["type"] == GAN_NOISE_TYPE:
             return {"error": "GAN models don't use test set evaluation — check generated samples in the training dashboard"}
+    from data_loaders import LM_DATASET_TYPES
+    for n in graph["nodes"]:
+        if n["type"] in LM_DATASET_TYPES:
+            return {"error": "Language models don't use test set evaluation — use Step Through > Generate to produce text samples"}
 
     trained_modules = get_trained_modules()
     graph = graph_data["graph"]
@@ -1334,6 +1338,10 @@ def infer_graph(graph_data: dict) -> dict:
             return {"error": "Diffusion models generate images via denoising — use Step Through > Denoise tab"}
         if n["type"] == GAN_NOISE_TYPE:
             return {"error": "GAN inference generates images from noise — use Step Through > Denoise or check training dashboard for generated samples"}
+    from data_loaders import LM_DATASET_TYPES
+    for n in graph["nodes"]:
+        if n["type"] in LM_DATASET_TYPES:
+            return {"error": "Language models generate text autoregressively — use Step Through > Generate tab"}
 
     trained_modules = get_trained_modules()
     graph = graph_data["graph"]
@@ -1363,8 +1371,9 @@ def infer_graph(graph_data: dict) -> dict:
                     outputs = {k: tensor_info(v) for k, v in tensors.items() if isinstance(v, torch.Tensor)}
                     first_tensor = next(v for v in tensors.values() if isinstance(v, torch.Tensor))
 
-                    # Include the actual label for display
-                    label = int(tensors["labels"][0]) if "labels" in tensors else None
+                    # Include the actual label for display (scalar labels only, not sequences)
+                    lbl_tensor = tensors.get("labels")
+                    label = int(lbl_tensor[0]) if lbl_tensor is not None and isinstance(lbl_tensor, torch.Tensor) and lbl_tensor.dim() == 1 else None
 
                     meta: dict = {
                         "outputShape": list(first_tensor.shape),
@@ -1547,7 +1556,7 @@ def _pick_tracked_samples(dataset, dataset_type: str, n: int = 4) -> list[dict]:
 
         sample: dict = {
             "idx": idx,
-            "label": int(lbl) if isinstance(lbl, (int, torch.Tensor)) else None,
+            "label": int(lbl) if isinstance(lbl, int) or (isinstance(lbl, torch.Tensor) and lbl.dim() == 0) else None,
             "input": inp if isinstance(inp, torch.Tensor) else torch.tensor(inp),
         }
 

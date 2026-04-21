@@ -16,6 +16,8 @@ interface DatasetInfo {
   diskSize: string;
   sampleImages?: Record<string, number[][][]>;
   isText?: boolean;
+  isLanguageModel?: boolean;
+  vocabSize?: number;
   sampleTexts?: Record<string, string[]>;
 }
 
@@ -156,10 +158,17 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
               {info.testSamples != null && ` / ${info.testSamples.toLocaleString()}`}
             </span>
           </div>
-          <div className="dataset-detail-stat">
-            <span className="dataset-detail-stat-label">Classes</span>
-            <span>{info.labels.length}</span>
-          </div>
+          {info.vocabSize != null ? (
+            <div className="dataset-detail-stat">
+              <span className="dataset-detail-stat-label">Vocab Size</span>
+              <span>{info.vocabSize} chars</span>
+            </div>
+          ) : (
+            <div className="dataset-detail-stat">
+              <span className="dataset-detail-stat-label">Classes</span>
+              <span>{info.labels.length}</span>
+            </div>
+          )}
           <div className="dataset-detail-stat">
             <span className="dataset-detail-stat-label">Disk Size</span>
             <span>{info.diskSize}</span>
@@ -190,62 +199,80 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
           </div>
         )}
 
-        {/* Search */}
-        <input
-          className="dataset-detail-search"
-          type="text"
-          placeholder="Search labels..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-
-        {/* Labels + samples */}
-        <div className="dataset-detail-labels">
-          {pagedLabels.map((label) => (
-            <div key={label} className="dataset-detail-label-row">
-              <span className="dataset-detail-label-name">{label}</span>
-              {info.sampleImages && (
-                <div className="dataset-detail-samples">
-                  {(info.sampleImages[label] ?? []).map((pixels, i) => (
-                    <MiniImage key={i} pixels={pixels} channels={info.channels ?? 1} />
-                  ))}
-                </div>
-              )}
-              {info.sampleTexts && (
+        {/* Language model: show sample text directly */}
+        {info.isLanguageModel && info.sampleTexts && (
+          <div className="dataset-detail-labels">
+            {Object.entries(info.sampleTexts).map(([key, texts]) => (
+              <div key={key} className="dataset-detail-label-row">
+                <span className="dataset-detail-label-name">{key}</span>
                 <div className="dataset-detail-texts">
-                  {(info.sampleTexts[label] ?? []).map((text, i) => (
+                  {texts.map((text, i) => (
                     <div key={i} className="dataset-detail-text-sample">{text}</div>
                   ))}
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Classification datasets: labels with search + pagination */}
+        {!info.isLanguageModel && (
+          <>
+            <input
+              className="dataset-detail-search"
+              type="text"
+              placeholder="Search labels..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+
+            <div className="dataset-detail-labels">
+              {pagedLabels.map((label) => (
+                <div key={label} className="dataset-detail-label-row">
+                  <span className="dataset-detail-label-name">{label}</span>
+                  {info.sampleImages && (
+                    <div className="dataset-detail-samples">
+                      {(info.sampleImages[label] ?? []).map((pixels, i) => (
+                        <MiniImage key={i} pixels={pixels} channels={info.channels ?? 1} />
+                      ))}
+                    </div>
+                  )}
+                  {info.sampleTexts && (
+                    <div className="dataset-detail-texts">
+                      {(info.sampleTexts[label] ?? []).map((text, i) => (
+                        <div key={i} className="dataset-detail-text-sample">{text}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {filteredLabels.length === 0 && (
+                <div className="dataset-detail-empty">No matching labels</div>
               )}
             </div>
-          ))}
-          {filteredLabels.length === 0 && (
-            <div className="dataset-detail-empty">No matching labels</div>
-          )}
-        </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="dataset-detail-pagination">
-            <button
-              className="dataset-detail-page-btn"
-              disabled={page === 0}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              Prev
-            </button>
-            <span className="dataset-detail-page-info">
-              {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredLabels.length)} of {filteredLabels.length}
-            </span>
-            <button
-              className="dataset-detail-page-btn"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </button>
-          </div>
+            {totalPages > 1 && (
+              <div className="dataset-detail-pagination">
+                <button
+                  className="dataset-detail-page-btn"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Prev
+                </button>
+                <span className="dataset-detail-page-info">
+                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredLabels.length)} of {filteredLabels.length}
+                </span>
+                <button
+                  className="dataset-detail-page-btn"
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

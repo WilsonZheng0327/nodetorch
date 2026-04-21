@@ -52,31 +52,48 @@ export const crossEntropyLossNode: NodeDefinition = {
           return { outputs: {} };
         }
 
-        // Validate: predictions should be [B, C], labels should be [B]
-        if (predictions.length !== 2) {
+        // Validate: predictions should be [B, C] or [B, seq_len, C]
+        if (predictions.length !== 2 && predictions.length !== 3) {
           return {
             outputs: {},
-            metadata: { error: `Predictions should be [B, C], got [${predictions.join(', ')}]` },
+            metadata: { error: `Predictions should be [B, C] or [B, seq_len, C], got [${predictions.join(', ')}]` },
           };
         }
 
-        if (labels.length !== 1 || labels[0] !== predictions[0]) {
-          return {
-            outputs: {},
-            metadata: { error: `Labels batch size ${labels[0]} doesn't match predictions batch size ${predictions[0]}` },
-          };
+        const B = predictions[0];
+        const C = predictions[predictions.length - 1];
+        const isSequence = predictions.length === 3;
+
+        if (isSequence) {
+          // [B, seq_len, C] with labels [B, seq_len]
+          if (labels.length !== 2 || labels[0] !== B || labels[1] !== predictions[1]) {
+            return {
+              outputs: {},
+              metadata: { error: `Labels should be [${B}, ${predictions[1]}], got [${labels.join(', ')}]` },
+            };
+          }
+        } else {
+          // [B, C] with labels [B]
+          if (labels.length !== 1 || labels[0] !== B) {
+            return {
+              outputs: {},
+              metadata: { error: `Labels batch size ${labels[0]} doesn't match predictions batch size ${B}` },
+            };
+          }
+        }
+
+        const shapes = [
+          { label: 'Output', value: 'scalar' },
+          { label: 'Classes', value: String(C) },
+          { label: 'Batch', value: String(B) },
+        ];
+        if (isSequence) {
+          shapes.push({ label: 'Seq length', value: String(predictions[1]) });
         }
 
         return {
           outputs: { out: [] }, // scalar — empty shape
-          metadata: {
-            outputShape: ['scalar'],
-            shapes: [
-              { label: 'Output', value: 'scalar' },
-              { label: 'Classes', value: String(predictions[1]) },
-              { label: 'Batch', value: String(predictions[0]) },
-            ],
-          },
+          metadata: { outputShape: ['scalar'], shapes },
         };
       },
     },

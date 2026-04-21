@@ -274,7 +274,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
       <div className="dashboard-tabs">
         {(['loss', 'accuracy', 'gradients', 'perclass', 'samples', 'test', 'epochs'] as const)
           .filter((tab) => {
-            if (isAutoregressive && (tab === 'accuracy' || tab === 'perclass' || tab === 'test')) return false;
+            if (isAutoregressive && (tab === 'perclass' || tab === 'test')) return false;
             return true;
           })
           .map((tab) => (
@@ -379,15 +379,15 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
             <PerClassChart data={viewed?.perClassAccuracy ?? []} />
           ) : (
             <Chart
-              data={progress.map((d) => activeTab === 'loss' ? d.loss : d.accuracy)}
-              valData={progress.map((d) => activeTab === 'loss' ? d.valLoss : d.valAccuracy)}
+              data={progress.map((d) => activeTab === 'loss' ? d.loss : isAutoregressive ? (d.perplexity ?? 0) : d.accuracy)}
+              valData={progress.map((d) => activeTab === 'loss' ? d.valLoss : isAutoregressive ? (d.valPerplexity ?? null) : d.valAccuracy)}
               compareData={compareRun ? compareRun.epochHistory.map((d) => activeTab === 'loss' ? d.loss : d.accuracy) : undefined}
               compareLabel={compareRun ? `${compareRun.optimizer} lr=${compareRun.learningRate} ep=${compareRun.epochs}` : undefined}
               labels={progress.map((d) => d.epoch)}
               color={activeTab === 'loss' ? '#ef4444' : '#10b981'}
               valColor="#fab387"
               compareColor="#cba6f7"
-              formatValue={activeTab === 'loss' ? (v) => v.toFixed(4) : (v) => (v * 100).toFixed(1) + '%'}
+              formatValue={activeTab === 'loss' ? (v) => v.toFixed(4) : isAutoregressive ? (v) => v.toFixed(1) : (v) => (v * 100).toFixed(1) + '%'}
               selectedIndex={selectedEpoch != null ? selectedEpoch - 1 : null}
             />
           )

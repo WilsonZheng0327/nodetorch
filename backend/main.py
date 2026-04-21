@@ -561,9 +561,11 @@ async def export_python_endpoint(request: dict):
     try:
         code = export_to_python(request["graph"])
         graph_name = request["graph"].get("graph", {}).get("name", "model").replace(" ", "_").lower()
+        # HTTP headers must be ASCII/latin-1 — strip non-ASCII from filename
+        graph_name = graph_name.encode("ascii", "ignore").decode("ascii") or "model"
         return Response(
-            content=code,
-            media_type="text/x-python",
+            content=code.encode("utf-8"),
+            media_type="text/x-python; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{graph_name}.py"'}
         )
     except Exception as e:

@@ -427,7 +427,7 @@ def _extract_sample_info(nodes: dict, results: dict) -> dict:
             labels = tensors.get("labels")
             info: dict = {
                 "datasetType": node["type"],
-                "actualLabel": int(labels[0].item()) if labels is not None and isinstance(labels, torch.Tensor) else None,
+                "actualLabel": int(labels[0].item()) if labels is not None and isinstance(labels, torch.Tensor) and labels.dim() == 1 else None,
             }
             # Image datasets: provide pixel preview
             if out is not None and isinstance(out, torch.Tensor) and out.dim() == 4:

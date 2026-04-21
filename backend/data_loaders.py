@@ -414,10 +414,11 @@ def detail_tiny_shakespeare() -> dict:
         "description": "Character-level language modeling on Shakespeare plays (~1MB)",
         "isText": True,
         "isLanguageModel": True,
+        "labels": [],
         "trainSamples": len(text),
         "vocabSize": len(char2idx),
         "diskSize": "~1 MB",
-        "sampleTexts": {"Shakespeare": [sample]},
+        "sampleTexts": {"Sample": [sample]},
     }
 
 

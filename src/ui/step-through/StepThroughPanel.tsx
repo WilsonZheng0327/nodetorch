@@ -533,26 +533,44 @@ function GenerateView({ result, prompt, temperature, topK, maxTokens, loading, o
       <div className="generate-controls">
         <div className="generate-prompt-row">
           <label className="generate-label">Prompt</label>
-          <input
-            type="text"
+          <textarea
             className="generate-prompt-input"
             value={prompt}
             onChange={(e) => onPromptChange(e.target.value)}
             placeholder="Start of generated text (optional)"
+            rows={3}
           />
         </div>
         <div className="generate-sliders">
           <div className="generate-slider-group">
-            <label className="generate-label">Temperature: {temperature.toFixed(2)}</label>
-            <input type="range" min={0.1} max={2.0} step={0.05} value={temperature} onChange={(e) => onTempChange(parseFloat(e.target.value))} />
+            <label className="generate-label" title="Controls randomness. Lower = more predictable, higher = more creative. At 0.1 the model almost always picks the most likely next character. At 2.0 it explores rare choices.">
+              Temperature
+              <span className="generate-label-help">?</span>
+            </label>
+            <div className="generate-slider-row">
+              <input type="range" min={0.1} max={2.0} step={0.05} value={temperature} onChange={(e) => onTempChange(parseFloat(e.target.value))} />
+              <input type="number" className="generate-slider-value" min={0.1} max={2.0} step={0.05} value={temperature} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onTempChange(Math.max(0.1, Math.min(2.0, v))); }} />
+            </div>
           </div>
           <div className="generate-slider-group">
-            <label className="generate-label">Top-K: {topK === 0 ? 'off' : topK}</label>
-            <input type="range" min={0} max={65} step={1} value={topK} onChange={(e) => onTopKChange(parseInt(e.target.value, 10))} />
+            <label className="generate-label" title="Limits sampling to the K most likely next characters. 0 = off (sample from all). Lower values make output more focused, higher values allow more variety.">
+              Top-K {topK === 0 && <span style={{ opacity: 0.5 }}>(off)</span>}
+              <span className="generate-label-help">?</span>
+            </label>
+            <div className="generate-slider-row">
+              <input type="range" min={0} max={65} step={1} value={topK} onChange={(e) => onTopKChange(parseInt(e.target.value, 10))} />
+              <input type="number" className="generate-slider-value" min={0} max={65} step={1} value={topK} onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) onTopKChange(Math.max(0, Math.min(65, v))); }} />
+            </div>
           </div>
           <div className="generate-slider-group">
-            <label className="generate-label">Max tokens: {maxTokens}</label>
-            <input type="range" min={20} max={500} step={10} value={maxTokens} onChange={(e) => onMaxTokensChange(parseInt(e.target.value, 10))} />
+            <label className="generate-label" title="Maximum number of characters to generate. The model stops after producing this many tokens or if it gets stuck in a loop.">
+              Max tokens
+              <span className="generate-label-help">?</span>
+            </label>
+            <div className="generate-slider-row">
+              <input type="range" min={20} max={500} step={10} value={maxTokens} onChange={(e) => onMaxTokensChange(parseInt(e.target.value, 10))} />
+              <input type="number" className="generate-slider-value" min={20} max={500} step={10} value={maxTokens} onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) onMaxTokensChange(Math.max(20, Math.min(500, v))); }} />
+            </div>
           </div>
         </div>
         <button className="step-through-btn generate-btn" onClick={onGenerate} disabled={loading}>

@@ -225,7 +225,7 @@ def run_backward_step_through(graph_data: dict) -> dict:
         labels = data_tensors.get("labels")
         sample_info = {
             "datasetType": nodes[data_nid]["type"],
-            "actualLabel": int(labels[0]) if labels is not None else None,
+            "actualLabel": int(labels[0]) if labels is not None and isinstance(labels, torch.Tensor) and labels.dim() == 1 else None,
         }
         if out is not None and isinstance(out, torch.Tensor) and out.dim() == 4:
             sample_info.update(_tensor_to_preview_image(out[0].detach(), nodes[data_nid]["type"]))

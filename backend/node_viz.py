@@ -690,9 +690,9 @@ def backward_viz_linear(module, activation, gradient):
     if gm:
         result["extras"].append(gm)
     if gradient is not None and gradient.dim() >= 2:
-        per_neuron = gradient[0].abs() if gradient.dim() == 2 else gradient.abs()
-        max_idx = int(per_neuron.argmax())
-        max_val = float(per_neuron[max_idx])
+        flat = gradient[0].abs().flatten() if gradient.dim() >= 2 else gradient.abs().flatten()
+        max_idx = int(flat.argmax())
+        max_val = float(flat[max_idx])
         result["insight"] = f"Neuron {max_idx} has the largest gradient ({max_val:.4f}) — the loss is most sensitive to its output"
     if not result["extras"]:
         del result["extras"]

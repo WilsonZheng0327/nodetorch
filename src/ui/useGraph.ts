@@ -832,13 +832,34 @@ export function useGraph(domain: DomainContext) {
         return;
       }
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = (graphRef.current.name?.replace(/\s+/g, '_').toLowerCase() || 'model') + '.py';
-      a.click();
-      URL.revokeObjectURL(url);
-      setStatus({ type: 'success', message: 'Python code exported' });
+      const filename = (graphRef.current.name?.replace(/\s+/g, '_').toLowerCase() || 'model') + '.py';
+
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: filename,
+            types: [{
+              description: 'Python Script',
+              accept: { 'text/x-python': ['.py'] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          setStatus({ type: 'success', message: 'Python code exported' });
+        } catch {
+          // User cancelled the picker
+          return;
+        }
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        setStatus({ type: 'success', message: 'Python code exported' });
+      }
       setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
     } catch {
       setStatus({ type: 'error', message: 'Cannot connect to backend' });
@@ -1003,6 +1024,9 @@ export function useGraph(domain: DomainContext) {
             dLoss: msg.dLoss,
             gLoss: msg.gLoss,
             trainingMode: msg.trainingMode,
+            perplexity: msg.perplexity,
+            valPerplexity: msg.valPerplexity,
+            generatedText: msg.generatedText,
           }]);
           // Accumulate visualization snapshots per epoch
           if (msg.nodeSnapshots) {
