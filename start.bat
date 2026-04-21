@@ -103,19 +103,17 @@ if not exist ".venv" (
 )
 
 :: ─────────────────────────────────────────────
-:: Setup frontend (first run)
+:: Setup frontend (always runs to pick up new deps)
 :: ─────────────────────────────────────────────
-if not exist "node_modules" (
-    echo.
-    echo  Installing frontend dependencies...
-    call npm install --silent 2>nul
-    if errorlevel 1 (
-        echo [ERROR] npm install failed
-        pause
-        exit /b 1
-    )
-    echo   [OK] Frontend dependencies installed
+echo.
+echo  Installing frontend dependencies...
+call npm install --silent 2>nul
+if errorlevel 1 (
+    echo [ERROR] npm install failed
+    pause
+    exit /b 1
 )
+echo   [OK] Frontend dependencies installed
 
 :: ─────────────────────────────────────────────
 :: Start

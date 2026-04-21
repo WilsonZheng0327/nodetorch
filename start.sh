@@ -146,19 +146,17 @@ if [ ! -d ".venv" ]; then
 fi
 
 # ─────────────────────────────────────────────
-# Setup frontend (first run)
+# Setup frontend (always runs to pick up new deps)
 # ─────────────────────────────────────────────
-if [ ! -d "node_modules" ]; then
-    echo ""
-    echo -e "${YELLOW}Installing frontend dependencies...${NC}"
-    npm install --silent 2>/dev/null
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}✗ npm install failed${NC}"
-        echo "  Try running manually: npm install"
-        exit 1
-    fi
-    echo -e "  ${GREEN}✓${NC} Frontend dependencies installed"
+echo ""
+echo -e "${YELLOW}Installing frontend dependencies...${NC}"
+npm install --silent 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo -e "${RED}✗ npm install failed${NC}"
+    echo "  Try running manually: npm install"
+    exit 1
 fi
+echo -e "  ${GREEN}✓${NC} Frontend dependencies installed"
 
 # ─────────────────────────────────────────────
 # Check GPU status
