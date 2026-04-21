@@ -34,6 +34,7 @@ backend/storage/weights/
 backend/storage/runs/
 backend/storage/blocks/
 /data/
+backend/data/
 test_diffusion_output/
 storage/
 test_diffusion.py
