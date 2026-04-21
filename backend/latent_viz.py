@@ -83,23 +83,94 @@ def generate_latent_grid(graph_data: dict, grid_size: int = 10, latent_range: fl
 
     dev = get_device()
 
-    # Generate grid of latent vectors
-    # Sweep first two dims, keep the rest at 0
-    values = torch.linspace(-latent_range, latent_range, grid_size)
-    grid_images = []
-
     for mod in trained.values():
         if isinstance(mod, nn.Module):
             mod.eval()
+
+    # Encode real data to find the most informative latent dimensions
+    # and the actual distribution range
+    encoder_order = []
+    for nid in order:
+        if nid == reparam_nid:
+            break
+        if nodes[nid]["type"] not in OPTIMIZER_NODES and nodes[nid]["type"] not in ALL_LOSS_NODES:
+            encoder_order.append(nid)
+
+    # Find data node to get real samples
+    data_nid = None
+    for nid, n in nodes.items():
+        if n["type"] in DATA_LOADERS:
+            data_nid = nid
+            break
+
+    # Default sweep dims and range
+    sweep_dim0, sweep_dim1 = 0, 1
+    mean_latent = torch.zeros(latent_dim, device=dev)
+
+    if data_nid:
+        try:
+            loader = DATA_LOADERS[nodes[data_nid]["type"]]
+            sample_data = loader({**nodes[data_nid].get("properties", {}), "batchSize": 128})
+            sample_images = sample_data["out"].to(dev)
+
+            with torch.no_grad():
+                # Run encoder to get mean vectors
+                enc_results: dict[str, dict] = {data_nid: {"out": sample_images}}
+                if "labels" in sample_data and isinstance(sample_data["labels"], torch.Tensor):
+                    enc_results[data_nid]["labels"] = sample_data["labels"].to(dev)
+
+                for nid in encoder_order:
+                    n = nodes[nid]
+                    ntype = n["type"]
+                    mod = trained.get(nid)
+                    if mod is None:
+                        continue
+                    inputs = gather_inputs(nid, edges, enc_results)
+                    if ntype in MULTI_INPUT_NODES:
+                        try:
+                            enc_results[nid] = {"out": mod(**{k: v for k, v in inputs.items()})}
+                        except Exception:
+                            continue
+                    elif "in" in inputs:
+                        try:
+                            raw = mod(inputs["in"])
+                            if isinstance(raw, dict):
+                                enc_results[nid] = raw
+                            else:
+                                enc_results[nid] = {"out": raw}
+                        except Exception:
+                            continue
+
+                # Get the mean input to reparameterize
+                reparam_inputs = gather_inputs(reparam_nid, edges, enc_results)
+                if "mean" in reparam_inputs:
+                    mean_vectors = reparam_inputs["mean"]  # [128, latent_dim]
+                    # Find dims with highest variance — those encode the most info
+                    variances = mean_vectors.var(dim=0)
+                    top_dims = variances.argsort(descending=True)
+                    sweep_dim0 = int(top_dims[0])
+                    sweep_dim1 = int(top_dims[1])
+                    # Use actual distribution to set range
+                    mean_latent = mean_vectors.mean(dim=0)
+                    std0 = mean_vectors[:, sweep_dim0].std().item()
+                    std1 = mean_vectors[:, sweep_dim1].std().item()
+                    latent_range = max(std0, std1) * 3.0  # cover 3 sigma
+                    latent_range = max(latent_range, 1.0)  # minimum range
+        except Exception:
+            pass  # Fall back to default dims 0,1
+
+    # Generate grid of latent vectors
+    values = torch.linspace(-latent_range, latent_range, grid_size)
+    grid_images = []
 
     with torch.no_grad():
         for i, y_val in enumerate(values):
             row_images = []
             for j, x_val in enumerate(values):
-                # Create latent vector: dim 0 = x, dim 1 = y, rest = 0
-                z = torch.zeros(1, latent_dim, device=dev)
-                z[0, 0] = x_val
-                z[0, 1] = y_val
+                # Start from the mean latent, sweep the two most informative dims
+                z = mean_latent.unsqueeze(0).clone()  # [1, latent_dim]
+                z[0, sweep_dim0] = x_val
+                z[0, sweep_dim1] = y_val
 
                 # Run through decoder
                 results: dict[str, dict] = {}
@@ -181,8 +252,9 @@ def generate_latent_grid(graph_data: dict, grid_size: int = 10, latent_range: fl
     return {
         "grid": grid_images,
         "gridSize": grid_size,
-        "latentRange": latent_range,
+        "latentRange": float(latent_range),
         "latentDim": latent_dim,
+        "sweepDims": [sweep_dim0, sweep_dim1],
         "imageH": imageH,
         "imageW": imageW,
         "channels": channels,

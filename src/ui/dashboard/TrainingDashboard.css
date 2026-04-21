@@ -838,3 +838,41 @@
   border: 1px solid #45475a;
   background: #11111b;
 }
+
+
+/* --- Generated text samples (autoregressive) --- */
+
+.generated-text-samples {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.generated-text-sample {
+  border: 1px solid var(--border, #45475a);
+  border-radius: 8px;
+  background: var(--bg-surface, #1e1e2e);
+  padding: 10px 14px;
+}
+
+.generated-text-epoch {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent, #89b4fa);
+  margin-bottom: 6px;
+}
+
+.generated-text-content {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  color: var(--text, #cdd6f4);
+  max-height: 120px;
+  overflow-y: auto;
+}

@@ -53,12 +53,14 @@ def compute_loss_landscape(
     """
     graph_data = copy.deepcopy(graph_data)
 
-    # GAN and diffusion models don't support loss landscape visualization
+    # GAN, diffusion, and VAE models don't support loss landscape visualization
     for n in graph_data["graph"]["nodes"]:
         if n["type"] in ("ml.gan.noise_input", "ml.loss.gan"):
             return {"error": "Loss landscape is not available for GAN models — the adversarial loss requires running both generator and discriminator"}
         if n["type"] == "ml.diffusion.noise_scheduler":
             return {"error": "Loss landscape is not available for diffusion models — the loss depends on random timestep sampling"}
+        if n["type"] == "ml.loss.vae":
+            return {"error": "Loss landscape is not available for VAE models — the reparameterization trick introduces stochastic sampling that makes the surface unreliable"}
 
     # Use trained modules if available
     if has_trained_model():
@@ -185,8 +187,18 @@ def compute_loss_landscape(
 
         # Find min/max for color scaling
         flat = [v for row in grid for v in row if v == v]  # NaN-safe
+        if not flat:
+            return {"error": "Loss landscape produced no valid values — the model may need retraining"}
         minv = min(flat) if flat else 0
         maxv = max(flat) if flat else 1
+
+        # Replace NaN/Inf with None for JSON serialization
+        import math
+        grid = [
+            [v if math.isfinite(v) else None for v in row]
+            for row in grid
+        ]
+        center = center if math.isfinite(center) else minv
 
         return {
             "grid": grid,

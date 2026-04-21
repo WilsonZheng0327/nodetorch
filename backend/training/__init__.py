@@ -16,11 +16,14 @@ from .base import TrainingContext, TrainingResult, build_training_context, save_
 from .standard import standard_train
 from .gan import gan_train
 from .diffusion import diffusion_train
+from .autoregressive import autoregressive_train
+from data_loaders import LM_DATASET_TYPES
 
 TRAINING_LOOPS: dict[str, callable] = {
     "standard": standard_train,
     "gan": gan_train,
     "diffusion": diffusion_train,
+    "autoregressive": autoregressive_train,
 }
 
 
@@ -32,6 +35,8 @@ def detect_training_mode(nodes: dict) -> str:
             return "gan"
         if ntype == "ml.diffusion.noise_scheduler":
             return "diffusion"
+        if ntype in LM_DATASET_TYPES:
+            return "autoregressive"
     return "standard"
 
 

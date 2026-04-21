@@ -22,6 +22,14 @@ export const attentionNode: NodeDefinition = {
       defaultValue: 0.0,
       affects: 'execution',
     },
+    {
+      id: 'causalMask',
+      name: 'Causal Mask',
+      type: { kind: 'boolean' },
+      defaultValue: false,
+      affects: 'execution',
+      help: 'Prevents each position from attending to future positions. Required for autoregressive models (language models, GPT-style). Each token can only "see" tokens that came before it.',
+    },
   ],
 
   getPorts: () => [

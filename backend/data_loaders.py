@@ -19,6 +19,9 @@ import torchvision.transforms as transforms
 # All downloaded datasets go here
 DATASETS_DIR = "./storage/datasets"
 
+# Dataset types that signal autoregressive/language model training mode
+LM_DATASET_TYPES = {"data.tiny_shakespeare"}
+
 
 # --- MNIST ---
 
@@ -330,6 +333,94 @@ def train_dataset_ag_news(vocab_size=10000, max_len=128) -> torch.utils.data.Dat
     return AGNewsDataset(vocab_size, max_len)
 
 
+# --- TinyShakespeare (character-level language modeling) ---
+
+import os
+import urllib.request
+
+_SHAKESPEARE_URL = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+_shakespeare_cache: dict[str, object] = {}
+
+
+def _get_shakespeare_text() -> str:
+    """Load or download TinyShakespeare text."""
+    if "text" in _shakespeare_cache:
+        return _shakespeare_cache["text"]
+    filepath = os.path.join(DATASETS_DIR, "tiny_shakespeare.txt")
+    if not os.path.exists(filepath):
+        os.makedirs(DATASETS_DIR, exist_ok=True)
+        urllib.request.urlretrieve(_SHAKESPEARE_URL, filepath)
+    with open(filepath, "r", encoding="utf-8") as f:
+        text = f.read()
+    _shakespeare_cache["text"] = text
+    return text
+
+
+def get_shakespeare_vocab() -> tuple[dict[str, int], dict[int, str]]:
+    """Get character-level vocab (char→idx, idx→char). Cached."""
+    if "char2idx" in _shakespeare_cache:
+        return _shakespeare_cache["char2idx"], _shakespeare_cache["idx2char"]
+    text = _get_shakespeare_text()
+    chars = sorted(set(text))
+    char2idx = {ch: i for i, ch in enumerate(chars)}
+    idx2char = {i: ch for ch, i in char2idx.items()}
+    _shakespeare_cache["char2idx"] = char2idx
+    _shakespeare_cache["idx2char"] = idx2char
+    return char2idx, idx2char
+
+
+class TinyShakespeareDataset(torch.utils.data.Dataset):
+    """Character-level LM dataset. Each sample is (input_ids, target_ids) where
+    target is shifted by 1 position (next-character prediction)."""
+
+    def __init__(self, seq_len: int = 128):
+        text = _get_shakespeare_text()
+        self.char2idx, _ = get_shakespeare_vocab()
+        self.data = torch.tensor([self.char2idx[ch] for ch in text], dtype=torch.long)
+        self.seq_len = seq_len
+
+    def __len__(self):
+        return (len(self.data) - 1) // self.seq_len
+
+    def __getitem__(self, idx):
+        start = idx * self.seq_len
+        chunk = self.data[start : start + self.seq_len + 1]
+        # If chunk is short (end of text), pad
+        if len(chunk) < self.seq_len + 1:
+            chunk = torch.cat([chunk, torch.zeros(self.seq_len + 1 - len(chunk), dtype=torch.long)])
+        return chunk[:-1], chunk[1:]  # (input, target)
+
+
+def load_tiny_shakespeare(props: dict) -> dict[str, torch.Tensor]:
+    """Load a batch from TinyShakespeare."""
+    batch_size = props.get("batchSize", 32)
+    seq_len = props.get("seqLen", 128)
+    dataset = TinyShakespeareDataset(seq_len)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    inputs, targets = next(iter(loader))
+    return {"out": inputs, "labels": targets}
+
+
+def train_dataset_tiny_shakespeare(seqLen: int = 128) -> torch.utils.data.Dataset:
+    return TinyShakespeareDataset(seqLen)
+
+
+def detail_tiny_shakespeare() -> dict:
+    text = _get_shakespeare_text()
+    char2idx, _ = get_shakespeare_vocab()
+    sample = text[:500]
+    return {
+        "name": "Tiny Shakespeare",
+        "description": "Character-level language modeling on Shakespeare plays (~1MB)",
+        "isText": True,
+        "isLanguageModel": True,
+        "trainSamples": len(text),
+        "vocabSize": len(char2idx),
+        "diskSize": "~1 MB",
+        "sampleTexts": {"Shakespeare": [sample]},
+    }
+
+
 # --- Registries ---
 # Each registry maps node type string → function.
 # graph_builder.py uses these — no if/else chains needed.
@@ -342,6 +433,7 @@ DATA_LOADERS: dict[str, callable] = {
     "data.fashion_mnist": load_fashion_mnist,
     "data.imdb": load_imdb,
     "data.ag_news": load_ag_news,
+    "data.tiny_shakespeare": load_tiny_shakespeare,
 }
 
 # Get full training dataset: () → Dataset
@@ -352,6 +444,7 @@ TRAIN_DATASETS: dict[str, callable] = {
     "data.fashion_mnist": train_dataset_fashion_mnist,
     "data.imdb": train_dataset_imdb,
     "data.ag_news": train_dataset_ag_news,
+    "data.tiny_shakespeare": train_dataset_tiny_shakespeare,
 }
 
 # Undo normalization for image preview: (tensor [C,H,W]) → tensor [C,H,W] in 0-1
@@ -562,6 +655,7 @@ DATASET_DETAILS: dict[str, callable] = {
     "data.fashion_mnist": detail_fashion_mnist,
     "data.imdb": detail_imdb,
     "data.ag_news": detail_ag_news,
+    "data.tiny_shakespeare": detail_tiny_shakespeare,
 }
 
 # Class name lookup per dataset — used for confusion matrix labels, etc.

@@ -17,6 +17,9 @@ export interface TrackedSampleProbe {
 
 export interface EpochData {
   epoch: number;
+  perplexity?: number;
+  valPerplexity?: number | null;
+  generatedText?: string | null;
   totalEpochs?: number;
   loss: number;
   accuracy: number;
@@ -168,6 +171,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
   };
 
   const latest = progress.length > 0 ? progress[progress.length - 1] : null;
+  const isAutoregressive = latest?.trainingMode === 'autoregressive';
   const finished = !isTraining && progress.length > 0;
   // The epoch data currently being viewed (selected via slider, or latest)
   const viewed = selectedEpoch != null && selectedEpoch <= progress.length
@@ -241,10 +245,17 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
             <span className="dashboard-metric-label">Loss</span>
             <span className="dashboard-metric-value">{latest.loss?.toFixed(4)}</span>
           </div>
-          <div className="dashboard-metric">
-            <span className="dashboard-metric-label">Accuracy</span>
-            <span className="dashboard-metric-value">{(latest.accuracy * 100).toFixed(1)}%</span>
-          </div>
+          {isAutoregressive ? (
+            <div className="dashboard-metric">
+              <span className="dashboard-metric-label">Perplexity</span>
+              <span className="dashboard-metric-value">{latest.perplexity?.toFixed(1) ?? '—'}</span>
+            </div>
+          ) : (
+            <div className="dashboard-metric">
+              <span className="dashboard-metric-label">Accuracy</span>
+              <span className="dashboard-metric-value">{(latest.accuracy * 100).toFixed(1)}%</span>
+            </div>
+          )}
           <div className="dashboard-metric">
             <span className="dashboard-metric-label">Time</span>
             <span className="dashboard-metric-value">{latest.time != null ? `${latest.time}s` : '—'}</span>
@@ -261,13 +272,18 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
 
       {/* Tab selector */}
       <div className="dashboard-tabs">
-        {(['loss', 'accuracy', 'gradients', 'perclass', 'samples', 'test', 'epochs'] as const).map((tab) => (
+        {(['loss', 'accuracy', 'gradients', 'perclass', 'samples', 'test', 'epochs'] as const)
+          .filter((tab) => {
+            if (isAutoregressive && (tab === 'accuracy' || tab === 'perclass' || tab === 'test')) return false;
+            return true;
+          })
+          .map((tab) => (
           <button
             key={tab}
             className={`dashboard-tab ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {{ loss: 'Loss', accuracy: 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', samples: 'Samples', test: 'Test', epochs: 'Epochs' }[tab]}
+            {{ loss: 'Loss', accuracy: isAutoregressive ? 'Perplexity' : 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', samples: isAutoregressive ? 'Generated' : 'Samples', test: 'Test', epochs: 'Epochs' }[tab]}
           </button>
         ))}
         <span className="dashboard-tab-divider" />
@@ -320,7 +336,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
             onClearCompare={() => setCompareRun(null)}
           />
         ) : activeTab === 'samples' ? (
-          <TrackedSamplesView progress={progress} />
+          isAutoregressive ? <GeneratedTextView progress={progress} /> : <TrackedSamplesView progress={progress} />
         ) : activeTab === 'test' ? (
           <TestResultView result={testResult} />
         ) : activeTab === 'epochs' ? (
@@ -331,9 +347,9 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
                   <tr>
                     <th>Epoch</th>
                     <th>Loss</th>
-                    <th>Acc</th>
+                    <th>{isAutoregressive ? 'PPL' : 'Acc'}</th>
                     <th>Val Loss</th>
-                    <th>Val Acc</th>
+                    <th>{isAutoregressive ? 'Val PPL' : 'Val Acc'}</th>
                     <th>LR</th>
                     <th>Time</th>
                   </tr>
@@ -343,9 +359,9 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
                     <tr key={d.epoch}>
                       <td>{d.epoch}</td>
                       <td>{d.loss?.toFixed(4)}</td>
-                      <td>{(d.accuracy * 100).toFixed(1)}%</td>
+                      <td>{isAutoregressive ? (d.perplexity?.toFixed(1) ?? '—') : `${(d.accuracy * 100).toFixed(1)}%`}</td>
                       <td>{d.valLoss != null ? d.valLoss.toFixed(4) : '—'}</td>
-                      <td>{d.valAccuracy != null ? `${(d.valAccuracy * 100).toFixed(1)}%` : '—'}</td>
+                      <td>{isAutoregressive ? (d.valPerplexity != null ? d.valPerplexity.toFixed(1) : '—') : (d.valAccuracy != null ? `${(d.valAccuracy * 100).toFixed(1)}%` : '—')}</td>
                       <td>{d.learningRate != null ? d.learningRate.toExponential(1) : '—'}</td>
                       <td>{d.time != null ? `${d.time}s` : ''}</td>
                     </tr>
@@ -986,6 +1002,28 @@ function PerClassChart({ data }: { data: { cls: number; accuracy: number }[] }) 
 
 
 // --- Tracked Samples View ---
+
+function GeneratedTextView({ progress }: { progress: EpochData[] }) {
+  const samples = progress
+    .filter((ep) => ep.generatedText)
+    .map((ep) => ({ epoch: ep.epoch, text: ep.generatedText! }));
+
+  if (samples.length === 0) {
+    return <div className="dashboard-chart-placeholder">No generated samples yet — text is generated periodically during training</div>;
+  }
+
+  return (
+    <div className="generated-text-samples">
+      {samples.map((s) => (
+        <div key={s.epoch} className="generated-text-sample">
+          <div className="generated-text-epoch">Epoch {s.epoch}</div>
+          <pre className="generated-text-content">{s.text}</pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 function TrackedSamplesView({ progress }: { progress: EpochData[] }) {
   // For GAN/diffusion, show generated samples instead of tracked samples

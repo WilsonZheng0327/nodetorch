@@ -56,7 +56,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
   const [misclassFilter, setMisclassFilter] = useState<{ actual: number; predicted: number } | null>(null);
   const [landscape, setLandscape] = useState<LandscapeData | null>(null);
   const [landscapeLoading, setLandscapeLoading] = useState(false);
-  const [latentGrid, setLatentGrid] = useState<{ grid: (number[][] | number[][][] | null)[][]; gridSize: number; latentRange: number; imageH: number; imageW: number; channels: number } | null>(null);
+  const [latentGrid, setLatentGrid] = useState<{ grid: (number[][] | number[][][] | null)[][]; gridSize: number; latentRange: number; imageH: number; imageW: number; channels: number; sweepDims?: [number, number] } | null>(null);
   const [latentGridLoading, setLatentGridLoading] = useState(false);
 
   const runLatentGrid = () => {
@@ -330,7 +330,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
                         Sweeps across two latent dimensions and decodes each point.
                         Shows how the model organizes concepts in the learned latent space.
                       </div>
-                      <button className="layer-detail-action-btn" onClick={runLatentGrid}>
+                      <button className="layer-detail-action-btn" style={{ marginTop: 8 }} onClick={runLatentGrid}>
                         Generate Latent Grid (10×10)
                       </button>
                     </>
@@ -828,17 +828,17 @@ function MisclassCard({ sample }: { sample: {
 
 // --- Latent Grid View (VAE) ---
 
-function LatentGridView({ data }: { data: { grid: (number[][] | number[][][] | null)[][]; gridSize: number; latentRange: number; imageH: number; imageW: number; channels: number } }) {
+function LatentGridView({ data }: { data: { grid: (number[][] | number[][][] | null)[][]; gridSize: number; latentRange: number; imageH: number; imageW: number; channels: number; sweepDims?: [number, number] } }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || data.imageH === 0) return;
 
-    const cellSize = Math.max(20, Math.min(40, Math.floor(600 / data.gridSize)));
+    const cellSize = Math.max(24, Math.min(52, Math.floor(600 / data.gridSize)));
     const padLeft = 40;
     const padTop = 24;
-    const padRight = 8;
+    const padRight = 32;
     const padBottom = 40;
     const totalW = data.gridSize * cellSize + padLeft + padRight;
     const totalH = data.gridSize * cellSize + padTop + padBottom;
@@ -899,22 +899,26 @@ function LatentGridView({ data }: { data: { grid: (number[][] | number[][][] | n
     ctx.fillStyle = '#a6adc8';
     ctx.font = '11px JetBrains Mono, monospace';
 
-    // X axis (dim 0)
-    ctx.textAlign = 'center';
-    ctx.fillText(`-${data.latentRange}`, padLeft, totalH - 6);
-    ctx.fillText('0', padLeft + (data.gridSize * cellSize) / 2, totalH - 6);
-    ctx.fillText(`+${data.latentRange}`, padLeft + data.gridSize * cellSize, totalH - 6);
-    ctx.fillText('latent dim 0', padLeft + (data.gridSize * cellSize) / 2, totalH - 20);
+    const dim0 = data.sweepDims?.[0] ?? 0;
+    const dim1 = data.sweepDims?.[1] ?? 1;
+    const range = Number(data.latentRange.toFixed(1));
 
-    // Y axis (dim 1)
+    // X axis
+    ctx.textAlign = 'center';
+    ctx.fillText(`-${range}`, padLeft, totalH - 6);
+    ctx.fillText('0', padLeft + (data.gridSize * cellSize) / 2, totalH - 6);
+    ctx.fillText(`+${range}`, padLeft + data.gridSize * cellSize, totalH - 6);
+    ctx.fillText(`latent dim ${dim0}`, padLeft + (data.gridSize * cellSize) / 2, totalH - 20);
+
+    // Y axis
     ctx.textAlign = 'right';
-    ctx.fillText(`-${data.latentRange}`, padLeft - 4, padTop + 8);
-    ctx.fillText(`+${data.latentRange}`, padLeft - 4, padTop + data.gridSize * cellSize);
+    ctx.fillText(`-${range}`, padLeft - 4, padTop + 8);
+    ctx.fillText(`+${range}`, padLeft - 4, padTop + data.gridSize * cellSize);
     ctx.save();
     ctx.translate(12, padTop + (data.gridSize * cellSize) / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.textAlign = 'center';
-    ctx.fillText('latent dim 1', 0, 0);
+    ctx.fillText(`latent dim ${dim1}`, 0, 0);
     ctx.restore();
   }, [data]);
 

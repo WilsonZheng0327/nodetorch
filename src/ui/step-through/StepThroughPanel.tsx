@@ -2,7 +2,7 @@
 // Loads a sample from the dataset and walks through each layer's transformation.
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import type { StepThroughResult, BackwardStepThroughResult, StepThroughMode, DenoiseStepThroughResult } from './types';
+import type { StepThroughResult, BackwardStepThroughResult, StepThroughMode, DenoiseStepThroughResult, TextGenerationResult } from './types';
 import { StageTimeline } from './StageTimeline';
 import { StageCard } from './StageCard';
 import { StageDetail } from './StageDetail';
@@ -21,6 +21,11 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const [resultB, setResultB] = useState<StepThroughResult | null>(null);  // second sample for compare
   const [backwardResult, setBackwardResult] = useState<BackwardStepThroughResult | null>(null);
   const [denoiseResult, setDenoiseResult] = useState<DenoiseStepThroughResult | null>(null);
+  const [genResult, setGenResult] = useState<TextGenerationResult | null>(null);
+  const [genPrompt, setGenPrompt] = useState('');
+  const [genTemp, setGenTemp] = useState(0.8);
+  const [genTopK, setGenTopK] = useState(0);
+  const [genMaxTokens, setGenMaxTokens] = useState(200);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +142,33 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     }
   };
 
+  // Load text generation
+  const loadGenerate = () => {
+    setLoading(true);
+    setError(null);
+    fetch('http://localhost:8000/generate-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        graph: JSON.parse(graphJson),
+        prompt: genPrompt || '',
+        maxTokens: genMaxTokens,
+        temperature: genTemp,
+        topK: genTopK,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok') {
+          setGenResult(data.result);
+        } else {
+          setError(data.error ?? 'Failed to generate text');
+        }
+      })
+      .catch(() => setError('Cannot connect to backend'))
+      .finally(() => setLoading(false));
+  };
+
   const exitCompare = () => setResultB(null);
   const compareMode = resultB !== null;
 
@@ -168,6 +200,13 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     try {
       const g = JSON.parse(graphJson);
       return g.graph?.nodes?.some((n: any) => n.type === 'ml.gan.noise_input' || n.type === 'ml.loss.gan') ?? false;
+    } catch { return false; }
+  })();
+
+  const isAutoregGraph = (() => {
+    try {
+      const g = JSON.parse(graphJson);
+      return g.graph?.nodes?.some((n: any) => n.type === 'data.tiny_shakespeare') ?? false;
     } catch { return false; }
   })();
 
@@ -204,6 +243,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     setIsPlaying(false);
     if (m === 'backward' && !backwardResult && !loading) loadBackward();
     if (m === 'denoise' && !denoiseResult && !loading) loadDenoise();
+    // generate mode doesn't auto-load — user clicks the button
   };
 
   if (!open) return null;
@@ -235,6 +275,14 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
                 onClick={() => switchMode('denoise')}
               >
                 {isGANGraph ? 'Generate' : 'Denoise'}
+              </button>
+            )}
+            {isAutoregGraph && (
+              <button
+                className={`step-through-mode-tab ${mode === 'generate' ? 'step-through-mode-tab-active step-through-mode-tab-denoise' : ''}`}
+                onClick={() => switchMode('generate')}
+              >
+                Generate
               </button>
             )}
           </span>
@@ -273,6 +321,11 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
           {mode === 'denoise' && (
             <button className="step-through-btn" onClick={loadDenoise} disabled={loading}>
               Regenerate
+            </button>
+          )}
+          {mode === 'generate' && (
+            <button className="step-through-btn" onClick={loadGenerate} disabled={loading}>
+              Generate
             </button>
           )}
           <button className="step-through-close" onClick={onClose}>&times;</button>
@@ -421,11 +474,107 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
           {mode === 'denoise' && denoiseResult && denoiseSteps[currentIdx] && (
             <DenoiseView step={denoiseSteps[currentIdx]} channels={denoiseResult.channels} />
           )}
+
+          {mode === 'generate' && (
+            <GenerateView
+              result={genResult}
+              prompt={genPrompt}
+              temperature={genTemp}
+              topK={genTopK}
+              maxTokens={genMaxTokens}
+              loading={loading}
+              onPromptChange={setGenPrompt}
+              onTempChange={setGenTemp}
+              onTopKChange={setGenTopK}
+              onMaxTokensChange={setGenMaxTokens}
+              onGenerate={loadGenerate}
+            />
+          )}
         </>
+      )}
+
+      {/* Generate mode renders outside totalSteps check since it doesn't use steps */}
+      {mode === 'generate' && !loading && totalSteps === 0 && (
+        <GenerateView
+          result={genResult}
+          prompt={genPrompt}
+          temperature={genTemp}
+          topK={genTopK}
+          maxTokens={genMaxTokens}
+          loading={loading}
+          onPromptChange={setGenPrompt}
+          onTempChange={setGenTemp}
+          onTopKChange={setGenTopK}
+          onMaxTokensChange={setGenMaxTokens}
+          onGenerate={loadGenerate}
+        />
       )}
     </div>
   );
 }
+
+// --- Text generation view ---
+
+function GenerateView({ result, prompt, temperature, topK, maxTokens, loading, onPromptChange, onTempChange, onTopKChange, onMaxTokensChange, onGenerate }: {
+  result: TextGenerationResult | null;
+  prompt: string;
+  temperature: number;
+  topK: number;
+  maxTokens: number;
+  loading: boolean;
+  onPromptChange: (v: string) => void;
+  onTempChange: (v: number) => void;
+  onTopKChange: (v: number) => void;
+  onMaxTokensChange: (v: number) => void;
+  onGenerate: () => void;
+}) {
+  return (
+    <div className="generate-view">
+      <div className="generate-controls">
+        <div className="generate-prompt-row">
+          <label className="generate-label">Prompt</label>
+          <input
+            type="text"
+            className="generate-prompt-input"
+            value={prompt}
+            onChange={(e) => onPromptChange(e.target.value)}
+            placeholder="Start of generated text (optional)"
+          />
+        </div>
+        <div className="generate-sliders">
+          <div className="generate-slider-group">
+            <label className="generate-label">Temperature: {temperature.toFixed(2)}</label>
+            <input type="range" min={0.1} max={2.0} step={0.05} value={temperature} onChange={(e) => onTempChange(parseFloat(e.target.value))} />
+          </div>
+          <div className="generate-slider-group">
+            <label className="generate-label">Top-K: {topK === 0 ? 'off' : topK}</label>
+            <input type="range" min={0} max={65} step={1} value={topK} onChange={(e) => onTopKChange(parseInt(e.target.value, 10))} />
+          </div>
+          <div className="generate-slider-group">
+            <label className="generate-label">Max tokens: {maxTokens}</label>
+            <input type="range" min={20} max={500} step={10} value={maxTokens} onChange={(e) => onMaxTokensChange(parseInt(e.target.value, 10))} />
+          </div>
+        </div>
+        <button className="step-through-btn generate-btn" onClick={onGenerate} disabled={loading}>
+          {loading ? 'Generating...' : 'Generate'}
+        </button>
+      </div>
+
+      {result && (
+        <div className="generate-output">
+          <pre className="generate-text">
+            <span className="generate-text-prompt">{result.prompt}</span>
+            <span className="generate-text-continuation">{result.generated}</span>
+          </pre>
+          <div className="generate-meta">
+            {result.tokens.length} tokens generated
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // --- Sample preview header ---
 

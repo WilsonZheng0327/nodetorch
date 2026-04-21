@@ -40,6 +40,7 @@ from loss_landscape import compute_loss_landscape
 from latent_viz import generate_latent_grid
 from denoise_viz import run_denoise_step_through
 from gan_generate import generate_gan_images
+from text_generate import generate_text
 from runs_store import list_runs, load_run, delete_run
 from data_loaders import DATASET_DETAILS, augmentation_preview
 import os
@@ -203,6 +204,26 @@ async def latent_grid(request: dict):
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Latent grid failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/generate-text")
+async def generate_text_endpoint(request: dict):
+    """Generate text autoregressively from a trained language model."""
+    logger.info("Text generation requested")
+    try:
+        result = generate_text(
+            request["graph"],
+            prompt=request.get("prompt", ""),
+            max_tokens=request.get("maxTokens", 200),
+            temperature=request.get("temperature", 0.8),
+            top_k=request.get("topK", 0),
+        )
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Text generation failed: {e}")
         return {"status": "error", "error": str(e)}
 
 

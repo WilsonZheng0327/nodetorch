@@ -191,18 +191,24 @@ class AttentionModule(nn.Module):
     """Why wrapper: F.scaled_dot_product_attention is a function, not an nn.Module.
     Can't be registered in nn.ModuleDict, has no .parameters(). This wraps it
     so it behaves like any other module in the execution loop."""
-    def __init__(self, dropout: float = 0.0):
+    def __init__(self, dropout: float = 0.0, is_causal: bool = False):
         super().__init__()
         self.dropout = dropout
+        self.is_causal = is_causal
 
     def forward(self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
         return torch.nn.functional.scaled_dot_product_attention(
-            query, key, value, dropout_p=self.dropout if self.training else 0.0,
+            query, key, value,
+            dropout_p=self.dropout if self.training else 0.0,
+            is_causal=self.is_causal,
         )
 
 
 def build_attention(props: dict, input_shapes: dict) -> nn.Module:
-    return AttentionModule(dropout=props.get("dropout", 0.0))
+    return AttentionModule(
+        dropout=props.get("dropout", 0.0),
+        is_causal=props.get("causalMask", False),
+    )
 
 
 # --- Activations (no wrapper needed — all are single tensor in/out) ---
@@ -231,10 +237,28 @@ def build_leaky_relu(props: dict, input_shapes: dict) -> nn.Module:
     return nn.LeakyReLU(negative_slope=props.get("negativeSlope", 0.01))
 
 
-# --- Loss (no wrapper needed) ---
+# --- Loss ---
+
+class CrossEntropyLossWrapper(nn.Module):
+    """CrossEntropy that auto-reshapes for sequence models.
+    Standard: predictions [B, C], labels [B].
+    Sequence: predictions [B, seq_len, C], labels [B, seq_len].
+    Reshapes the latter to [B*seq_len, C] and [B*seq_len] automatically."""
+    def __init__(self):
+        super().__init__()
+        self.loss = nn.CrossEntropyLoss()
+
+    def forward(self, predictions: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        if predictions.dim() == 3:
+            # [B, seq_len, vocab_size] → [B*seq_len, vocab_size]
+            B, S, C = predictions.shape
+            predictions = predictions.reshape(B * S, C)
+            labels = labels.reshape(B * S)
+        return self.loss(predictions, labels)
+
 
 def build_cross_entropy_loss(props: dict, input_shapes: dict) -> nn.Module:
-    return nn.CrossEntropyLoss()
+    return CrossEntropyLossWrapper()
 
 
 def build_mse_loss(props: dict, input_shapes: dict) -> nn.Module:

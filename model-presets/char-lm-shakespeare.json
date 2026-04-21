@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "graph": {
+    "id": "main",
+    "name": "Char-LM — Tiny Shakespeare",
+    "nodes": [
+      {
+        "id": "data", "type": "data.tiny_shakespeare",
+        "position": { "x": 0, "y": 0 },
+        "properties": { "batchSize": 64, "seqLen": 128 }
+      },
+      {
+        "id": "embed", "type": "ml.layers.embedding",
+        "position": { "x": 250, "y": 0 },
+        "properties": { "numEmbeddings": 65, "embeddingDim": 64 }
+      },
+      {
+        "id": "lstm", "type": "ml.layers.lstm",
+        "position": { "x": 500, "y": 0 },
+        "properties": { "hiddenSize": 256, "numLayers": 2, "dropout": 0.2 }
+      },
+      {
+        "id": "linear", "type": "ml.layers.linear",
+        "position": { "x": 750, "y": 0 },
+        "properties": { "outFeatures": 65 }
+      },
+      {
+        "id": "loss", "type": "ml.loss.cross_entropy",
+        "position": { "x": 1000, "y": 50 },
+        "properties": {}
+      },
+      {
+        "id": "adam", "type": "ml.optimizers.adam",
+        "position": { "x": 1250, "y": 100 },
+        "properties": { "lr": 0.002, "epochs": 20, "scheduler": "cosine", "gradClip": 1.0 }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": { "nodeId": "data", "portId": "out" }, "target": { "nodeId": "embed", "portId": "in" } },
+      { "id": "e2", "source": { "nodeId": "embed", "portId": "out" }, "target": { "nodeId": "lstm", "portId": "in" } },
+      { "id": "e3", "source": { "nodeId": "lstm", "portId": "out" }, "target": { "nodeId": "linear", "portId": "in" } },
+      { "id": "e4", "source": { "nodeId": "linear", "portId": "out" }, "target": { "nodeId": "loss", "portId": "predictions" } },
+      { "id": "e5", "source": { "nodeId": "data", "portId": "labels" }, "target": { "nodeId": "loss", "portId": "labels" } },
+      { "id": "e6", "source": { "nodeId": "loss", "portId": "out" }, "target": { "nodeId": "adam", "portId": "loss" } }
+    ]
+  }
+}

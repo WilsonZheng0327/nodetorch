@@ -5,6 +5,7 @@ import { cifar10Node } from './cifar10';
 import { fashionMnistNode } from './fashion-mnist';
 import { imdbNode } from './imdb';
 import { agNewsNode } from './ag-news';
+import { tinyShakespeareNode } from './tiny-shakespeare';
 
 export const dataNodes: NodeDefinition[] = [
   mnistNode,
@@ -13,4 +14,5 @@ export const dataNodes: NodeDefinition[] = [
   fashionMnistNode,
   imdbNode,
   agNewsNode,
+  tinyShakespeareNode,
 ];

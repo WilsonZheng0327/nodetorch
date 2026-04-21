@@ -120,7 +120,16 @@ export interface BackwardStepThroughResult {
   modelState?: ModelState;
 }
 
-export type StepThroughMode = 'forward' | 'backward' | 'denoise';
+export type StepThroughMode = 'forward' | 'backward' | 'denoise' | 'generate';
+
+// --- Text generation ---
+
+export interface TextGenerationResult {
+  prompt: string;
+  generated: string;
+  fullText: string;
+  tokens: { char: string; prob: number }[];
+}
 
 // --- Diffusion denoising step-through ---
 
