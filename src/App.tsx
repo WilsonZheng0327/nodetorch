@@ -397,6 +397,8 @@ export default function App() {
           <RF.Panel position="bottom-right" className="bottom-panel">
             <RF.MiniMap
               className="minimap-themed"
+              pannable
+              zoomable
               maskColor="rgba(17, 17, 27, 0.7)"
               nodeColor={(node) => {
                 const inst = graph.graph.nodes.get(node.id);

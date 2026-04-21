@@ -836,6 +836,56 @@ def _standard_classification_loop(opt_props: dict, opt_type: str, loss_node: dic
     return '\n'.join(lines)
 
 
+def _autoregressive_training_loop(opt_props: dict, opt_type: str) -> str:
+    """Generate autoregressive LM training loop (per-token CrossEntropy, perplexity)."""
+    import math as _math  # noqa: F401  (used in generated code)
+    epochs = opt_props.get("epochs", 10)
+    scheduler_type = opt_props.get("scheduler", "")
+    grad_clip = opt_props.get("gradClip", 0)
+    opt_code = _optimizer_code(opt_type, opt_props)
+
+    lines = []
+    lines.append("import math")
+    lines.append("")
+    lines.append("def train():")
+    lines.append("    model = Model().to(device)")
+    lines.append("    criterion = nn.CrossEntropyLoss()")
+    lines.append(f"    optimizer = {opt_code}")
+    if scheduler_type:
+        lines.append(f"    scheduler = {_scheduler_code(scheduler_type, epochs)}")
+    lines.append("")
+    lines.append(f"    for epoch in range({epochs}):")
+    lines.append("        model.train()")
+    lines.append("        running_loss = 0.0")
+    lines.append("        n_batches = 0")
+    lines.append("")
+    lines.append("        for inputs, targets in train_loader:")
+    lines.append("            inputs, targets = inputs.to(device), targets.to(device)")
+    lines.append("")
+    lines.append("            optimizer.zero_grad()")
+    lines.append("            logits = model(inputs)  # [B, seq_len, vocab_size]")
+    lines.append("            B, S, V = logits.shape")
+    lines.append("            loss = criterion(logits.reshape(B * S, V), targets.reshape(B * S))")
+    lines.append("            loss.backward()")
+    if grad_clip and grad_clip > 0:
+        lines.append(f"            torch.nn.utils.clip_grad_norm_(model.parameters(), {grad_clip})")
+    lines.append("            optimizer.step()")
+    lines.append("")
+    lines.append("            running_loss += loss.item()")
+    lines.append("            n_batches += 1")
+    lines.append("")
+    if scheduler_type:
+        lines.append("        scheduler.step()")
+    lines.append("        epoch_loss = running_loss / max(n_batches, 1)")
+    lines.append("        ppl = math.exp(min(epoch_loss, 20))")
+    lines.append(f'        print(f"Epoch {{epoch+1}}/{epochs} — Loss: {{epoch_loss:.4f}}, Perplexity: {{ppl:.2f}}")')
+    lines.append("")
+    lines.append("    print('Training complete!')")
+    lines.append("    return model")
+
+    return '\n'.join(lines)
+
+
 def _standard_reconstruction_loop(opt_props: dict, opt_type: str) -> str:
     """Generate MSE reconstruction training loop (autoencoder)."""
     lr = opt_props.get("lr", 0.001)
@@ -1187,15 +1237,114 @@ def _scheduler_code(scheduler_type: str, epochs: int) -> str:
 
 # ─── Dataset loading code generation ─────────────────────────────────────────
 
+def _text_dataset_code(hf_name: str, props: dict, num_classes: int) -> str:
+    """Generate HuggingFace text dataset loading with a simple word-level vocab."""
+    batch_size = props.get("batchSize", 32)
+    max_len = props.get("maxLen", 256 if hf_name == "imdb" else 128)
+    vocab_size = props.get("vocabSize", 10000)
+
+    lines = [
+        "# --- Dataset (text: word-level vocab built from training split) ---",
+        "# Requires `datasets` package: pip install datasets",
+        "import re",
+        "from collections import Counter",
+        "from datasets import load_dataset",
+        "",
+        f"_raw_train = load_dataset('{hf_name}', split='train')",
+        f"_raw_test = load_dataset('{hf_name}', split='test')",
+        "",
+        "def _tokenize(text):",
+        "    return re.findall(r'[a-z]+', text.lower())",
+        "",
+        "# Build vocab from first 5k training samples (matches NodeTorch backend)",
+        "_counter = Counter()",
+        "for _t in _raw_train['text'][:5000]:",
+        "    _counter.update(_tokenize(_t))",
+        "vocab = {'<pad>': 0, '<unk>': 1}",
+        f"for _w, _ in _counter.most_common({vocab_size} - 2):",
+        "    vocab[_w] = len(vocab)",
+        "UNK = vocab['<unk>']",
+        "",
+        "class TextDataset(torch.utils.data.Dataset):",
+        "    def __init__(self, raw):",
+        "        self.raw = raw",
+        "    def __len__(self):",
+        "        return len(self.raw)",
+        "    def __getitem__(self, idx):",
+        "        text = self.raw[idx]['text']",
+        "        label = self.raw[idx]['label']",
+        "        tokens = _tokenize(text)",
+        f"        ids = [vocab.get(t, UNK) for t in tokens[:{max_len}]]",
+        f"        ids = ids + [0] * ({max_len} - len(ids))",
+        "        return torch.tensor(ids, dtype=torch.long), torch.tensor(label, dtype=torch.long)",
+        "",
+        "train_dataset = TextDataset(_raw_train)",
+        "test_dataset = TextDataset(_raw_test)",
+        f"train_loader = torch.utils.data.DataLoader(train_dataset, batch_size={batch_size}, shuffle=True, num_workers=0)",
+        f"test_loader = torch.utils.data.DataLoader(test_dataset, batch_size={batch_size}, shuffle=False, num_workers=0)",
+    ]
+    return '\n'.join(lines)
+
+
+def _shakespeare_dataset_code(props: dict) -> str:
+    """Generate TinyShakespeare character-level dataset code."""
+    batch_size = props.get("batchSize", 64)
+    seq_len = props.get("seqLen", 128)
+
+    lines = [
+        "# --- Dataset (Tiny Shakespeare: character-level language modeling) ---",
+        "import os, urllib.request",
+        "",
+        "_SHAKESPEARE_URL = 'https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt'",
+        "_path = './data/tiny_shakespeare.txt'",
+        "os.makedirs('./data', exist_ok=True)",
+        "if not os.path.exists(_path):",
+        "    urllib.request.urlretrieve(_SHAKESPEARE_URL, _path)",
+        "with open(_path, 'r', encoding='utf-8') as _f:",
+        "    _text = _f.read()",
+        "",
+        "_chars = sorted(set(_text))",
+        "char2idx = {c: i for i, c in enumerate(_chars)}",
+        "idx2char = {i: c for c, i in char2idx.items()}",
+        "VOCAB_SIZE = len(char2idx)",
+        "_data = torch.tensor([char2idx[c] for c in _text], dtype=torch.long)",
+        "",
+        "class TinyShakespeareDataset(torch.utils.data.Dataset):",
+        f"    SEQ_LEN = {seq_len}",
+        "    def __len__(self):",
+        "        return (len(_data) - 1) // self.SEQ_LEN",
+        "    def __getitem__(self, idx):",
+        "        start = idx * self.SEQ_LEN",
+        "        chunk = _data[start : start + self.SEQ_LEN + 1]",
+        "        if len(chunk) < self.SEQ_LEN + 1:",
+        "            chunk = torch.cat([chunk, torch.zeros(self.SEQ_LEN + 1 - len(chunk), dtype=torch.long)])",
+        "        return chunk[:-1], chunk[1:]",
+        "",
+        "train_dataset = TinyShakespeareDataset()",
+        f"train_loader = torch.utils.data.DataLoader(train_dataset, batch_size={batch_size}, shuffle=True, num_workers=0)",
+        "# No separate test set for char-level LM — use perplexity on held-out text if needed",
+        "test_loader = train_loader",
+    ]
+    return '\n'.join(lines)
+
+
 def _generate_dataset_code(data_node: dict) -> str:
     """Generate dataset loading code."""
     dtype = data_node["type"]
     props = data_node.get("properties", {})
     batch_size = props.get("batchSize", 32)
 
+    # Text datasets (HuggingFace) — sentiment / topic classification
+    if dtype == "data.imdb":
+        return _text_dataset_code("imdb", props, num_classes=2)
+    if dtype == "data.ag_news":
+        return _text_dataset_code("ag_news", props, num_classes=4)
+    # Character-level language model
+    if dtype == "data.tiny_shakespeare":
+        return _shakespeare_dataset_code(props)
+
     info = DATASET_CODE.get(dtype)
     if not info:
-        # Fallback for unknown datasets
         return f"# TODO: Add dataset loading for {dtype}\ntrain_loader = None"
 
     # Check augmentation flags
@@ -1309,6 +1458,8 @@ def export_to_python(graph_data: dict) -> str:
         training_code = _gan_training_loop(graph_data, modules)
     elif training_mode == "diffusion":
         training_code = _diffusion_training_loop(graph_data, modules)
+    elif training_mode == "autoregressive":
+        training_code = _autoregressive_training_loop(opt_props, opt_type)
     elif loss_node and loss_node["type"] == "ml.loss.vae":
         loss_props = loss_node.get("properties", {})
         training_code = _vae_training_loop(opt_props, opt_type, loss_props)
@@ -1408,6 +1559,39 @@ def export_to_python(graph_data: dict) -> str:
         sections.append("        z = torch.randn(16, 32, device=device)  # sample from N(0,1)")
         sections.append("        # Pass z through decoder (requires adapting the model)")
         sections.append("        print('VAE training complete. See model for encoding/decoding.')")
+    elif loss_node and loss_node["type"] == "ml.loss.mse":
+        # Reconstruction (autoencoder): report MSE, no accuracy
+        sections.append("    model = train()")
+        sections.append("    # Evaluate reconstruction MSE on test set")
+        sections.append("    model.eval()")
+        sections.append("    total_mse = 0.0")
+        sections.append("    n_batches = 0")
+        sections.append("    criterion_eval = nn.MSELoss()")
+        sections.append("    with torch.no_grad():")
+        sections.append("        for images, _ in test_loader:")
+        sections.append("            images = images.to(device)")
+        sections.append("            outputs = model(images)")
+        sections.append("            total_mse += criterion_eval(outputs, images).item()")
+        sections.append("            n_batches += 1")
+        sections.append("    print(f'Test reconstruction MSE: {total_mse / max(n_batches, 1):.4f}')")
+    elif data_node and data_node["type"] == "data.tiny_shakespeare":
+        # Autoregressive language model: report perplexity, skip accuracy
+        sections.append("    import math")
+        sections.append("    model = train()")
+        sections.append("    # Evaluate perplexity on held-out sequences")
+        sections.append("    model.eval()")
+        sections.append("    total_loss = 0.0")
+        sections.append("    n_tokens = 0")
+        sections.append("    criterion_eval = nn.CrossEntropyLoss(reduction='sum')")
+        sections.append("    with torch.no_grad():")
+        sections.append("        for inputs, targets in test_loader:")
+        sections.append("            inputs, targets = inputs.to(device), targets.to(device)")
+        sections.append("            logits = model(inputs)")
+        sections.append("            B, S, V = logits.shape")
+        sections.append("            total_loss += criterion_eval(logits.reshape(B*S, V), targets.reshape(B*S)).item()")
+        sections.append("            n_tokens += B * S")
+        sections.append("    avg = total_loss / max(n_tokens, 1)")
+        sections.append("    print(f'Test perplexity: {math.exp(min(avg, 20)):.2f}')")
     else:
         sections.append("    model = train()")
         sections.append("    # Evaluate on test set")
