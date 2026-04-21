@@ -33,7 +33,7 @@ backend/storage/datasets/
 backend/storage/weights/
 backend/storage/runs/
 backend/storage/blocks/
-data/
+/data/
 test_diffusion_output/
 storage/
 test_diffusion.py
