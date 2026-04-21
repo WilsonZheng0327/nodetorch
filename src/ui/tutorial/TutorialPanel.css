@@ -1,14 +1,14 @@
 .tutorial-panel {
   position: fixed;
   top: 50%;
-  left: calc(50% + 400px);
+  left: calc(50% + 430px);
   transform: translate(-50%, -50%);
-  width: 380px;
+  width: 460px;
   background: #1e1e2e;
   border: 1px solid #45475a;
   border-radius: 10px;
   font-family: 'Inter', system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   color: #cdd6f4;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   z-index: 15;
@@ -16,14 +16,14 @@
 }
 
 .tutorial-panel-collapsed {
-  width: 380px;
+  width: 460px;
 }
 
 .tutorial-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 12px 16px;
   cursor: grab;
   user-select: none;
   background: #181825;
@@ -45,7 +45,7 @@
 
 .tutorial-header-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .tutorial-header-right {
@@ -72,12 +72,12 @@
 }
 
 .tutorial-progress-ring {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
   color: #89b4fa;
   background: rgba(137, 180, 250, 0.1);
-  padding: 2px 5px;
+  padding: 3px 7px;
   border-radius: 8px;
 }
 
@@ -100,7 +100,7 @@
 
 /* Body */
 .tutorial-body {
-  max-height: 50vh;
+  max-height: 60vh;
   overflow-y: auto;
 }
 
@@ -126,14 +126,14 @@
 .tutorial-goal-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 16px;
   background: none;
   border: none;
   color: #cdd6f4;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
@@ -155,16 +155,16 @@
 }
 
 .tutorial-goal-count {
-  font-size: 11px;
+  font-size: 12px;
   font-family: 'JetBrains Mono', monospace;
   color: #6c7086;
 }
 
 .tutorial-goal-desc {
-  padding: 0 12px 6px 32px;
-  font-size: 12px;
+  padding: 0 16px 8px 38px;
+  font-size: 13px;
   color: #6c7086;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 /* Tasks */
@@ -179,17 +179,17 @@
 .tutorial-task-toggle {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 4px 12px 4px 32px;
+  padding: 6px 16px 6px 38px;
   background: none;
   border: none;
   color: #a6adc8;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   text-align: left;
-  line-height: 1.4;
+  line-height: 1.5;
   outline: none;
 }
 
@@ -221,18 +221,18 @@
 }
 
 .tutorial-task-hint {
-  padding: 2px 12px 6px 52px;
-  font-size: 11px;
+  padding: 4px 16px 8px 60px;
+  font-size: 12px;
   color: #585b70;
-  line-height: 1.45;
+  line-height: 1.55;
 }
 
 /* Completion message */
 .tutorial-congrats {
-  padding: 12px 16px;
-  font-size: 12px;
+  padding: 14px 18px;
+  font-size: 13px;
   color: #a6adc8;
-  line-height: 1.5;
+  line-height: 1.55;
   text-align: center;
   border-top: 1px solid #313244;
 }

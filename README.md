@@ -1,8 +1,16 @@
 <p align="center">
-  <img src="nodetorch.png" alt="NodeTorch" width="120" />
+  <img src="public/nodetorch.png" alt="NodeTorch" width="120" />
 </p>
 <h1 align="center">NodeTorch</h1>
 <p align="center">Node-based visual tool for building, inspecting, and understanding ML models.<br/>Educational and open-source.</p>
+
+---
+
+## Demo
+
+https://github.com/WilsonZheng0327/nodetorch/raw/master/public/demo.mp4
+
+> If the video doesn't play inline, [download it here](public/demo.mp4).
 
 ---
 
