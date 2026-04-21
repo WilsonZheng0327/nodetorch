@@ -8,9 +8,11 @@
 
 ## Demo
 
-https://github.com/WilsonZheng0327/nodetorch/raw/master/public/demo.mp4
+<p align="center">
+  <video src="https://github.com/WilsonZheng0327/nodetorch/raw/master/public/demo.mp4" controls width="720"></video>
+</p>
 
-> If the video doesn't play inline, [download it here](public/demo.mp4).
+> Doesn't play inline? [Watch / download here](public/demo.mp4).
 
 ---
 
