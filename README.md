@@ -8,9 +8,7 @@
 
 ## Demo
 
-<p align="center">
-    <video src="https://github.com/WilsonZheng0327/nodetorch/raw/master/public/Demo.mp4" controls width="720"></video>
-</p>
+https://github.com/user-attachments/assets/a58c5c44-d274-4949-8a00-f989c418fb07
 
 ---
 
