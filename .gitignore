@@ -39,3 +39,7 @@ test_diffusion_output/
 storage/
 test_diffusion.py
 test_diffusion_output/
+
+# Generated export scripts
+/*.py
+!/backend/**/*.py

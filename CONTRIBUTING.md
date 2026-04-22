@@ -169,6 +169,7 @@ LOSS_NODES = {"ml.loss.cross_entropy", "ml.loss.my_loss"}
 | **Optimizer** | `src/domain/nodes/optimizers/<node>.ts`, folder `index.ts`, + training loop in `graph_builder.py` |
 | **Dataset** | `src/domain/nodes/data/<node>.ts`, folder `index.ts`, `backend/data_loaders.py`, `backend/node_viz.py` |
 | **Structural** (Add, Reshape, etc.) | `src/domain/nodes/structural/<node>.ts`, folder `index.ts`, `backend/node_builders.py`, `backend/node_viz.py` |
+| **Preprocessing** (Tokenizer, etc.) | `src/domain/nodes/preprocessing/<node>.ts`, folder `index.ts`, `backend/node_builders.py`, `backend/node_viz.py`. New categories also need import in `src/domain/index.ts`. |
 
 ## Adding a New Data Type
 

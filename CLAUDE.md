@@ -51,7 +51,9 @@ Backend mirrors the engine: `backend/graph_builder.py` does the same topological
 - `backend/node_builders.py` — per-node-type `nn.Module` builder functions
 - `backend/node_viz.py` — per-node-type visualization registry (forward + backward step-through)
 - `backend/data_loaders.py` — per-dataset loader functions
-- `backend/training/` — training loop plugin system (standard, GAN, diffusion)
+- `backend/training/` — training loop plugin system (standard, GAN, diffusion, autoregressive)
+- `backend/bpe.py` — BPE tokenizer (learn merges from corpus, encode/decode, cached per dataset+vocab)
+- `backend/text_generate.py` — autoregressive text generation (char-level and BPE, temperature/top-k sampling)
 - `backend/step_through.py` — forward step-through orchestration (uses node_viz.py for viz)
 - `backend/backprop_sim.py` — backward step-through + simple backprop animation
 - `backend/denoise_viz.py` — diffusion denoising step-through visualization
@@ -61,7 +63,7 @@ Backend mirrors the engine: `backend/graph_builder.py` does the same topological
 ### Execution modes
 
 - **"shape"** — eager, TypeScript math, no backend. Runs on every edit.
-- **"train"** — manual, WebSocket streaming, epoch-by-epoch progress. Auto-detects paradigm (standard, GAN, diffusion).
+- **"train"** — manual, WebSocket streaming, epoch-by-epoch progress. Auto-detects paradigm (standard, GAN, diffusion, autoregressive).
 - **"test"** — evaluates on held-out test set (classification models only).
 - **"infer"** — manual, uses trained weights stored in backend memory.
 
@@ -71,12 +73,22 @@ The training loop is a plugin system. `train_graph()` auto-detects which paradig
 - **standard** — single forward → loss → backward → update. Handles classification, reconstruction, VAEs.
 - **gan** — alternating generator/discriminator updates with two optimizers.
 - **diffusion** — noise-conditioned denoising with timestep injection.
+- **autoregressive** — next-token prediction with 3D logit reshaping, perplexity metrics, text generation.
 
 See `docs/training-plugins.md` for the full architecture documentation.
 
+### Text preprocessing pipeline
+
+The `ml.preprocessing.tokenizer` node sits between data and embedding. Three modes:
+- **character** — each character is a token (default for Shakespeare, vocab ~65)
+- **word** — split on whitespace/punctuation, frequency-based vocab (default for IMDb/AG News)
+- **bpe** — Byte-Pair Encoding learned from the dataset (`backend/bpe.py`). BPE merges are cached per (dataset, vocab_size) so training only happens once (~5s on Shakespeare).
+
+During training, `build_training_context()` detects the tokenizer node's mode. If BPE, it learns merges from the corpus and creates a BPE-encoded dataset. During text generation, `text_generate.py` detects the mode and uses the matching encode/decode functions.
+
 ### Adding a new node type
 
-1. **Frontend**: create file in `src/domain/nodes/<category>/`, export a `NodeDefinition`, add to that folder's `index.ts` array. The domain `index.ts` doesn't change.
+1. **Frontend**: create file in `src/domain/nodes/<category>/`, export a `NodeDefinition`, add to that folder's `index.ts` array. If it's a new category (like `preprocessing/`), also import in `src/domain/index.ts`.
 2. **Backend builder**: add builder function to `backend/node_builders.py` (layers) or `backend/data_loaders.py` (datasets). Loss nodes also need `LOSS_NODES` in `graph_builder.py`.
 3. **Backend viz**: add forward/backward viz functions to `backend/node_viz.py` registries (`FORWARD_VIZ`, `BACKWARD_VIZ`). Optional — default fallback provides basic shape-based viz.
 
