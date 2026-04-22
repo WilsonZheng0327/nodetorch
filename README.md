@@ -2,7 +2,7 @@
   <img src="public/nodetorch.png" alt="NodeTorch" width="120" />
 </p>
 <h1 align="center">NodeTorch</h1>
-<p align="center">Node-based visual tool for building, inspecting, and understanding ML models.<br/>Educational and open-source.</p>
+<p align="center">Node-based visual educational tool for building, inspecting, and understanding ML models.
 
 ---
 
