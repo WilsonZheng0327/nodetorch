@@ -201,8 +201,17 @@ def extract_attention_map_mha(module, inputs: dict) -> dict | None:
     key = inputs.get("key", query)
     value = inputs.get("value", query)
     try:
+        # Apply causal mask if the wrapper has one, so the attention map
+        # matches the actual attention pattern used during forward pass.
+        kwargs: dict = {"need_weights": True, "average_attn_weights": True}
+        if getattr(module, "is_causal", False):
+            seq_len = query.shape[1]
+            kwargs["attn_mask"] = torch.triu(
+                torch.ones(seq_len, seq_len, device=query.device, dtype=torch.bool),
+                diagonal=1,
+            )
         with torch.no_grad():
-            _, attn = module.mha(query, key, value, need_weights=True, average_attn_weights=True)
+            _, attn = module.mha(query, key, value, **kwargs)
     except Exception:
         return None
     if attn is None or attn.dim() < 2:
@@ -608,6 +617,7 @@ FORWARD_VIZ: dict[str, callable] = {
     "ml.structural.permute": forward_viz_structural,
     "ml.structural.sequence_pool": forward_viz_structural,
     "ml.structural.reparameterize": forward_viz_structural,
+    "ml.preprocessing.tokenizer": forward_viz_structural,
 }
 
 for _lt in ALL_LOSS_NODES:

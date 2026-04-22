@@ -61,6 +61,60 @@ DATASET_CODE = {
 }
 
 
+_TOKENIZER_CLASS = '''class Tokenizer(nn.Module):
+    """Truncates/pads sequences to max_len and caps vocabulary indices.
+
+    Ensures all token ID sequences have uniform length and valid indices
+    before being fed to an embedding layer.
+    """
+    def __init__(self, vocab_size, max_len):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.max_len = max_len
+
+    def forward(self, x):
+        x = x[:, :self.max_len]
+        if x.shape[1] < self.max_len:
+            x = torch.nn.functional.pad(x, (0, self.max_len - x.shape[1]))
+        return x.clamp(0, self.vocab_size - 1)
+'''
+
+
+_POSITIONAL_ENCODING_CLASS = '''class PositionalEncoding(nn.Module):
+    """Adds position information to token embeddings.
+
+    'learned': trainable per-position embeddings (GPT/BERT style).
+    'sinusoidal': fixed sin/cos waves (original Transformer paper).
+    Input/output shape: [B, seq_len, embed_dim].
+    """
+    def __init__(self, max_len, embed_dim, encoding_type='learned'):
+        super().__init__()
+        self.max_len = max_len
+        self.embed_dim = embed_dim
+        self.encoding_type = encoding_type
+        if encoding_type == 'learned':
+            self.pos_embed = nn.Embedding(max_len, embed_dim)
+        else:
+            import math
+            pe = torch.zeros(max_len, embed_dim)
+            position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+            div_term = torch.exp(torch.arange(0, embed_dim, 2, dtype=torch.float) * -(math.log(10000.0) / embed_dim))
+            pe[:, 0::2] = torch.sin(position * div_term)
+            cos_part = torch.cos(position * div_term)
+            pe[:, 1::2] = cos_part[:, : pe[:, 1::2].shape[1]]
+            self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        seq_len = x.shape[1]
+        if self.encoding_type == 'learned':
+            positions = torch.arange(seq_len, device=x.device)
+            pos = self.pos_embed(positions)
+        else:
+            pos = self.pe[:seq_len].to(x.device)
+        return x + pos.unsqueeze(0)
+'''
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _sanitize_id(node_id: str) -> str:
@@ -193,6 +247,20 @@ def _module_code(node_type: str, props: dict, module) -> str | None:
         ne = props["numEmbeddings"]
         ed = props["embeddingDim"]
         return f"nn.Embedding({ne}, {ed})"
+
+    if node_type == "ml.layers.positional_encoding":
+        max_len = props.get("maxLen", 512)
+        encoding_type = props.get("encodingType", "learned")
+        # Read embed_dim from the runtime module so it stays in sync with upstream shape
+        embed_dim = getattr(module, "embed_dim", None) if module is not None else None
+        if embed_dim is None:
+            embed_dim = props.get("embeddingDim", 256)
+        return f"__POSITIONAL_ENCODING__({max_len}, {embed_dim}, '{encoding_type}')"
+
+    if node_type == "ml.preprocessing.tokenizer":
+        vs = props.get("vocabSize", 10000)
+        ml = props.get("maxLen", 256)
+        return f"__TOKENIZER__({vs}, {ml})"
 
     if node_type == "ml.layers.upsample":
         sf = props["scaleFactor"]
@@ -515,12 +583,19 @@ def _build_forward_body(
                         v_var = v
                     elif tp == "in":
                         q_var = k_var = v_var = v
+            causal = n.get("properties", {}).get("causalMask", False)
+            if causal:
+                lines.append(f"_S = {q_var}.shape[1]")
+                lines.append(f"_mask = torch.triu(torch.ones(_S, _S, device={q_var}.device, dtype=torch.bool), diagonal=1)")
+                call = f"{attr_name}({q_var}, {k_var}, {v_var}, attn_mask=_mask, need_weights=False)"
+            else:
+                call = f"{attr_name}({q_var}, {k_var}, {v_var}, need_weights=False)"
             if nid in needs_var:
                 vname = var_names[nid]
-                lines.append(f"{vname}, _ = {attr_name}({q_var}, {k_var}, {v_var})")
+                lines.append(f"{vname}, _ = {call}")
                 last_var = vname
             else:
-                lines.append(f"x, _ = {attr_name}({q_var}, {k_var}, {v_var})")
+                lines.append(f"x, _ = {call}")
                 last_var = "x"
             continue
 
@@ -704,6 +779,8 @@ def _generate_model_class(
     model_nodes: set[str] = set()
     init_lines: list[str] = []
     needs_resnet_helper = False
+    needs_pos_encoding = False
+    needs_tokenizer = False
 
     for nid in order:
         n = nodes[nid]
@@ -750,6 +827,14 @@ def _generate_model_class(
                 mode = n.get("properties", {}).get("mode", "features")
                 freeze = n.get("properties", {}).get("freeze", True)
                 init_lines.append(f"        self.{attr} = self._build_resnet18(mode='{mode}', freeze={freeze})")
+            elif code.startswith("__POSITIONAL_ENCODING__"):
+                needs_pos_encoding = True
+                args = code[len("__POSITIONAL_ENCODING__"):]
+                init_lines.append(f"        self.{attr} = PositionalEncoding{args}")
+            elif code.startswith("__TOKENIZER__"):
+                needs_tokenizer = True
+                args = code[len("__TOKENIZER__"):]
+                init_lines.append(f"        self.{attr} = Tokenizer{args}")
             else:
                 init_lines.append(f"        self.{attr} = {code}")
 
@@ -1328,11 +1413,209 @@ def _shakespeare_dataset_code(props: dict) -> str:
     return '\n'.join(lines)
 
 
-def _generate_dataset_code(data_node: dict) -> str:
+def _bpe_dataset_code(data_type: str, props: dict, bpe_config: dict) -> str:
+    """Generate BPE-tokenized dataset loading code."""
+    vocab_size = bpe_config.get("vocabSize", 10000)
+    max_len = bpe_config.get("maxLen", 256)
+    batch_size = props.get("batchSize", 32)
+
+    if data_type == "data.tiny_shakespeare":
+        seq_len = props.get("seqLen", 128)
+        return f'''import re, urllib.request, os
+from collections import Counter
+
+# --- BPE Tokenizer (learned from dataset) ---
+class BPETokenizer:
+    def __init__(self):
+        self.merges, self.vocab = [], {{}}
+    def train(self, text, vocab_size):
+        words = re.findall(r'[a-zA-Z]+|[0-9]+|[^\\s]', text.lower())
+        word_freqs = Counter()
+        for w in words:
+            word_freqs[tuple(w) + ('</w>',)] += 1
+        self.vocab = {{'<pad>': 0, '<unk>': 1}}
+        chars = set()
+        for wt in word_freqs:
+            chars.update(wt)
+        for ch in sorted(chars):
+            if ch not in self.vocab:
+                self.vocab[ch] = len(self.vocab)
+        self.merges = []
+        while len(self.vocab) < vocab_size:
+            pairs = Counter()
+            for wt, freq in word_freqs.items():
+                for i in range(len(wt) - 1):
+                    pairs[(wt[i], wt[i+1])] += freq
+            if not pairs: break
+            best = pairs.most_common(1)[0][0]
+            self.merges.append(best)
+            new_tok = best[0] + best[1]
+            self.vocab[new_tok] = len(self.vocab)
+            new_freqs = {{}}
+            for wt, freq in word_freqs.items():
+                nw = []
+                i = 0
+                while i < len(wt):
+                    if i < len(wt)-1 and wt[i] == best[0] and wt[i+1] == best[1]:
+                        nw.append(new_tok); i += 2
+                    else:
+                        nw.append(wt[i]); i += 1
+                new_freqs[tuple(nw)] = freq
+            word_freqs = new_freqs
+    def encode(self, text):
+        unk = self.vocab.get('<unk>', 1)
+        words = re.findall(r'[a-zA-Z]+|[0-9]+|[^\\s]', text.lower())
+        ids = []
+        for w in words:
+            syms = list(w) + ['</w>']
+            for a, b in self.merges:
+                m = a + b
+                i = 0
+                while i < len(syms)-1:
+                    if syms[i] == a and syms[i+1] == b:
+                        syms[i] = m; del syms[i+1]
+                    else: i += 1
+            ids.extend(self.vocab.get(s, unk) for s in syms)
+        return ids
+
+# Download and tokenize
+url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+path = os.path.join("data", "tiny_shakespeare.txt")
+os.makedirs("data", exist_ok=True)
+if not os.path.exists(path):
+    urllib.request.urlretrieve(url, path)
+with open(path, "r") as f:
+    raw_text = f.read()
+
+print("Learning BPE merges...")
+bpe = BPETokenizer()
+bpe.train(raw_text, vocab_size={vocab_size})
+VOCAB_SIZE = len(bpe.vocab)
+print(f"BPE vocab: {{VOCAB_SIZE}} tokens")
+
+all_ids = bpe.encode(raw_text)
+data_tensor = torch.tensor(all_ids, dtype=torch.long)
+SEQ_LEN = {seq_len}
+
+class TextDataset(torch.utils.data.Dataset):
+    def __init__(self, data):
+        self.data = data
+    def __len__(self):
+        return max(1, (len(self.data) - 1) // SEQ_LEN)
+    def __getitem__(self, idx):
+        start = idx * SEQ_LEN
+        chunk = self.data[start : start + SEQ_LEN + 1]
+        if len(chunk) < SEQ_LEN + 1:
+            chunk = torch.cat([chunk, torch.zeros(SEQ_LEN + 1 - len(chunk), dtype=torch.long)])
+        return chunk[:-1], chunk[1:]
+
+dataset = TextDataset(data_tensor)
+train_loader = torch.utils.data.DataLoader(dataset, batch_size={batch_size}, shuffle=True)
+'''
+    else:
+        # Classification dataset (IMDb, AG News) with BPE
+        if data_type == "data.imdb":
+            hf_name, num_classes = "imdb", 2
+        elif data_type == "data.ag_news":
+            hf_name, num_classes = "ag_news", 4
+        else:
+            return f"# BPE not supported for {data_type}"
+
+        return f'''import re
+from collections import Counter
+from datasets import load_dataset
+
+# --- BPE Tokenizer (learned from dataset) ---
+class BPETokenizer:
+    def __init__(self):
+        self.merges, self.vocab = [], {{}}
+    def train(self, text, vocab_size):
+        words = re.findall(r'[a-zA-Z]+|[0-9]+|[^\\s]', text.lower())
+        word_freqs = Counter()
+        for w in words:
+            word_freqs[tuple(w) + ('</w>',)] += 1
+        self.vocab = {{'<pad>': 0, '<unk>': 1}}
+        chars = set()
+        for wt in word_freqs:
+            chars.update(wt)
+        for ch in sorted(chars):
+            if ch not in self.vocab:
+                self.vocab[ch] = len(self.vocab)
+        self.merges = []
+        while len(self.vocab) < vocab_size:
+            pairs = Counter()
+            for wt, freq in word_freqs.items():
+                for i in range(len(wt) - 1):
+                    pairs[(wt[i], wt[i+1])] += freq
+            if not pairs: break
+            best = pairs.most_common(1)[0][0]
+            self.merges.append(best)
+            new_tok = best[0] + best[1]
+            self.vocab[new_tok] = len(self.vocab)
+            new_freqs = {{}}
+            for wt, freq in word_freqs.items():
+                nw = []
+                i = 0
+                while i < len(wt):
+                    if i < len(wt)-1 and wt[i] == best[0] and wt[i+1] == best[1]:
+                        nw.append(new_tok); i += 2
+                    else:
+                        nw.append(wt[i]); i += 1
+                new_freqs[tuple(nw)] = freq
+            word_freqs = new_freqs
+    def encode(self, text, max_len=None):
+        unk = self.vocab.get('<unk>', 1)
+        words = re.findall(r'[a-zA-Z]+|[0-9]+|[^\\s]', text.lower())
+        ids = []
+        for w in words:
+            syms = list(w) + ['</w>']
+            for a, b in self.merges:
+                m = a + b
+                i = 0
+                while i < len(syms)-1:
+                    if syms[i] == a and syms[i+1] == b:
+                        syms[i] = m; del syms[i+1]
+                    else: i += 1
+            ids.extend(self.vocab.get(s, unk) for s in syms)
+        if max_len:
+            ids = ids[:max_len] + [0] * max(0, max_len - len(ids))
+        return ids
+
+NUM_CLASSES = {num_classes}
+VOCAB_SIZE = {vocab_size}
+MAX_LEN = {max_len}
+
+ds = load_dataset("{hf_name}", split="train")
+print("Learning BPE merges...")
+bpe = BPETokenizer()
+corpus = "\\n".join(ds["text"][:5000])
+bpe.train(corpus, vocab_size=VOCAB_SIZE)
+VOCAB_SIZE = len(bpe.vocab)
+print(f"BPE vocab: {{VOCAB_SIZE}} tokens")
+
+class TextDataset(torch.utils.data.Dataset):
+    def __init__(self, ds):
+        self.ds = ds
+    def __len__(self):
+        return len(self.ds)
+    def __getitem__(self, idx):
+        ids = bpe.encode(self.ds[idx]["text"], max_len=MAX_LEN)
+        return torch.tensor(ids, dtype=torch.long), torch.tensor(self.ds[idx]["label"], dtype=torch.long)
+
+dataset = TextDataset(ds)
+train_loader = torch.utils.data.DataLoader(dataset, batch_size={batch_size}, shuffle=True)
+'''
+
+
+def _generate_dataset_code(data_node: dict, bpe_config: dict | None = None) -> str:
     """Generate dataset loading code."""
     dtype = data_node["type"]
     props = data_node.get("properties", {})
     batch_size = props.get("batchSize", 32)
+
+    # BPE mode — generate BPE tokenizer + dataset code
+    if bpe_config:
+        return _bpe_dataset_code(dtype, props, bpe_config)
 
     # Text datasets (HuggingFace) — sentiment / topic classification
     if dtype == "data.imdb":
@@ -1502,9 +1785,18 @@ def export_to_python(graph_data: dict) -> str:
     sections.append("print(f'Using device: {device}')")
     sections.append("")
 
-    # Dataset
+    # Dataset — check if tokenizer node specifies BPE mode
+    tokenizer_config = None
+    for n in nodes.values():
+        if n["type"] == "ml.preprocessing.tokenizer":
+            tokenizer_config = n.get("properties", {})
+            break
+
     if data_node:
-        sections.append(_generate_dataset_code(data_node))
+        if tokenizer_config and tokenizer_config.get("mode") == "bpe":
+            sections.append(_generate_dataset_code(data_node, bpe_config=tokenizer_config))
+        else:
+            sections.append(_generate_dataset_code(data_node))
         sections.append("")
 
     # Subgraph classes
@@ -1521,6 +1813,13 @@ def export_to_python(graph_data: dict) -> str:
         sections.append("")
         sections.append("# --- Model ---")
         sections.append("")
+        # Inject helper classes used by the model
+        if "Tokenizer(" in model_code:
+            sections.append(_TOKENIZER_CLASS)
+            sections.append("")
+        if "PositionalEncoding(" in model_code:
+            sections.append(_POSITIONAL_ENCODING_CLASS)
+            sections.append("")
         sections.append(model_code)
         sections.append("")
 

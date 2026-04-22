@@ -422,6 +422,73 @@ def detail_tiny_shakespeare() -> dict:
     }
 
 
+# --- BPE dataset wrappers ---
+# When the tokenizer node is in BPE mode, these replace the default datasets.
+# BPE merge rules are learned from the training text before the training loop.
+
+from bpe import get_bpe_tokenizer, BPETokenizer
+
+
+def get_raw_texts(dataset_type: str) -> str:
+    """Get raw text corpus for a dataset (used for BPE training)."""
+    if dataset_type == "data.tiny_shakespeare":
+        return _get_shakespeare_text()
+    if dataset_type == "data.imdb":
+        ds = _get_imdb_dataset()
+        return '\n'.join(ds["text"][:5000])  # first 5K for speed
+    if dataset_type == "data.ag_news":
+        ds = _get_agnews_dataset()
+        return '\n'.join(ds["text"][:5000])
+    return ""
+
+
+class BPETextDataset(torch.utils.data.Dataset):
+    """Classification dataset with BPE tokenization (IMDb, AG News)."""
+
+    def __init__(self, dataset_type: str, bpe: BPETokenizer, max_len: int = 256):
+        if dataset_type == "data.imdb":
+            self.ds = _get_imdb_dataset()
+            self.text_key = "text"
+            self.label_key = "label"
+        elif dataset_type == "data.ag_news":
+            self.ds = _get_agnews_dataset()
+            self.text_key = "text"
+            self.label_key = "label"
+        else:
+            raise ValueError(f"BPE not supported for {dataset_type}")
+        self.bpe = bpe
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __getitem__(self, idx):
+        text = self.ds[idx][self.text_key]
+        label = self.ds[idx][self.label_key]
+        ids = self.bpe.encode(text, max_len=self.max_len)
+        return torch.tensor(ids, dtype=torch.long), torch.tensor(label, dtype=torch.long)
+
+
+class BPELMDataset(torch.utils.data.Dataset):
+    """Language modeling dataset with BPE tokenization (next-token prediction)."""
+
+    def __init__(self, raw_text: str, bpe: BPETokenizer, seq_len: int = 128):
+        self.seq_len = seq_len
+        # Encode entire corpus once
+        all_ids = bpe.encode(raw_text)
+        self.data = torch.tensor(all_ids, dtype=torch.long)
+
+    def __len__(self):
+        return max(1, (len(self.data) - 1) // self.seq_len)
+
+    def __getitem__(self, idx):
+        start = idx * self.seq_len
+        chunk = self.data[start : start + self.seq_len + 1]
+        if len(chunk) < self.seq_len + 1:
+            chunk = torch.cat([chunk, torch.zeros(self.seq_len + 1 - len(chunk), dtype=torch.long)])
+        return chunk[:-1], chunk[1:]
+
+
 # --- Registries ---
 # Each registry maps node type string → function.
 # graph_builder.py uses these — no if/else chains needed.

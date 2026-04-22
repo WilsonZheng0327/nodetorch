@@ -2,6 +2,7 @@
 
 Iterative decode loop: encode prompt → forward → sample next token → append → repeat.
 Supports temperature scaling and top-k sampling.
+Detects tokenizer mode (character or BPE) from the graph and uses the right encoding.
 """
 
 from __future__ import annotations
@@ -17,15 +18,26 @@ from graph_builder import (
     ALL_LOSS_NODES,
 )
 from forward_utils import run_forward_pass
-from data_loaders import get_shakespeare_vocab, LM_DATASET_TYPES
+from data_loaders import get_shakespeare_vocab, LM_DATASET_TYPES, get_raw_texts
+from bpe import get_bpe_tokenizer
+
+# Node types that should be bypassed during generation (not part of the model forward pass)
+_GENERATION_SKIP_TYPES = ALL_LOSS_NODES | set(OPTIMIZER_NODES) | {"ml.preprocessing.tokenizer"}
 
 
-def _find_vocab_size(nodes: dict) -> int | None:
-    """Determine vocab size from dataset node type."""
+def _get_tokenizer_config(nodes: dict) -> dict | None:
+    """Find the tokenizer node and return its properties, or None."""
+    for n in nodes.values():
+        if n.get("type") == "ml.preprocessing.tokenizer":
+            return n.get("properties", {})
+    return None
+
+
+def _get_dataset_type(nodes: dict) -> str | None:
+    """Find the LM dataset node type."""
     for n in nodes.values():
         if n.get("type") in LM_DATASET_TYPES:
-            char2idx, _ = get_shakespeare_vocab()
-            return len(char2idx)
+            return n["type"]
     return None
 
 
@@ -46,7 +58,7 @@ def generate_text(
         top_k: if > 0, only sample from top-k most likely tokens
 
     Returns:
-        { prompt, generated, fullText, tokens: [{char, prob}] }
+        { prompt, generated, fullText, tokens: [{token, prob}] }
     """
     if not has_trained_model():
         return {"error": "No trained model — train first"}
@@ -57,10 +69,6 @@ def generate_text(
     edges = graph["edges"]
     order = topological_sort(nodes, edges)
 
-    # Get vocab
-    char2idx, idx2char = get_shakespeare_vocab()
-    vocab_size = len(char2idx)
-
     # Find data node
     data_nid = None
     for nid, n in nodes.items():
@@ -70,12 +78,49 @@ def generate_text(
     if not data_nid:
         return {"error": "No language model dataset node found"}
 
+    # Detect tokenization mode from graph
+    tok_config = _get_tokenizer_config(nodes)
+    tok_mode = tok_config.get("mode", "character") if tok_config else "character"
+    dataset_type = _get_dataset_type(nodes)
+
+    # Build encode/decode functions based on tokenizer mode
+    if tok_mode == "bpe" and dataset_type:
+        bpe_vocab_size = tok_config.get("vocabSize", 500) if tok_config else 500
+        raw_text = get_raw_texts(dataset_type)
+        bpe = get_bpe_tokenizer(raw_text, bpe_vocab_size, cache_key=dataset_type)
+        vocab_size = bpe.vocab_size
+
+        def encode_prompt(text: str) -> list[int]:
+            return bpe.encode(text)
+
+        def decode_token(token_id: int) -> str:
+            return bpe.decode_token(token_id)
+    else:
+        # Character-level (default)
+        char2idx, idx2char = get_shakespeare_vocab()
+        vocab_size = len(char2idx)
+
+        def encode_prompt(text: str) -> list[int]:
+            return [char2idx.get(ch, 0) for ch in text]
+
+        def decode_token(token_id: int) -> str:
+            return idx2char.get(token_id, '?')
+
+    # Context window = positional encoding's max_len
+    max_context = 512
+    for n in nodes.values():
+        if n["type"] == "ml.layers.positional_encoding":
+            max_context = n.get("properties", {}).get("maxLen", 512)
+            break
+
     dev = get_device()
 
     # Encode prompt
     if not prompt:
-        prompt = "\n"
-    prompt_ids = [char2idx.get(ch, 0) for ch in prompt]
+        prompt = "\n" if tok_mode != "bpe" else "the"
+    prompt_ids = encode_prompt(prompt)
+    if not prompt_ids:
+        prompt_ids = [0]
     current_ids = torch.tensor([prompt_ids], dtype=torch.long, device=dev)
 
     # Set to eval mode
@@ -84,18 +129,25 @@ def generate_text(
             mod.eval()
 
     tokens_info = []
-    generated_chars = []
+    generated_tokens = []
 
     # Build execution order (exclude optimizer/loss nodes for finding logits)
     exec_nodes = [nid for nid in order
                   if nodes[nid]["type"] not in OPTIMIZER_NODES
                   and nodes[nid]["type"] not in ALL_LOSS_NODES]
 
+    # Filter out loss/optimizer/tokenizer modules — they must not run during generation.
+    gen_modules = {k: v for k, v in trained.items()
+                   if nodes.get(k, {}).get("type") not in _GENERATION_SKIP_TYPES}
+
     with torch.no_grad():
         for step in range(max_tokens):
-            # Feed through model
             data_inputs = {data_nid: {"out": current_ids, "labels": current_ids}}
-            results = run_forward_pass(trained, nodes, edges, order, data_inputs)
+            # Pre-populate tokenizer results so downstream nodes get unpadded IDs
+            for nid, n in nodes.items():
+                if n["type"] == "ml.preprocessing.tokenizer":
+                    data_inputs[nid] = {"out": current_ids}
+            results = run_forward_pass(gen_modules, nodes, edges, order, data_inputs)
 
             # Find logits output: [1, seq_len, vocab_size]
             logits = None
@@ -122,24 +174,24 @@ def generate_text(
             next_id = torch.multinomial(probs, 1).item()
             prob = float(probs[next_id].item())
 
-            char = idx2char.get(next_id, '?')
-            generated_chars.append(char)
-            tokens_info.append({"char": char, "prob": round(prob, 4)})
+            token_str = decode_token(next_id)
+            generated_tokens.append(token_str)
+            tokens_info.append({"char": token_str, "prob": round(prob, 4)})
 
             # Append to sequence
             next_tensor = torch.tensor([[next_id]], dtype=torch.long, device=dev)
             current_ids = torch.cat([current_ids, next_tensor], dim=1)
 
-            # Limit context window
-            if current_ids.shape[1] > 512:
-                current_ids = current_ids[:, -512:]
+            # Limit context window to the positional encoding's max_len
+            if current_ids.shape[1] > max_context:
+                current_ids = current_ids[:, -max_context:]
 
     # Restore train mode
     for mod in trained.values():
         if hasattr(mod, 'train'):
             mod.train()
 
-    generated = ''.join(generated_chars)
+    generated = ''.join(generated_tokens)
     return {
         "prompt": prompt,
         "generated": generated,

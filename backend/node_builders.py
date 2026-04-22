@@ -109,6 +109,59 @@ def build_embedding(props: dict, input_shapes: dict) -> nn.Module:
     )
 
 
+class PositionalEncoding(nn.Module):
+    """Adds position information to token embeddings.
+
+    'learned' mode: trainable per-position embedding table (GPT/BERT style).
+    'sinusoidal' mode: fixed sin/cos waves at varying frequencies (original Transformer).
+    Input/output shape: [B, seq_len, embed_dim].
+    """
+    def __init__(self, max_len: int, embed_dim: int, encoding_type: str = "learned"):
+        super().__init__()
+        self.max_len = max_len
+        self.embed_dim = embed_dim
+        self.encoding_type = encoding_type
+        if encoding_type == "learned":
+            self.pos_embed = nn.Embedding(max_len, embed_dim)
+        else:
+            # Sinusoidal — precompute and register as buffer (no params, moves with .to())
+            import math as _math
+            pe = torch.zeros(max_len, embed_dim)
+            position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+            div_term = torch.exp(
+                torch.arange(0, embed_dim, 2, dtype=torch.float)
+                * -(_math.log(10000.0) / embed_dim)
+            )
+            pe[:, 0::2] = torch.sin(position * div_term)
+            # Handle odd embed_dim where the last cosine column would be cut
+            cos_part = torch.cos(position * div_term)
+            pe[:, 1::2] = cos_part[:, : pe[:, 1::2].shape[1]]
+            self.register_buffer("pe", pe)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: [B, seq_len, embed_dim]
+        seq_len = x.shape[1]
+        if self.encoding_type == "learned":
+            positions = torch.arange(seq_len, device=x.device).clamp(max=self.max_len - 1)
+            pos = self.pos_embed(positions)  # [seq_len, embed_dim]
+        else:
+            clamped = min(seq_len, self.max_len)
+            pos = self.pe[:clamped].to(x.device)  # [clamped, embed_dim]
+            if seq_len > self.max_len:
+                # Repeat the last position encoding for overflow positions
+                extra = pos[-1:].expand(seq_len - self.max_len, -1)
+                pos = torch.cat([pos, extra], dim=0)
+        return x + pos.unsqueeze(0)  # broadcast over batch
+
+
+def build_positional_encoding(props: dict, input_shapes: dict) -> nn.Module:
+    in_shape = input_shapes.get("in")
+    embed_dim = in_shape[-1] if in_shape else props.get("embeddingDim", 256)
+    max_len = props.get("maxLen", 512)
+    encoding_type = props.get("encodingType", "learned")
+    return PositionalEncoding(max_len, embed_dim, encoding_type)
+
+
 # --- Layers with wrappers (multi-output or non-standard calling convention) ---
 
 class LSTMWrapper(nn.Module):
@@ -167,13 +220,24 @@ def build_gru(props: dict, input_shapes: dict) -> nn.Module:
 class MHAWrapper(nn.Module):
     """Why wrapper: nn.MultiheadAttention returns (attn_output, attn_weights) — we only
     want the output. Also, our multi-input path calls module(**kwargs) with named args
-    (query, key, value), which MHA accepts but also returns the unwanted weights tuple."""
-    def __init__(self, mha: nn.MultiheadAttention):
+    (query, key, value), which MHA accepts but also returns the unwanted weights tuple.
+    The is_causal flag generates a triangular mask so each position can only attend to
+    earlier ones (required for autoregressive language models like GPT)."""
+    def __init__(self, mha: nn.MultiheadAttention, is_causal: bool = False):
         super().__init__()
         self.mha = mha
+        self.is_causal = is_causal
 
     def forward(self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
-        output, _ = self.mha(query, key, value)
+        if self.is_causal:
+            seq_len = query.shape[1]
+            attn_mask = torch.triu(
+                torch.ones(seq_len, seq_len, device=query.device, dtype=torch.bool),
+                diagonal=1,
+            )
+            output, _ = self.mha(query, key, value, attn_mask=attn_mask, need_weights=False)
+        else:
+            output, _ = self.mha(query, key, value, need_weights=False)
         return output
 
 
@@ -184,7 +248,7 @@ def build_multihead_attention(props: dict, input_shapes: dict) -> nn.Module:
         dropout=props.get("dropout", 0.0),
         batch_first=True,
     )
-    return MHAWrapper(mha)
+    return MHAWrapper(mha, is_causal=props.get("causalMask", False))
 
 
 class AttentionModule(nn.Module):
@@ -583,9 +647,47 @@ def build_pretrained_resnet18(props: dict, input_shapes: dict) -> nn.Module:
     )
 
 
+# --- Preprocessing ---
+
+class TokenizerModule(nn.Module):
+    """Preprocessing tokenizer — truncates/pads sequences and caps vocabulary.
+
+    In the graph, this sits between a text data node and the embedding layer.
+    The data node produces integer token IDs; this module normalizes them:
+      - Truncate to max_len (drop tokens beyond the limit)
+      - Pad to max_len (right-pad shorter sequences with 0 = <pad>)
+      - Clamp vocabulary (map out-of-vocab indices to 1 = <unk>)
+    """
+    def __init__(self, vocab_size: int, max_len: int):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.max_len = max_len
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Truncate to max_len
+        if x.shape[1] > self.max_len:
+            x = x[:, :self.max_len]
+        # Pad if shorter
+        if x.shape[1] < self.max_len:
+            pad_size = self.max_len - x.shape[1]
+            x = torch.nn.functional.pad(x, (0, pad_size))
+        # Cap vocabulary — map out-of-vocab to <unk> (index 1)
+        x = torch.where(x >= self.vocab_size, torch.ones_like(x), x)
+        return x
+
+
+def build_tokenizer(props: dict, input_shapes: dict) -> nn.Module:
+    return TokenizerModule(
+        vocab_size=props.get("vocabSize", 10000),
+        max_len=props.get("maxLen", 256),
+    )
+
+
 # --- Registry ---
 
 NODE_BUILDERS: dict[str, callable] = {
+    # Preprocessing
+    "ml.preprocessing.tokenizer": build_tokenizer,
     # Layers (no wrapper)
     "ml.layers.conv2d": build_conv2d,
     "ml.layers.conv1d": build_conv1d,
@@ -604,6 +706,7 @@ NODE_BUILDERS: dict[str, callable] = {
     "ml.layers.dropout2d": build_dropout2d,
     "ml.layers.layernorm": build_layernorm,
     "ml.layers.embedding": build_embedding,
+    "ml.layers.positional_encoding": build_positional_encoding,
     "ml.layers.upsample": build_upsample,
     "ml.layers.pretrained_resnet18": build_pretrained_resnet18,
     # Layers (with wrapper)

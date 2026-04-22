@@ -395,6 +395,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
             </div>
           )}
 
+          {mode !== 'generate' && (
           <div className="step-through-controls">
             <button
               className="step-through-ctrl"
@@ -433,8 +434,9 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
                 : `${currentIdx + 1} / ${totalSteps}`}
             </span>
           </div>
+          )}
 
-          {mode !== 'denoise' && (
+          {(mode === 'forward' || mode === 'backward') && (
             <>
               {mode === 'forward' && compareMode && resultB ? (
                 <CompareTimeline

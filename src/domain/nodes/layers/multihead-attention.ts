@@ -39,6 +39,14 @@ export const multiHeadAttentionNode: NodeDefinition = {
       affects: 'execution',
       help: 'Dropout applied to attention weights during training. Helps prevent overfitting.',
     },
+    {
+      id: 'causalMask',
+      name: 'Causal Mask',
+      type: { kind: 'boolean' },
+      defaultValue: false,
+      affects: 'execution',
+      help: 'Prevents each position from attending to future positions. Required for autoregressive (GPT-style) language models. Each token can only "see" tokens that came before it.',
+    },
   ],
 
   getPorts: () => [

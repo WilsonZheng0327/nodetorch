@@ -1002,7 +1002,6 @@
   color: #a6adc8;
   writing-mode: vertical-rl;
   text-orientation: mixed;
-  transform: rotate(180deg);
 }
 
 .extra-attention-axis-x {
@@ -1097,6 +1096,9 @@
 
 .generate-view {
   padding: 16px 20px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;

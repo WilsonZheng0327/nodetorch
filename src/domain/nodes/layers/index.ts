@@ -16,6 +16,7 @@ import { dropoutNode } from './dropout';
 import { dropout2dNode } from './dropout2d';
 import { layerNormNode } from './layernorm';
 import { embeddingNode } from './embedding';
+import { positionalEncodingNode } from './positional-encoding';
 import { multiHeadAttentionNode } from './multihead-attention';
 import { attentionNode } from './attention';
 import { lstmNode } from './lstm';
@@ -42,6 +43,7 @@ export const layerNodes: NodeDefinition[] = [
   dropout2dNode,
   layerNormNode,
   embeddingNode,
+  positionalEncodingNode,
   multiHeadAttentionNode,
   attentionNode,
   lstmNode,

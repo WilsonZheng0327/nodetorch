@@ -17,9 +17,11 @@ import { structuralNodes } from './nodes/structural';
 import { subgraphNodes } from './nodes/subgraph';
 import { ganNodes } from './nodes/gan';
 import { diffusionNodes } from './nodes/diffusion';
+import { preprocessingNodes } from './nodes/preprocessing';
 
 const allNodes = [
   ...dataNodes,
+  ...preprocessingNodes,
   ...layerNodes,
   ...activationNodes,
   ...lossNodes,

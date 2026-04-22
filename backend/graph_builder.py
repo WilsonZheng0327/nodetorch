@@ -957,17 +957,26 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
     if node_type in ("ml.layers.multihead_attention", "ml.layers.attention"):
         if module is not None:
             inputs = gather_inputs(node_id, edges, results)
-            inp = inputs.get("in")
-            if inp is not None:
+            # MHA/Attention use query/key/value ports, not "in"
+            query = inputs.get("query")
+            if query is not None:
+                key = inputs.get("key", query)
+                value = inputs.get("value", query)
                 try:
                     if node_type == "ml.layers.multihead_attention":
-                        _, attn_weights = module.mha(inp, inp, inp)
+                        kwargs = {"need_weights": True, "average_attn_weights": True}
+                        if getattr(module, "is_causal", False):
+                            seq_len = query.shape[1]
+                            kwargs["attn_mask"] = torch.triu(
+                                torch.ones(seq_len, seq_len, device=query.device, dtype=torch.bool),
+                                diagonal=1,
+                            )
+                        _, attn_weights = module.mha(query, key, value, **kwargs)
                     else:
-                        # Attention module: q=k=v=input
-                        q = module.q_proj(inp)
-                        k = module.k_proj(inp)
-                        d_k = q.shape[-1]
-                        scores = torch.matmul(q, k.transpose(-2, -1)) / (d_k ** 0.5)
+                        # SDPA: compute attention weights manually
+                        import math as _math
+                        d_k = query.shape[-1]
+                        scores = torch.matmul(query, key.transpose(-2, -1)) / _math.sqrt(d_k)
                         attn_weights = torch.softmax(scores, dim=-1)
                     if attn_weights is not None:
                         # Take first sample, first head

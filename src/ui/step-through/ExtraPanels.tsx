@@ -259,10 +259,10 @@ function AttentionMap({ data }: { data: Extract<Extra, { kind: 'attention_map' }
         {downsampled && <span className="extra-panel-note"> — downsampled to {data.rows} × {data.cols}</span>}
       </div>
       <div className="extra-attention-wrap">
-        <div className="extra-attention-axis-y">query →</div>
+        <div className="extra-attention-axis-y">query ↓</div>
         <div>
           <canvas ref={canvasRef} className="extra-attention-canvas" />
-          <div className="extra-attention-axis-x">← key</div>
+          <div className="extra-attention-axis-x">key →</div>
         </div>
       </div>
       <div className="extra-weight-legend">

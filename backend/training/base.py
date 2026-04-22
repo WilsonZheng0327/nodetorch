@@ -38,7 +38,8 @@ from graph_builder import (
     _probe_tracked_samples,
     _collect_misclassifications,
 )
-from data_loaders import DATA_LOADERS, TRAIN_DATASETS, CLASS_NAMES
+from data_loaders import DATA_LOADERS, TRAIN_DATASETS, CLASS_NAMES, get_raw_texts, BPETextDataset, BPELMDataset
+from bpe import get_bpe_tokenizer
 from forward_utils import run_forward_pass
 
 
@@ -174,11 +175,23 @@ def build_training_context(
     if not loss_node_ids:
         return {"error": "No loss node in graph"}
 
-    # Load dataset
+    # Check for tokenizer node with BPE mode
+    tokenizer_config = None
+    for n in nodes_list:
+        if n.get("type") == "ml.preprocessing.tokenizer":
+            tokenizer_config = n.get("properties", {})
+            break
+
+    # Load dataset (swap in BPE dataset if tokenizer is in BPE mode)
     dataset_type = data_node["type"]
-    train_dataset, train_loader, val_loader = load_dataset(
-        dataset_type, data_node, props, batch_size,
-    )
+    if tokenizer_config and tokenizer_config.get("mode") == "bpe":
+        train_dataset, train_loader, val_loader = load_bpe_dataset(
+            dataset_type, data_node, props, batch_size, tokenizer_config,
+        )
+    else:
+        train_dataset, train_loader, val_loader = load_dataset(
+            dataset_type, data_node, props, batch_size,
+        )
     if isinstance(train_dataset, dict):
         return train_dataset  # error dict
 
@@ -234,6 +247,49 @@ def load_dataset(dataset_type, data_node, optimizer_props, batch_size):
         })
     else:
         train_dataset = dataset_builder()
+
+    val_split = optimizer_props.get("valSplit", 0.1)
+    val_loader = None
+    if val_split > 0 and len(train_dataset) > 10:
+        n_val = max(1, int(len(train_dataset) * val_split))
+        n_train = len(train_dataset) - n_val
+        train_subset, val_subset = torch.utils.data.random_split(
+            train_dataset, [n_train, n_val],
+            generator=torch.Generator().manual_seed(42),
+        )
+        train_loader = torch.utils.data.DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = torch.utils.data.DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+    else:
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    return train_dataset, train_loader, val_loader
+
+
+def load_bpe_dataset(dataset_type, data_node, optimizer_props, batch_size, tokenizer_config):
+    """Load dataset with BPE tokenization. Learns BPE merges from corpus first.
+
+    Returns (dataset, train_loader, val_loader) or an error dict.
+    """
+    import logging
+    logger = logging.getLogger("nodetorch")
+
+    vocab_size = tokenizer_config.get("vocabSize", 10000)
+    max_len = tokenizer_config.get("maxLen", 256)
+
+    raw_text = get_raw_texts(dataset_type)
+    if not raw_text:
+        return {"error": f"BPE not supported for dataset: {dataset_type}"}
+
+    logger.info(f"Learning BPE merges (vocab_size={vocab_size})...")
+    bpe = get_bpe_tokenizer(raw_text, vocab_size, cache_key=dataset_type)
+    logger.info(f"BPE ready: {bpe.vocab_size} tokens, {len(bpe.merges)} merges")
+
+    from data_loaders import LM_DATASET_TYPES
+    if dataset_type in LM_DATASET_TYPES:
+        seq_len = data_node.get("properties", {}).get("seqLen", 128)
+        train_dataset = BPELMDataset(raw_text, bpe, seq_len=seq_len)
+    else:
+        train_dataset = BPETextDataset(dataset_type, bpe, max_len=max_len)
 
     val_split = optimizer_props.get("valSplit", 0.1)
     val_loader = None
