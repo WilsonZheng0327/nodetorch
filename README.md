@@ -24,8 +24,11 @@ Build neural networks by dragging nodes onto a canvas and connecting them. Shape
 - **Inference** — run trained models on new samples, see predictions (classification) or reconstructions (autoencoders)
 - **Loss landscape** — 2D visualization of the loss surface around trained weights
 - **Node visualization** — per-node weight/gradient/activation histograms with health indicators
+- **Text generation** — train character-level language models, then generate text interactively with temperature and top-K sampling
 - **Save/load** — export graphs as JSON, save/load trained weights to disk
-- **Model presets** — one-click load of 11 pre-built architectures
+- **Export to Python** — generate a standalone, runnable PyTorch training script from any graph
+- **Model presets** — one-click load of 16 pre-built architectures
+- **Guided tutorials** — built-in tutorial panel with 8 tracks (UI basics + paradigm-specific walkthroughs for CNNs, VAEs, GANs, diffusion, and language models)
 - **Dark/light theme** — toggle in bottom-left corner
 
 ## Supported Architectures
@@ -38,6 +41,7 @@ Build neural networks by dragging nodes onto a canvas and connecting them. Shape
 | Reconstruction | MNIST | Convolutional Autoencoder, VAE |
 | Generative (GAN) | MNIST | DCGAN |
 | Generative (Diffusion) | MNIST | Diffusion, Diffusion U-Net |
+| Language Modeling | Tiny Shakespeare (chars) | Char-LM (LSTM) |
 
 ## Available Nodes
 
