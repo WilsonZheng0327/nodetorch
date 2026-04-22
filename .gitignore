@@ -43,3 +43,4 @@ test_diffusion_output/
 # Generated export scripts
 /*.py
 !/backend/**/*.py
+CONTRIBUTING.md
