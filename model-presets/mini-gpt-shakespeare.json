@@ -108,7 +108,7 @@
         "properties": {} },
       { "id": "adamw", "type": "ml.optimizers.adamw",
         "position": { "x": 7300, "y": 300 },
-        "properties": { "lr": 0.0003, "epochs": 20, "scheduler": "cosine", "gradClip": 1.0, "weightDecay": 0.01, "valSplit": 0.1 } }
+        "properties": { "lr": 0.0003, "epochs": 100, "scheduler": "cosine", "gradClip": 1.0, "weightDecay": 0.01, "valSplit": 0.1 } }
     ],
     "edges": [
       { "id": "e_data_tok",    "source": { "nodeId": "data", "portId": "out" },       "target": { "nodeId": "tok", "portId": "in" } },
