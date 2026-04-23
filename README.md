@@ -65,38 +65,69 @@ Build neural networks by dragging nodes onto a canvas and connecting them. Shape
 
 **Optimizers**: SGD, Adam, AdamW — with schedulers (cosine, step, warmup), early stopping, gradient clipping
 
+## Prerequisites
+
+- **Node.js** 18+ and npm
+- **Python** 3.10+
+- **PyTorch** — GPU strongly recommended for training. CPU works but is much slower.
+
+> **CUDA version matters.** If you have an NVIDIA GPU, your PyTorch CUDA version must match your installed NVIDIA driver. Check your driver version with `nvidia-smi`, then pick the matching PyTorch install command from [pytorch.org/get-started](https://pytorch.org/get-started/locally/). Mismatched versions will silently fall back to CPU.
+
 ## Setup
 
-### Frontend
+### Option 1: Start script (recommended)
 
+The start script auto-detects your GPU, installs everything, and launches both servers.
+
+**macOS / Linux:**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+**Windows:**
+```
+start.bat
+```
+
+First run takes 2-5 minutes (downloads PyTorch + dependencies). After that, starts in seconds. Press Ctrl+C to stop both servers.
+
+### Option 2: Manual setup (two terminals)
+
+Use this if the start script doesn't work, or if you want more control.
+
+**Terminal 1 — Backend:**
+```bash
+# Create Python virtual environment
+python3 -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+# .venv\Scripts\activate         # Windows
+
+# Install PyTorch — pick ONE based on your hardware:
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128    # NVIDIA GPU (CUDA 12.8)
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124    # NVIDIA GPU (CUDA 12.4)
+pip install torch torchvision                                                        # Apple Silicon (MPS)
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu      # CPU only
+
+# Install remaining dependencies
+pip install -r requirements.txt
+
+# Start backend server
+cd backend
+python main.py
+```
+
+Backend runs at http://localhost:8000.
+
+**Terminal 2 — Frontend:**
 ```bash
 npm install
 npm run dev
 ```
 
-Opens at http://localhost:5173.
+Frontend opens at http://localhost:5173.
 
-### Backend
-
-Requires Python 3.12+.
-
-```bash
-# Create venv
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install PyTorch (pick your CUDA version from https://pytorch.org/get-started/locally/)
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-
-# Install remaining dependencies
-pip install -r requirements.txt
-
-# Run the server
-cd backend
-python main.py
-```
-
-Runs at http://localhost:8000. Auto-detects CUDA/MPS if available.
+> **Verify GPU is detected:** When the backend starts, it logs the device (e.g. `CUDA: NVIDIA RTX 4090`). If it says `CPU only` but you have a GPU, your PyTorch CUDA version likely doesn't match your driver — reinstall PyTorch with the correct CUDA version.
 
 ## Usage
 
@@ -122,6 +153,3 @@ Runs at http://localhost:8000. Auto-detects CUDA/MPS if available.
 | Ctrl+C / Ctrl+V | Copy / Paste nodes |
 | Delete | Remove selected nodes |
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add new node types, datasets, and visualizations.
