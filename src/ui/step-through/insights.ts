@@ -12,7 +12,8 @@ export function compactShape(shape: number[] | undefined): string {
   if (!shape) return '—';
   // Drop batch dim (first dim = 1 during step-through)
   const inner = shape[0] === 1 ? shape.slice(1) : shape;
-  return inner.join('×');
+  // Matrix notation: [dim1, dim2, ...]
+  return `[${inner.join(', ')}]`;
 }
 
 /** Fallback insight if backend didn't provide one. */

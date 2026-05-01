@@ -5,7 +5,7 @@ export const softmaxNode: NodeDefinition = {
   version: 1,
   displayName: 'Softmax',
   description: 'Softmax activation (outputs sum to 1)',
-  category: ['ML', 'Activations'],
+  category: ['ML', 'Layers'],
   learnMore: 'Converts a vector of raw scores into probabilities that sum to 1. The standard final activation for multi-class classification. Applied automatically inside CrossEntropyLoss, so you usually don\'t need to add it explicitly.',
 
   getProperties: () => [
@@ -28,7 +28,7 @@ export const softmaxNode: NodeDefinition = {
     shape: {
       execute: async ({ inputs }) => {
         const input = inputs.in;
-        if (!input) return { outputs: {} };
+        if (!input || (typeof input === 'object' && !Array.isArray(input))) return { outputs: {} };
         return { outputs: { out: input }, metadata: { outputShape: input, shapes: [{ label: 'Output', value: input }] } };
       },
     },

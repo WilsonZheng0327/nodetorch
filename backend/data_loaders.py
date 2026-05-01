@@ -12,6 +12,7 @@
 # Adding a new dataset: implement 4 functions, add to 4 registries.
 # No changes needed in graph_builder.py.
 
+import random as _random
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -487,6 +488,52 @@ class BPELMDataset(torch.utils.data.Dataset):
         if len(chunk) < self.seq_len + 1:
             chunk = torch.cat([chunk, torch.zeros(self.seq_len + 1 - len(chunk), dtype=torch.long)])
         return chunk[:-1], chunk[1:]
+
+
+# --- Label-filtered sample loading (for step-through) ---
+
+def load_sample_by_label(
+    dataset_type: str,
+    props: dict,
+    filter_label: int | None = None,
+    sample_idx: int | None = None,
+) -> tuple[dict, int]:
+    """Load a single sample, optionally filtered to a specific label or by exact index.
+
+    Returns (tensors_dict, index_used) so callers can reproduce the same sample.
+    If sample_idx is given, loads that exact index (ignores filter_label).
+    If filter_label is given, picks a random sample with that label.
+    Otherwise picks a random sample.
+    """
+    dataset_fn = TRAIN_DATASETS.get(dataset_type)
+    if dataset_fn is None:
+        loader_fn = DATA_LOADERS.get(dataset_type)
+        if loader_fn is None:
+            return {}, -1
+        return loader_fn({**props, "batchSize": 1}), -1
+
+    dataset = dataset_fn()
+
+    idx = sample_idx
+    if idx is None:
+        if filter_label is not None and hasattr(dataset, 'targets'):
+            targets = dataset.targets
+            if isinstance(targets, torch.Tensor):
+                targets = targets.tolist()
+            matching = [i for i, t in enumerate(targets) if t == filter_label]
+            if matching:
+                idx = _random.choice(matching)
+        if idx is None:
+            idx = _random.randint(0, len(dataset) - 1)
+
+    sample = dataset[idx]
+
+    if isinstance(sample, (tuple, list)) and len(sample) == 2:
+        img, label = sample
+        return {"out": img.unsqueeze(0), "labels": torch.tensor([label])}, idx
+    if isinstance(sample, dict):
+        return {k: (v.unsqueeze(0) if isinstance(v, torch.Tensor) else v) for k, v in sample.items()}, idx
+    return {}, idx
 
 
 # --- Registries ---

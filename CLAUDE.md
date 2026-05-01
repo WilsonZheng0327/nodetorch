@@ -14,10 +14,19 @@ npm install              # install dependencies
 npm run dev              # dev server at http://localhost:5173
 npm run build            # type-check + production build (tsc -b && vite build)
 npx tsc --noEmit         # type-check only
+npm run lint             # ESLint (flat config, TS/TSX only)
 
 # Backend (from repo root, uses .venv)
 .venv/bin/python backend/main.py   # FastAPI server at http://localhost:8000
+
+# Tests — frontend (vitest), backend (pytest)
+npm test                                          # all frontend tests
+npx vitest run tests/frontend/core/graph.test.ts  # single frontend test file
+.venv/bin/pytest                                  # all backend tests
+.venv/bin/pytest tests/backend/test_export.py     # single backend test file
 ```
+
+Test locations: `tests/frontend/` (vitest, configured in `vite.config.ts`) and `tests/backend/` (pytest, configured in `pytest.ini` with `pythonpath = backend`).
 
 Backend must be restarted manually after Python changes — no hot reload.
 
@@ -59,6 +68,20 @@ Backend mirrors the engine: `backend/graph_builder.py` does the same topological
 - `backend/denoise_viz.py` — diffusion denoising step-through visualization
 - `backend/gan_generate.py` — GAN image generation on demand
 - `backend/latent_viz.py` — VAE latent space grid visualization
+- `backend/export_python.py` — generates standalone runnable PyTorch training scripts from graphs
+- `src/ui/tutorial/` — guided tutorial system (goal-based tasks with auto-detection)
+- `model-presets/` — shipped preset graph JSON files, served via `GET /presets` endpoint
+
+### Styling
+
+Plain CSS with CSS custom properties for theming. No Tailwind, no CSS modules. Theme variables defined in `src/index.css` (Catppuccin-inspired palette). Dark theme is default; light theme uses `[data-theme="light"]` selector. Component styles are colocated CSS files (e.g., `EngineNode.css`).
+
+### Frontend ↔ Backend communication
+
+- **Shape mode**: no backend needed — pure TypeScript math.
+- **Training**: WebSocket at `ws://localhost:8000/ws`. Frontend sends serialized graph JSON. Backend streams messages: `{ type: 'epoch', epoch, loss, accuracy?, ...metrics }`, `{ type: 'loss', loss }` (per-step), `{ type: 'done', result }`. Frontend can send `{ type: 'cancel' }`.
+- **Other modes** (infer, test, step-through, export): REST endpoints on the FastAPI server.
+- **Graph serialization**: `SerializedGraph` format (version `'1.0'`) with nested `subgraph` support for composite nodes. Serialize/deserialize functions in `useGraph.ts`.
 
 ### Execution modes
 

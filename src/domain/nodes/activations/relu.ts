@@ -36,7 +36,7 @@ export const reluNode: NodeDefinition = {
     shape: {
       execute: async ({ inputs }) => {
         const input = inputs.in;
-        if (!input) {
+        if (!input || (typeof input === 'object' && !Array.isArray(input))) {
           return { outputs: {} };
         }
         return {

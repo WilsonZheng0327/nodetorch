@@ -171,35 +171,27 @@ def _retain_grad_recursive(modules: dict) -> None:
             _retain_grad_recursive(dict(mod.inner_modules))
 
 
-def run_backward_step_through(graph_data: dict) -> dict:
+def run_backward_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
     """Run a forward+backward pass and return rich per-node backward stages.
 
-    Returns: { stages: [...], loss: float, sample: {...}, modelState: {...} }
+    Requires trained weights. Accepts sample_idx to reproduce the same sample
+    used in forward step-through.
+
+    Returns: { stages: [...], loss: float, sample: {...} }
     """
+    if not has_trained_model():
+        raise RuntimeError("Train the model first — backward step-through requires trained weights")
+
     graph_data = copy.deepcopy(graph_data)
 
-    # Override batch size to 1
     for n in graph_data["graph"]["nodes"]:
         if n["type"] in DATA_LOADERS:
             n["properties"] = {**n.get("properties", {}), "batchSize": 1}
 
-    # Use trained modules if available
-    use_trained = has_trained_model()
-    trained_note = None
-
-    if use_trained:
-        try:
-            modules, nodes, edges, results = _build_with_trained(graph_data)
-            trained_note = "using trained weights"
-        except Exception:
-            use_trained = False
-            trained_note = "trained model incompatible — using random weights"
-
-    if not use_trained:
-        modules, _, _, nodes, edges = build_and_run_graph(graph_data)
-        results = _forward_pass(modules, nodes, edges)
-        if trained_note is None:
-            trained_note = "using random weights (no trained model)"
+    try:
+        modules, nodes, edges, results = _build_with_trained(graph_data, sample_idx=sample_idx)
+    except Exception as e:
+        raise RuntimeError(f"Backward step-through failed: {e}")
 
     # Retain gradients on all subgraph inner tensors before backward
     _retain_grad_recursive(modules)
@@ -235,9 +227,10 @@ def run_backward_step_through(graph_data: dict) -> dict:
                 sample_info["sampleText"] = data_tensors["_texts"][0][:500]
 
     # Backward pass
-    loss_tensor = results.get(loss_nid, {}).get("out")
+    loss_tensor = results.get(loss_nid, {}).get("out") if loss_nid else None
     if loss_tensor is None:
-        return {"error": "Loss did not produce a value — check connections"}
+        # GAN graphs can't run backward in step-through (loss needs dual-path execution)
+        return {"stages": [], "loss": 0.0, "sample": sample_info}
 
     try:
         loss_tensor.backward()
@@ -329,10 +322,6 @@ def run_backward_step_through(graph_data: dict) -> dict:
         "stages": stages,
         "loss": loss_val,
         "sample": sample_info,
-        "modelState": {
-            "usingTrainedWeights": use_trained,
-            "note": trained_note,
-        },
     }
 
 
@@ -403,8 +392,9 @@ def _forward_pass(modules: dict, nodes: dict, edges: list) -> dict:
     return results
 
 
-def _build_with_trained(graph_data: dict) -> tuple:
+def _build_with_trained(graph_data: dict, sample_idx: int | None = None) -> tuple:
     """Build modules using trained weights and run forward pass."""
+    from data_loaders import load_sample_by_label
     trained = get_trained_modules()
     graph = graph_data["graph"]
     nodes = {n["id"]: n for n in graph["nodes"]}
@@ -420,9 +410,8 @@ def _build_with_trained(graph_data: dict) -> tuple:
         node_type = node["type"]
         props = node.get("properties", {})
 
-        loader = DATA_LOADERS.get(node_type)
-        if loader:
-            tensors = loader(props)
+        if node_type in DATA_LOADERS:
+            tensors, _ = load_sample_by_label(node_type, props, sample_idx=sample_idx)
             tensors = {k: v.to(dev) if isinstance(v, torch.Tensor) else v for k, v in tensors.items()}
             if "out" in tensors and isinstance(tensors["out"], torch.Tensor) and tensors["out"].is_floating_point():
                 tensors["out"] = tensors["out"].detach().requires_grad_(True)
@@ -458,7 +447,11 @@ def _build_with_trained(graph_data: dict) -> tuple:
         modules[node_id] = module
 
         inputs = gather_inputs(node_id, edges, results)
-        out = execute_node(node_type, module, inputs)
+        try:
+            out = execute_node(node_type, module, inputs)
+        except Exception:
+            # Some nodes may fail (e.g. GAN loss needs both real/fake scores)
+            continue
         if out is not None:
             for k, v in out.items():
                 if isinstance(v, torch.Tensor) and v.requires_grad:

@@ -314,15 +314,15 @@ async def load_model_endpoint(request: dict):
 async def step_through(request: dict):
     """Run a forward pass through the graph on a single sample, returning ordered stages.
 
-    Request: { graph, sampleIdx? }
-    Response: { status: "ok", result: { stages, sample } } or error
+    Request: { graph, filterLabel?, sampleIdx? }
+    Response: { status: "ok", result: { stages, sample, sampleIdx } } or error
     """
     logger.info("Step-through requested")
     try:
         result = run_step_through(
             request["graph"],
-            request.get("sampleIdx"),
-            mask=request.get("mask"),
+            filter_label=request.get("filterLabel"),
+            sample_idx=request.get("sampleIdx"),
         )
         return {"status": "ok", "result": result}
     except Exception as e:
@@ -406,7 +406,7 @@ async def backward_step_through(request: dict):
     """Run a forward+backward pass and return rich per-node backward stages."""
     logger.info("Backward step-through requested")
     try:
-        result = run_backward_step_through(request["graph"])
+        result = run_backward_step_through(request["graph"], sample_idx=request.get("sampleIdx"))
         if "error" in result:
             return {"status": "error", "error": result["error"]}
         return {"status": "ok", "result": result}

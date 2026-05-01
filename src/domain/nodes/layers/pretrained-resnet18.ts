@@ -52,17 +52,28 @@ export const pretrainedResnet18Node: NodeDefinition = {
 
         const B = input[0];
         const outShape = properties.mode === 'logits' ? [B, 1000] : [B, 512];
-        // resnet18 total trainable params: ~11.7M. 0 if frozen.
-        const paramCount = properties.freeze ? 0 : 11689512;
+        const totalParams = 11689512;
+        const trainableParams = properties.freeze ? 0 : totalParams;
 
         return {
           outputs: { out: outShape },
           metadata: {
             outputShape: outShape,
-            paramCount,
+            paramCount: trainableParams,
+            paramBreakdown: [
+              `Total parameters: ${totalParams.toLocaleString()}`,
+              `Trainable: ${trainableParams.toLocaleString()} (${properties.freeze ? 'frozen' : 'all unfrozen'})`,
+              `Architecture: 4 residual blocks (BasicBlock \u00d7 [2, 2, 2, 2])`,
+              `Pretrained on: ImageNet (1.2M images, 1000 classes, ~69.8% top-1 acc)`,
+              `Mode: ${properties.mode === 'logits' ? 'Full model \u2192 1000-class logits' : 'Feature extractor \u2192 512-dim vector'}`,
+              `Input: auto-resized to 224\u00d7224`,
+            ].join('\n'),
             shapes: [
               { label: 'Output', value: outShape },
-              { label: 'Input → 224×224', value: 'auto-resized' },
+              { label: 'Input', value: 'auto-resized to 224\u00d7224' },
+              { label: 'Pretrained', value: 'ImageNet (69.8% top-1)' },
+              { label: 'Total params', value: '11.7M' },
+              { label: 'Trainable', value: properties.freeze ? '0 (frozen)' : '11.7M' },
             ],
           },
         };

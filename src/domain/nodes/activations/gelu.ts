@@ -19,7 +19,7 @@ export const geluNode: NodeDefinition = {
     shape: {
       execute: async ({ inputs }) => {
         const input = inputs.in;
-        if (!input) return { outputs: {} };
+        if (!input || (typeof input === 'object' && !Array.isArray(input))) return { outputs: {} };
         return { outputs: { out: input }, metadata: { outputShape: input, shapes: [{ label: 'Output', value: input }] } };
       },
     },

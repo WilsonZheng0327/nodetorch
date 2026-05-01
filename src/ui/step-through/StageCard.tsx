@@ -1,8 +1,9 @@
 // Small card shown in the horizontal timeline, one per stage.
-// Shows layer name, output shape, and a tiny preview viz.
+// Only shows feature map previews for layers that produce spatial data.
+// Other layers just show an enlarged name and shape.
 
 import { useRef, useEffect } from 'react';
-import type { Stage } from './types';
+import type { Stage, Transformation, FeatureMaps } from './types';
 import { compactShape } from './insights';
 
 interface Props {
@@ -12,54 +13,40 @@ interface Props {
 }
 
 export function StageCard({ stage, active, onClick }: Props) {
-  const title = stage.blockName
-    ? `${stage.blockName} › ${stage.displayName}`
-    : stage.displayName;
+  const title = stage.blockName ? `${stage.blockName} > ${stage.displayName}` : stage.displayName;
+  const fmaps = stage.transformation ? extractOutputFeatureMaps(stage.transformation) : undefined;
+  const hasPreview = fmaps && fmaps.maps.length > 0;
 
   return (
     <button
-      className={`stage-card ${active ? 'stage-card-active' : ''} ${stage.depth > 0 ? 'stage-card-nested' : ''}`}
+      className={`stage-card ${active ? 'stage-card-active' : ''} ${stage.depth > 0 ? 'stage-card-nested' : ''} ${!hasPreview ? 'stage-card-no-preview' : ''}`}
       onClick={onClick}
       title={title}
     >
-      {stage.blockName && (
-        <div className="stage-card-block">{stage.blockName}</div>
+      {stage.blockName && <div className="stage-card-block">{stage.blockName}</div>}
+      <div className={`stage-card-name ${!hasPreview ? 'stage-card-name-large' : ''}`}>{stage.displayName}</div>
+      {hasPreview && (
+        <div className="stage-card-preview">
+          <MiniFeatureMap pixels={fmaps!.maps[0]} />
+        </div>
       )}
-      <div className="stage-card-name">{stage.displayName}</div>
-      <div className="stage-card-preview">
-        <StageMiniViz stage={stage} />
-      </div>
       <div className="stage-card-shape">{compactShape(stage.outputShape)}</div>
     </button>
   );
 }
 
-// --- Small per-kind preview ---
-
-function StageMiniViz({ stage }: { stage: Stage }) {
-  const viz = stage.viz;
-  if (!viz) return <div className="stage-card-empty">—</div>;
-
-  if (viz.kind === 'feature_maps' && viz.featureMaps && viz.featureMaps.maps[0]) {
-    return <MiniFeatureMap pixels={viz.featureMaps.maps[0]} />;
+/** Only extract feature maps for spatial layers — conv, pool, upsample, data, dropout. */
+function extractOutputFeatureMaps(t: Transformation): FeatureMaps | undefined {
+  switch (t.type) {
+    case 'conv2d': return t.output;
+    case 'pool': return (t.output.height > 2 && t.output.width > 2) ? t.output : undefined;
+    case 'upsample': return t.output;
+    case 'data': return t.featureMaps;
+    case 'dropout': return t.outputMaps;
+    case 'activation': return t.outputMaps;
+    default: return undefined;
   }
-
-  if (viz.kind === 'vector' && viz.vector) {
-    return <MiniSparkline values={viz.vector.values} />;
-  }
-
-  if (viz.kind === 'probabilities' && viz.probabilities) {
-    return <MiniSparkline values={viz.probabilities.values} color="#10b981" />;
-  }
-
-  if (viz.kind === 'scalar' && viz.scalar) {
-    return <div className="stage-card-scalar">{viz.scalar.value.toFixed(3)}</div>;
-  }
-
-  return <div className="stage-card-empty">—</div>;
 }
-
-// --- Tiny canvas helpers ---
 
 function MiniFeatureMap({ pixels }: { pixels: number[][] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -77,44 +64,10 @@ function MiniFeatureMap({ pixels }: { pixels: number[][] }) {
       for (let x = 0; x < w; x++) {
         const idx = (y * w + x) * 4;
         const v = pixels[y][x];
-        data.data[idx] = v;
-        data.data[idx + 1] = v;
-        data.data[idx + 2] = v;
-        data.data[idx + 3] = 255;
+        data.data[idx] = v; data.data[idx + 1] = v; data.data[idx + 2] = v; data.data[idx + 3] = 255;
       }
     }
     ctx.putImageData(data, 0, 0);
   }, [pixels]);
-  return <canvas ref={canvasRef} className="stage-card-canvas" />;
-}
-
-function MiniSparkline({ values, color = '#89b4fa' }: { values: number[]; color?: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || values.length === 0) return;
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
-    const w = rect.width;
-    const h = rect.height;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = color;
-    const bw = w / values.length;
-    // Integer pixel alignment for crisp bars
-    for (let i = 0; i < values.length; i++) {
-      const x = Math.round(i * bw);
-      const nextX = Math.round((i + 1) * bw);
-      const bh = Math.round(((values[i] - min) / range) * (h - 1));
-      ctx.fillRect(x, h - bh, Math.max(1, nextX - x - 1), bh);
-    }
-  }, [values, color]);
   return <canvas ref={canvasRef} className="stage-card-canvas" />;
 }

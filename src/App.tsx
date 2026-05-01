@@ -344,7 +344,7 @@ export default function App() {
     fetch('http://localhost:8000/presets/load', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: 'diffusion-mnist.json' }),
+      body: JSON.stringify({ filename: 'mlp-mnist.json' }),
     })
       .then((r) => r.json())
       .then((data) => {
