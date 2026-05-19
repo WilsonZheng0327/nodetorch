@@ -44,3 +44,5 @@ test_diffusion_output/
 /*.py
 !/backend/**/*.py
 CONTRIBUTING.md
+
+.claude
