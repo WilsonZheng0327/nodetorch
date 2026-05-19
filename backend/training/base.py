@@ -175,16 +175,19 @@ def build_training_context(
     if not loss_node_ids:
         return {"error": "No loss node in graph"}
 
-    # Check for tokenizer node with BPE mode
+    # Check for tokenizer node — BPE needs a different dataset path
+    tokenizer_type = None
     tokenizer_config = None
     for n in nodes_list:
-        if n.get("type") == "ml.preprocessing.tokenizer":
+        nt = n.get("type", "")
+        if nt.startswith("ml.preprocessing.tokenizer_"):
+            tokenizer_type = nt
             tokenizer_config = n.get("properties", {})
             break
 
-    # Load dataset (swap in BPE dataset if tokenizer is in BPE mode)
+    # Load dataset (swap in BPE dataset if tokenizer is BPE)
     dataset_type = data_node["type"]
-    if tokenizer_config and tokenizer_config.get("mode") == "bpe":
+    if tokenizer_type == "ml.preprocessing.tokenizer_bpe":
         train_dataset, train_loader, val_loader = load_bpe_dataset(
             dataset_type, data_node, props, batch_size, tokenizer_config,
         )
@@ -275,13 +278,18 @@ def load_bpe_dataset(dataset_type, data_node, optimizer_props, batch_size, token
 
     vocab_size = tokenizer_config.get("vocabSize", 10000)
     max_len = tokenizer_config.get("maxLen", 256)
+    lowercase = tokenizer_config.get("lowercase", True)
+    eow = tokenizer_config.get("endOfWordMarker", "</w>")
 
     raw_text = get_raw_texts(dataset_type)
     if not raw_text:
         return {"error": f"BPE not supported for dataset: {dataset_type}"}
 
-    logger.info(f"Learning BPE merges (vocab_size={vocab_size})...")
-    bpe = get_bpe_tokenizer(raw_text, vocab_size, cache_key=dataset_type)
+    logger.info(f"Learning BPE merges (vocab_size={vocab_size}, lowercase={lowercase}, eow={eow!r})...")
+    bpe = get_bpe_tokenizer(
+        raw_text, vocab_size, cache_key=dataset_type,
+        lowercase=lowercase, end_of_word_marker=eow,
+    )
     logger.info(f"BPE ready: {bpe.vocab_size} tokens, {len(bpe.merges)} merges")
 
     from data_loaders import LM_DATASET_TYPES

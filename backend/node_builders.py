@@ -677,8 +677,11 @@ class TokenizerModule(nn.Module):
 
 
 def build_tokenizer(props: dict, input_shapes: dict) -> nn.Module:
+    # Char tokenizer has no vocabSize prop — vocab is corpus-determined.
+    # Use a very large cap so the clamp is effectively a no-op for char mode.
+    vocab_size = props.get("vocabSize", 1_000_000)
     return TokenizerModule(
-        vocab_size=props.get("vocabSize", 10000),
+        vocab_size=vocab_size,
         max_len=props.get("maxLen", 256),
     )
 
@@ -687,7 +690,9 @@ def build_tokenizer(props: dict, input_shapes: dict) -> nn.Module:
 
 NODE_BUILDERS: dict[str, callable] = {
     # Preprocessing
-    "ml.preprocessing.tokenizer": build_tokenizer,
+    "ml.preprocessing.tokenizer_char": build_tokenizer,
+    "ml.preprocessing.tokenizer_word": build_tokenizer,
+    "ml.preprocessing.tokenizer_bpe": build_tokenizer,
     # Layers (no wrapper)
     "ml.layers.conv2d": build_conv2d,
     "ml.layers.conv1d": build_conv1d,

@@ -1,6 +1,10 @@
 import type { NodeDefinition } from '../../../core/nodedef';
-import { tokenizerNode } from './tokenizer';
+import { tokenizerCharNode } from './tokenizer-char';
+import { tokenizerWordNode } from './tokenizer-word';
+import { tokenizerBpeNode } from './tokenizer-bpe';
 
 export const preprocessingNodes: NodeDefinition[] = [
-  tokenizerNode,
+  tokenizerCharNode,
+  tokenizerWordNode,
+  tokenizerBpeNode,
 ];

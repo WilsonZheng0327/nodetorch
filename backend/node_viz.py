@@ -84,7 +84,9 @@ FORWARD_VIZ: dict[str, callable] = {
     "ml.structural.permute": forward_viz_structural,
     "ml.structural.sequence_pool": forward_viz_structural,
     "ml.structural.reparameterize": forward_viz_structural,
-    "ml.preprocessing.tokenizer": forward_viz_structural,
+    "ml.preprocessing.tokenizer_char": forward_viz_structural,
+    "ml.preprocessing.tokenizer_word": forward_viz_structural,
+    "ml.preprocessing.tokenizer_bpe": forward_viz_structural,
 }
 
 # Register loss and data nodes dynamically

@@ -257,8 +257,13 @@ def _module_code(node_type: str, props: dict, module) -> str | None:
             embed_dim = props.get("embeddingDim", 256)
         return f"__POSITIONAL_ENCODING__({max_len}, {embed_dim}, '{encoding_type}')"
 
-    if node_type == "ml.preprocessing.tokenizer":
-        vs = props.get("vocabSize", 10000)
+    if node_type in (
+        "ml.preprocessing.tokenizer_char",
+        "ml.preprocessing.tokenizer_word",
+        "ml.preprocessing.tokenizer_bpe",
+    ):
+        # Char tokenizer has no vocabSize prop — vocab is corpus-determined.
+        vs = props.get("vocabSize", 1_000_000)
         ml = props.get("maxLen", 256)
         return f"__TOKENIZER__({vs}, {ml})"
 
@@ -1785,15 +1790,18 @@ def export_to_python(graph_data: dict) -> str:
     sections.append("print(f'Using device: {device}')")
     sections.append("")
 
-    # Dataset — check if tokenizer node specifies BPE mode
+    # Dataset — check if a BPE tokenizer node is in the graph
+    tokenizer_type = None
     tokenizer_config = None
     for n in nodes.values():
-        if n["type"] == "ml.preprocessing.tokenizer":
+        nt = n.get("type", "")
+        if nt.startswith("ml.preprocessing.tokenizer_"):
+            tokenizer_type = nt
             tokenizer_config = n.get("properties", {})
             break
 
     if data_node:
-        if tokenizer_config and tokenizer_config.get("mode") == "bpe":
+        if tokenizer_type == "ml.preprocessing.tokenizer_bpe":
             sections.append(_generate_dataset_code(data_node, bpe_config=tokenizer_config))
         else:
             sections.append(_generate_dataset_code(data_node))

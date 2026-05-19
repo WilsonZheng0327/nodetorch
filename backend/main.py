@@ -6,6 +6,7 @@
 #   POST /train               — synchronous training (REST, no streaming)
 #   POST /infer               — inference using stored trained weights
 #   GET  /dataset/{type}      — dataset detail info (labels, sample images)
+#   POST /tokenizer/preview   — preview tokenizer vocab from corpus (no training)
 #   GET  /blocks              — list saved + preset block templates
 #   POST /blocks/save         — save a custom block as JSON
 #   GET  /blocks/{filename}   — load a specific block
@@ -41,6 +42,7 @@ from latent_viz import generate_latent_grid
 from denoise_viz import run_denoise_step_through
 from gan_generate import generate_gan_images
 from text_generate import generate_text
+from tokenizer_preview import preview_tokenizer
 from runs_store import list_runs, load_run, delete_run
 from data_loaders import DATASET_DETAILS, augmentation_preview
 import os
@@ -224,6 +226,28 @@ async def generate_text_endpoint(request: dict):
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Text generation failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/tokenizer/preview")
+async def tokenizer_preview_endpoint(request: dict):
+    """Preview a tokenizer's vocab from the upstream corpus, without training.
+
+    Body: { nodeType, properties, datasetType, sampleText? }
+    """
+    try:
+        node_type = request.get("nodeType")
+        properties = request.get("properties") or {}
+        dataset_type = request.get("datasetType")
+        sample_text = request.get("sampleText")
+        if not node_type or not dataset_type:
+            return {"status": "error", "error": "nodeType and datasetType required"}
+        result = preview_tokenizer(node_type, properties, dataset_type, sample_text)
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Tokenizer preview failed: {e}")
         return {"status": "error", "error": str(e)}
 
 

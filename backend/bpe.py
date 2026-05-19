@@ -18,13 +18,28 @@ import torch
 class BPETokenizer:
     """Byte-Pair Encoding tokenizer that learns subword units from text."""
 
-    def __init__(self):
+    def __init__(self, lowercase: bool = True, end_of_word_marker: str = "</w>"):
         self.merges: list[tuple[str, str]] = []
         self.vocab: dict[str, int] = {}
+        # Per-token corpus frequency, populated during training.
+        self.token_freqs: dict[str, int] = {}
+        self.lowercase = lowercase
+        # Empty string disables the marker.
+        self.end_of_word_marker = end_of_word_marker or ""
 
     @property
     def vocab_size(self) -> int:
         return len(self.vocab)
+
+    def _split_words(self, text: str) -> list[str]:
+        if self.lowercase:
+            text = text.lower()
+        return re.findall(r'[a-zA-Z]+|[0-9]+|[^\s]', text)
+
+    def _word_to_symbols(self, word: str) -> tuple[str, ...]:
+        if self.end_of_word_marker:
+            return tuple(word) + (self.end_of_word_marker,)
+        return tuple(word)
 
     def train(self, text: str, vocab_size: int, on_progress=None):
         """Learn BPE merge rules from a text corpus.
@@ -35,10 +50,10 @@ class BPETokenizer:
             on_progress: optional callback(current_vocab, target_vocab)
         """
         # Tokenize into words, track frequency of each word (as character tuple)
-        words = re.findall(r'[a-zA-Z]+|[0-9]+|[^\s]', text.lower())
+        words = self._split_words(text)
         word_freqs: dict[tuple[str, ...], int] = Counter()
         for word in words:
-            word_freqs[tuple(word) + ('</w>',)] += 1
+            word_freqs[self._word_to_symbols(word)] += 1
 
         # Initial vocab: special tokens + all unique characters
         self.vocab = {'<pad>': 0, '<unk>': 1}
@@ -87,13 +102,19 @@ class BPETokenizer:
             if on_progress and len(self.vocab) % 100 == 0:
                 on_progress(len(self.vocab), vocab_size)
 
+        # Final per-token corpus frequencies (using the post-merge tokenization).
+        self.token_freqs = {}
+        for word_tuple, freq in word_freqs.items():
+            for sym in word_tuple:
+                self.token_freqs[sym] = self.token_freqs.get(sym, 0) + freq
+
     def encode(self, text: str, max_len: int | None = None) -> list[int]:
         """Encode text to BPE token IDs."""
         unk_id = self.vocab.get('<unk>', 1)
-        words = re.findall(r'[a-zA-Z]+|[0-9]+|[^\s]', text.lower())
+        words = self._split_words(text)
         ids: list[int] = []
         for word in words:
-            symbols = list(word) + ['</w>']
+            symbols = list(self._word_to_symbols(word))
             # Apply merges in learned order
             for a, b in self.merges:
                 merged = a + b
@@ -114,7 +135,11 @@ class BPETokenizer:
         """Decode token IDs back to text."""
         inv = {v: k for k, v in self.vocab.items()}
         tokens = [inv.get(i, '') for i in ids if i > 1]  # skip pad and unk
-        return ''.join(tokens).replace('</w>', ' ').strip()
+        marker = self.end_of_word_marker
+        joined = ''.join(tokens)
+        if marker:
+            joined = joined.replace(marker, ' ')
+        return joined.strip()
 
     def decode_token(self, token_id: int) -> str:
         """Decode a single token ID, preserving word boundaries as spaces."""
@@ -122,7 +147,10 @@ class BPETokenizer:
         raw = inv.get(token_id, '')
         if not raw or token_id <= 1:
             return ''
-        return raw.replace('</w>', ' ')
+        marker = self.end_of_word_marker
+        if marker:
+            return raw.replace(marker, ' ')
+        return raw
 
 
 # --- Cached instances ---
@@ -136,6 +164,8 @@ def get_bpe_tokenizer(
     vocab_size: int,
     cache_key: str,
     on_progress=None,
+    lowercase: bool = True,
+    end_of_word_marker: str = "</w>",
 ) -> BPETokenizer:
     """Get or train a cached BPE tokenizer.
 
@@ -144,12 +174,16 @@ def get_bpe_tokenizer(
         vocab_size: target vocab size
         cache_key: unique key for caching (e.g. dataset name)
         on_progress: optional callback(current, target) during training
+        lowercase: lowercase the corpus before training
+        end_of_word_marker: token appended to each word; "" disables it
     """
-    full_key = f"{cache_key}_{vocab_size}"
+    marker_key = end_of_word_marker or "none"
+    lc_key = "lc" if lowercase else "cs"
+    full_key = f"{cache_key}_{vocab_size}_{lc_key}_{marker_key}"
     if full_key in _bpe_cache:
         return _bpe_cache[full_key]
 
-    tokenizer = BPETokenizer()
+    tokenizer = BPETokenizer(lowercase=lowercase, end_of_word_marker=end_of_word_marker)
     tokenizer.train(raw_text, vocab_size, on_progress)
     _bpe_cache[full_key] = tokenizer
     return tokenizer

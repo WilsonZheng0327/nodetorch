@@ -115,7 +115,7 @@ During training, `build_training_context()` detects the tokenizer node's mode. I
 2. **Backend builder**: add builder function to `backend/node_builders.py` (layers) or `backend/data_loaders.py` (datasets). Loss nodes also need `LOSS_NODES` in `graph_builder.py`.
 3. **Backend viz**: add forward/backward viz functions to `backend/node_viz.py` registries (`FORWARD_VIZ`, `BACKWARD_VIZ`). Optional — default fallback provides basic shape-based viz.
 
-See `CONTRIBUTING.md` for full details with code examples and a per-node-type file change table.
+Additional design docs live in `docs/`: `shape-inference.md`, `training-flow.md`, `training-plugins.md`, `visualization.md`, `multi-output-nodes.md`, `custom-blocks.md`, `copy-paste.md`, `undo-redo.md`.
 
 ### Node metadata convention
 

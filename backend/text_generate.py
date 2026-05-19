@@ -21,16 +21,22 @@ from forward_utils import run_forward_pass
 from data_loaders import get_shakespeare_vocab, LM_DATASET_TYPES, get_raw_texts
 from bpe import get_bpe_tokenizer
 
+TOKENIZER_TYPES = {
+    "ml.preprocessing.tokenizer_char",
+    "ml.preprocessing.tokenizer_word",
+    "ml.preprocessing.tokenizer_bpe",
+}
+
 # Node types that should be bypassed during generation (not part of the model forward pass)
-_GENERATION_SKIP_TYPES = ALL_LOSS_NODES | set(OPTIMIZER_NODES) | {"ml.preprocessing.tokenizer"}
+_GENERATION_SKIP_TYPES = ALL_LOSS_NODES | set(OPTIMIZER_NODES) | TOKENIZER_TYPES
 
 
-def _get_tokenizer_config(nodes: dict) -> dict | None:
-    """Find the tokenizer node and return its properties, or None."""
+def _get_tokenizer(nodes: dict) -> tuple[str | None, dict | None]:
+    """Find the tokenizer node — return (type, properties) or (None, None)."""
     for n in nodes.values():
-        if n.get("type") == "ml.preprocessing.tokenizer":
-            return n.get("properties", {})
-    return None
+        if n.get("type") in TOKENIZER_TYPES:
+            return n.get("type"), n.get("properties", {})
+    return None, None
 
 
 def _get_dataset_type(nodes: dict) -> str | None:
@@ -79,15 +85,20 @@ def generate_text(
         return {"error": "No language model dataset node found"}
 
     # Detect tokenization mode from graph
-    tok_config = _get_tokenizer_config(nodes)
-    tok_mode = tok_config.get("mode", "character") if tok_config else "character"
+    tok_type, tok_config = _get_tokenizer(nodes)
+    is_bpe = tok_type == "ml.preprocessing.tokenizer_bpe"
     dataset_type = _get_dataset_type(nodes)
 
     # Build encode/decode functions based on tokenizer mode
-    if tok_mode == "bpe" and dataset_type:
+    if is_bpe and dataset_type:
         bpe_vocab_size = tok_config.get("vocabSize", 500) if tok_config else 500
+        lowercase = tok_config.get("lowercase", True) if tok_config else True
+        eow = tok_config.get("endOfWordMarker", "</w>") if tok_config else "</w>"
         raw_text = get_raw_texts(dataset_type)
-        bpe = get_bpe_tokenizer(raw_text, bpe_vocab_size, cache_key=dataset_type)
+        bpe = get_bpe_tokenizer(
+            raw_text, bpe_vocab_size, cache_key=dataset_type,
+            lowercase=lowercase, end_of_word_marker=eow,
+        )
         vocab_size = bpe.vocab_size
 
         def encode_prompt(text: str) -> list[int]:
@@ -117,7 +128,7 @@ def generate_text(
 
     # Encode prompt
     if not prompt:
-        prompt = "\n" if tok_mode != "bpe" else "the"
+        prompt = "\n" if not is_bpe else "the"
     prompt_ids = encode_prompt(prompt)
     if not prompt_ids:
         prompt_ids = [0]
@@ -145,7 +156,7 @@ def generate_text(
             data_inputs = {data_nid: {"out": current_ids, "labels": current_ids}}
             # Pre-populate tokenizer results so downstream nodes get unpadded IDs
             for nid, n in nodes.items():
-                if n["type"] == "ml.preprocessing.tokenizer":
+                if n["type"] in TOKENIZER_TYPES:
                     data_inputs[nid] = {"out": current_ids}
             results = run_forward_pass(gen_modules, nodes, edges, order, data_inputs)
 

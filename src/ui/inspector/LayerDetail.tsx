@@ -2,8 +2,15 @@
 // Opened from PropertyInspector. Fetches data from /layer-detail endpoint.
 // Renders weight matrix heatmap, feature maps, attention map, hidden state.
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import './LayerDetail.css';
+import { TokenizerDetail } from './TokenizerDetail';
+
+const TOKENIZER_TYPES = new Set([
+  'ml.preprocessing.tokenizer_char',
+  'ml.preprocessing.tokenizer_word',
+  'ml.preprocessing.tokenizer_bpe',
+]);
 
 interface Props {
   nodeId: string;
@@ -108,6 +115,13 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
   };
 
   useEffect(() => {
+    // Tokenizer nodes have their own detail panel that fetches from
+    // /tokenizer/preview — skip the /layer-detail call entirely.
+    if (TOKENIZER_TYPES.has(nodeType)) {
+      setLoading(false);
+      setDetail(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     fetch('http://localhost:8000/layer-detail', {
@@ -122,9 +136,33 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
       })
       .catch(() => setError('Cannot connect to backend'))
       .finally(() => setLoading(false));
-  }, [nodeId, graphJson]);
+  }, [nodeId, nodeType, graphJson]);
 
   const typeName = nodeType.split('.').pop() ?? nodeType;
+  const isTokenizer = TOKENIZER_TYPES.has(nodeType);
+
+  // For tokenizer nodes: pull current node properties + upstream dataset type
+  // from the serialized graph so the detail panel can preview without training.
+  const tokenizerInfo = useMemo(() => {
+    if (!isTokenizer) return null;
+    try {
+      const graph = JSON.parse(graphJson);
+      const nodes: any[] = graph?.graph?.nodes ?? graph?.nodes ?? [];
+      const edges: any[] = graph?.graph?.edges ?? graph?.edges ?? [];
+      const tok = nodes.find((n) => n.id === nodeId);
+      const properties: Record<string, any> = tok?.properties ?? {};
+      // Walk back from tokenizer's input edge to find the dataset node.
+      const incoming = edges.find((e) => e.target === nodeId);
+      const upstream = incoming ? nodes.find((n) => n.id === incoming.source) : null;
+      const datasetType: string | null =
+        upstream && typeof upstream.type === 'string' && upstream.type.startsWith('data.')
+          ? upstream.type
+          : null;
+      return { properties, datasetType };
+    } catch {
+      return { properties: {}, datasetType: null };
+    }
+  }, [isTokenizer, nodeId, graphJson]);
 
   return (
     <div className="layer-detail-overlay" onClick={onClose}>
@@ -136,6 +174,13 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
         <div className="layer-detail-body">
           {loading && <div className="layer-detail-loading">Loading...</div>}
           {error && <div className="layer-detail-error">{error}</div>}
+          {isTokenizer && tokenizerInfo && (
+            <TokenizerDetail
+              nodeType={nodeType}
+              nodeProperties={tokenizerInfo.properties}
+              datasetType={tokenizerInfo.datasetType}
+            />
+          )}
           {detail && (
             <>
               {detail.weightMatrix && (
@@ -344,7 +389,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
                 </DetailSection>
               )}
 
-              {!detail.weightMatrix && !detail.featureMaps && !detail.attentionMap && !detail.hiddenState && !detail.confusionMatrix && nodeType !== 'ml.structural.reparameterize' && (
+              {!detail.weightMatrix && !detail.featureMaps && !detail.attentionMap && !detail.hiddenState && !detail.confusionMatrix && nodeType !== 'ml.structural.reparameterize' && !isTokenizer && (
                 <div className="layer-detail-loading">No detailed visualization available for this node type</div>
               )}
             </>

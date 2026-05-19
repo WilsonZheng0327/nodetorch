@@ -10,9 +10,9 @@
         "properties": { "batchSize": 64, "seqLen": 256 }
       },
       {
-        "id": "tok", "type": "ml.preprocessing.tokenizer",
+        "id": "tok", "type": "ml.preprocessing.tokenizer_char",
         "position": { "x": 200, "y": 200 },
-        "properties": { "mode": "character", "vocabSize": 65, "maxLen": 256 }
+        "properties": { "maxLen": 256, "lowercase": false }
       },
       {
         "id": "embed", "type": "ml.layers.embedding",
