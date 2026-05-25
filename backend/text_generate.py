@@ -126,10 +126,12 @@ def generate_text(
 
     dev = get_device()
 
-    # Encode prompt
-    if not prompt:
-        prompt = "\n" if not is_bpe else "the"
-    prompt_ids = encode_prompt(prompt)
+    # Encode prompt. If the user gave no prompt, we still need a seed token so
+    # the autoregressive loop has something to start from — but we DON'T echo
+    # that internal seed back to the UI as if the user typed it.
+    user_prompt = prompt
+    seed_prompt = prompt if prompt else ("\n" if not is_bpe else "the")
+    prompt_ids = encode_prompt(seed_prompt)
     if not prompt_ids:
         prompt_ids = [0]
     current_ids = torch.tensor([prompt_ids], dtype=torch.long, device=dev)
@@ -204,8 +206,8 @@ def generate_text(
 
     generated = ''.join(generated_tokens)
     return {
-        "prompt": prompt,
+        "prompt": user_prompt,
         "generated": generated,
-        "fullText": prompt + generated,
+        "fullText": user_prompt + generated,
         "tokens": tokens_info,
     }

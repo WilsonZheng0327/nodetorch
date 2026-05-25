@@ -194,6 +194,528 @@
   white-space: nowrap;
 }
 
+/* --- Text/token preview (LM sample header) --- */
+
+.step-through-text-preview {
+  margin-top: 6px;
+  max-width: 900px;
+}
+
+.step-through-text-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.step-through-text-tab {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid #313244;
+  border-radius: 4px;
+  color: #6c7086;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+}
+.step-through-text-tab:hover { color: #cdd6f4; }
+.step-through-text-tab-active { background: #313244; color: #89b4fa; border-color: #45475a; }
+
+.step-through-text-expand {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: transparent;
+  border: none;
+  color: #89b4fa;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.step-through-text-body {
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 4px;
+  padding: 6px 8px;
+  max-height: 60px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a6adc8;
+  transition: max-height 0.15s ease-out;
+}
+.step-through-text-body-expanded { max-height: 280px; }
+
+.step-through-text-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.step-through-token-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.step-through-token {
+  padding: 1px 4px;
+  background: #313244;
+  border-radius: 3px;
+  color: #cdd6f4;
+  font-size: 11px;
+  white-space: pre;
+}
+
+/* --- Inline spinner (next to Generate / New sample buttons) --- */
+
+.step-through-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 6px;
+  border: 2px solid rgba(205, 214, 244, 0.25);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: step-through-spin 0.7s linear infinite;
+}
+
+@keyframes step-through-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- Attention heatmap --- */
+
+.tfm-attention {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.tfm-attention-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.tfm-attn-tab {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 4px;
+  color: #6c7086;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tfm-attn-tab:hover { color: #cdd6f4; }
+.tfm-attn-tab-active { background: #313244; color: #89b4fa; border-color: #45475a; }
+
+.tfm-attn-meta {
+  margin-left: 12px;
+  font-size: 11px;
+  color: #6c7086;
+}
+
+.tfm-attention-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.tfm-attention-canvas-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.tfm-attention-canvas {
+  display: block;
+  border: 1px solid #313244;
+  border-radius: 4px;
+}
+
+.tfm-attention-axis-label {
+  font-size: 11px;
+  color: #6c7086;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.tfm-attention-axis-x { margin-top: 10px; }
+.tfm-attention-canvas-wrap { padding-left: 28px; padding-bottom: 4px; position: relative; }
+.tfm-attention-axis-y {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: rotate(-90deg);
+  transform-origin: center center;
+  white-space: nowrap;
+}
+
+.tfm-attention-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #6c7086;
+}
+.tfm-attention-legend-bar {
+  width: 160px;
+  height: 8px;
+  border-radius: 2px;
+  border: 1px solid #313244;
+}
+
+/* --- Per-head entropy badge in tabs --- */
+
+.tfm-attn-entropy {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  vertical-align: 1px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.tfm-attn-entropy-sharp   { background: rgba(166, 227, 161, 0.18); color: #a6e3a1; }
+.tfm-attn-entropy-mid     { background: rgba(249, 226, 175, 0.18); color: #f9e2af; }
+.tfm-attn-entropy-diffuse { background: rgba(243, 139, 168, 0.18); color: #f38ba8; }
+
+.tfm-attn-help {
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid #45475a;
+  background: transparent;
+  color: #6c7086;
+  border-radius: 50%;
+  font-size: 11px; font-weight: 700;
+  cursor: pointer;
+  margin-left: 4px;
+}
+.tfm-attn-help:hover { color: #89b4fa; border-color: #89b4fa; }
+
+.tfm-attn-expand {
+  margin-left: 6px;
+  padding: 4px 10px;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  color: #cdd6f4;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tfm-attn-expand:hover { background: #45475a; color: #89b4fa; }
+
+.tfm-attn-help-blurb {
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #a6adc8;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.tfm-attn-help-blurb ul { margin: 6px 0 0 0; padding-left: 18px; }
+.tfm-attn-help-blurb li { margin-bottom: 3px; }
+.tfm-attn-help-pill {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-right: 4px;
+}
+
+.tfm-attention-collapsed-note {
+  font-size: 11px;
+  color: #6c7086;
+  font-style: italic;
+  padding: 6px 0;
+}
+
+/* --- Fullscreen modal --- */
+
+.tfm-attention-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.tfm-attention-modal {
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 10px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.tfm-attention-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #313244;
+  flex-shrink: 0;
+}
+.tfm-attention-modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #cdd6f4;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tfm-attention-modal-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.tfm-attention-modal-close {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  color: #cdd6f4;
+  font-size: 18px;
+  cursor: pointer;
+}
+.tfm-attention-modal-close:hover { background: #313244; color: #f38ba8; }
+
+.tfm-attention-modal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 16px 16px;
+  overflow: hidden;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* Heatmap takes the rest of the modal height. Focus-row + legend below get
+   a natural-height footer so the heatmap dominates the view. */
+.tfm-attention-modal-heatmap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tfm-attention-modal-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tfm-attention-expanded-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* In the expanded view, the canvas-wrap centers itself and the axis labels
+   sit just outside the canvas. Larger padding so labels don't crowd the map. */
+.tfm-attention-canvas-wrap-expanded {
+  padding-left: 36px;
+  padding-bottom: 18px;
+}
+
+/* --- Heatmap stacking (token labels overlay canvas) --- */
+
+.tfm-attention-canvas-stack {
+  position: relative;
+  display: inline-block;
+}
+
+.tfm-attention-tokens {
+  display: flex;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: #6c7086;
+  pointer-events: none;
+}
+
+.tfm-attention-tokens-x {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  flex-direction: row;
+}
+.tfm-attention-token-x {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  transform: rotate(60deg);
+  transform-origin: top left;
+  height: 50px;
+}
+
+.tfm-attention-tokens-y {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  margin-right: 2px;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+.tfm-attention-token-y {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  white-space: nowrap;
+  overflow: hidden;
+  padding-right: 2px;
+  width: 24px;
+}
+
+.tfm-attention-tooltip {
+  position: absolute;
+  background: #181825;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #cdd6f4;
+  pointer-events: none;
+  z-index: 5;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.tfm-attention-tooltip-w {
+  color: #89b4fa;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.tfm-attention-hint {
+  text-align: center;
+  font-size: 10px;
+  color: #6c7086;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* --- Focused query row drill-in --- */
+
+.tfm-attention-focus {
+  margin-top: 14px;
+  border-top: 1px solid #313244;
+  padding-top: 12px;
+}
+
+.tfm-attention-focus-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tfm-attention-focus-title {
+  font-size: 13px;
+  color: #a6adc8;
+  font-family: 'JetBrains Mono', monospace;
+}
+.tfm-attention-focus-title b { color: #89b4fa; font-weight: 700; }
+
+.tfm-attention-focus-note { color: #6c7086; font-style: italic; }
+
+.tfm-attention-focus-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+.tfm-attention-focus-top-label { color: #6c7086; }
+.tfm-attention-focus-top-chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 6px;
+  background: #313244;
+  border-radius: 3px;
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', monospace;
+}
+.tfm-attention-focus-top-w { color: #f9e2af; font-weight: 700; }
+
+.tfm-attention-focus-bars {
+  display: flex;
+  align-items: flex-end;
+  height: 110px;
+  gap: 1px;
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 4px;
+  padding: 4px;
+  overflow-x: auto;
+}
+.tfm-attention-focus-bar {
+  flex: 1 0 4px;
+  min-width: 2px;
+  background: #585b70;
+  border-radius: 1px 1px 0 0;
+  transition: background 0.1s;
+}
+.tfm-attention-focus-bar:hover { background: #89b4fa; }
+.tfm-attention-focus-bar-top { background: #f9e2af; }
+.tfm-attention-focus-bar-top:hover { background: #fab387; }
+
+.tfm-attention-focus-labels {
+  display: flex;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #6c7086;
+  gap: 1px;
+  padding: 0 4px;
+  margin-top: 2px;
+  overflow-x: auto;
+}
+.tfm-attention-focus-label {
+  flex: 1 0 4px;
+  min-width: 2px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
 /* --- Navigation controls --- */
 
 .step-through-controls {
@@ -1174,6 +1696,20 @@
   gap: 6px;
   position: relative;
   padding: 0 12px;
+}
+
+/* When every panel in the row is a bar chart (no feature maps / constants),
+   stretch each column to fill the container — bar charts read much better
+   at full width. The "=" / "→" separator column stays its natural size. */
+.tfm-add-columns-flex {
+  width: 100%;
+}
+.tfm-add-columns-flex > .tfm-add-col:not(.tfm-add-eq) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.tfm-add-columns-flex > .tfm-add-col:not(.tfm-add-eq) > .tfm-vector-canvas {
+  width: 100%;
 }
 
 .tfm-add-col-label {

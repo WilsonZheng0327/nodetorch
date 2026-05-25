@@ -68,6 +68,8 @@ def run_step_through(
     order = topological_sort(nodes, edges)
     stages: list[dict] = []
     sample_info = _extract_sample_info(nodes, results)
+    # Tokens are useful as axis labels for attention maps — thread them through.
+    sample_tokens = sample_info.get("tokens")
 
     for node_id in order:
         node = nodes[node_id]
@@ -82,6 +84,7 @@ def run_step_through(
                 block_name = node.get("properties", {}).get("blockName") or node_id
                 inner_stages = _build_subgraph_stages(
                     sg_module=sg_module, block_name=block_name, depth=1, parent_path=[node_id],
+                    sample_tokens=sample_tokens,
                 )
                 stages.extend(inner_stages)
                 continue
@@ -89,6 +92,7 @@ def run_step_through(
         stage = _build_stage(
             node=node, node_id=node_id, path=[node_id], depth=0,
             edges=edges, results=results, nodes=nodes, module=modules.get(node_id),
+            sample_tokens=sample_tokens,
         )
         if stage:
             stages.append(stage)
@@ -381,7 +385,7 @@ def _forward_gan(graph_data, filter_label=None, sample_idx=None):
 
 # --- Subgraph recursion ---
 
-def _build_subgraph_stages(*, sg_module, block_name, depth, parent_path):
+def _build_subgraph_stages(*, sg_module, block_name, depth, parent_path, sample_tokens=None):
     inner_nodes = sg_module.inner_nodes
     inner_edges = sg_module.inner_edges
     inner_order = sg_module.inner_order
@@ -401,12 +405,14 @@ def _build_subgraph_stages(*, sg_module, block_name, depth, parent_path):
             stages.extend(_build_subgraph_stages(
                 sg_module=inner_mod, block_name=nested_name,
                 depth=depth + 1, parent_path=parent_path + [inner_nid],
+                sample_tokens=sample_tokens,
             ))
             continue
 
         stage = _build_stage(
             node=inner_node, node_id=inner_nid, path=parent_path + [inner_nid],
             depth=depth, edges=inner_edges, results=inner_results, nodes=inner_nodes, module=inner_mod,
+            sample_tokens=sample_tokens,
         )
         if stage:
             stage["blockName"] = block_name
@@ -432,11 +438,64 @@ def _extract_sample_info(nodes, results):
             if out is not None and isinstance(out, torch.Tensor) and out.dim() == 4:
                 info.update(_tensor_to_preview_image(out[0], dataset_type))
             elif out is not None and isinstance(out, torch.Tensor) and out.dim() == 2:
-                info["tokenIds"] = out[0].tolist()[:64]
-                if "_texts" in tensors:
-                    info["sampleText"] = tensors["_texts"][0][:500]
+                # Send full token sequence — frontend can decide how much to render.
+                ids = out[0].tolist()
+                info["tokenIds"] = ids
+                tokens, text = _decode_tokens(dataset_type, ids, nodes)
+                if tokens is not None:
+                    info["tokens"] = tokens
+                if text is not None:
+                    info["sampleText"] = text
+                elif "_texts" in tensors:
+                    info["sampleText"] = tensors["_texts"][0]
             return info
     return {}
+
+
+def _decode_tokens(dataset_type, ids, nodes):
+    """Decode token IDs into (per-token strings, joined text). Returns (None, None) if unknown.
+
+    Detects the tokenizer node in the graph and picks the matching decoder:
+      - tokenizer_bpe → BPE subword decoder
+      - tokenizer_char (default for shakespeare) → char-level vocab
+    """
+    # Find tokenizer node (if any) so we can pick the right decoder for BPE/word modes.
+    tok_node = None
+    for n in nodes.values():
+        if n.get("type", "").startswith("ml.preprocessing.tokenizer_"):
+            tok_node = n
+            break
+
+    tok_type = tok_node["type"] if tok_node else None
+    tok_props = tok_node.get("properties", {}) if tok_node else {}
+
+    if tok_type == "ml.preprocessing.tokenizer_bpe":
+        try:
+            from bpe import get_bpe_tokenizer
+            from data_loaders import get_raw_texts
+            raw = get_raw_texts(dataset_type)
+            if raw:
+                bpe = get_bpe_tokenizer(
+                    raw,
+                    tok_props.get("vocabSize", 500),
+                    cache_key=dataset_type,
+                    lowercase=tok_props.get("lowercase", True),
+                    end_of_word_marker=tok_props.get("endOfWordMarker", "</w>"),
+                )
+                tokens = [bpe.decode_token(int(i)) for i in ids]
+                return tokens, "".join(tokens)
+        except Exception:
+            pass
+
+    if dataset_type == "data.tiny_shakespeare":
+        try:
+            from data_loaders import get_shakespeare_vocab
+            _, idx2char = get_shakespeare_vocab()
+            tokens = [idx2char.get(int(i), "?") for i in ids]
+            return tokens, "".join(tokens)
+        except Exception:
+            return None, None
+    return None, None
 
 
 def _tensor_to_preview_image(img, dataset_type):
@@ -452,7 +511,7 @@ def _tensor_to_preview_image(img, dataset_type):
 
 # --- Stage building ---
 
-def _build_stage(*, node, node_id, path, depth, edges, results, nodes, module=None):
+def _build_stage(*, node, node_id, path, depth, edges, results, nodes, module=None, sample_tokens=None):
     node_type = node["type"]
     out_dict = results.get(node_id, {})
     output = out_dict.get("out") if isinstance(out_dict, dict) else None
@@ -483,6 +542,10 @@ def _build_stage(*, node, node_id, path, depth, edges, results, nodes, module=No
         "inputShape": list(input_tensor.shape) if input_tensor is not None else None,
         "outputShape": list(output.shape) if output is not None else ([1] if node_type in ALL_LOSS_NODES else None),
     }
+
+    # Stash sample tokens on out_dict so the per-node viz can use them as axis labels.
+    if sample_tokens is not None and isinstance(out_dict, dict):
+        out_dict = {**out_dict, "_sample_tokens": sample_tokens}
 
     try:
         viz_result = get_forward_viz(node_type, module, input_tensor, output, inputs, out_dict)

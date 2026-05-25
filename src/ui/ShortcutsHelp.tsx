@@ -19,6 +19,7 @@ const SHORTCUTS: { category: string; items: Shortcut[] }[] = [
     items: [
       { keys: 'Tab', description: 'Toggle node palette' },
       { keys: 'W / A / S / D', description: 'Pan camera (also arrow keys)' },
+      { keys: 'Shift + Arrow / WASD', description: 'Pan camera fast' },
       { keys: 'Scroll', description: 'Zoom in / out' },
       { keys: 'Drag blank area', description: 'Pan camera' },
       { keys: '?', description: 'Show this help' },

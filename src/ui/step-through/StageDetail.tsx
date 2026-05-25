@@ -21,6 +21,7 @@ import { ReshapeViz } from './transformations/ReshapeViz';
 import { GanLossViz } from './transformations/GanLossViz';
 import { VaeLossViz } from './transformations/VaeLossViz';
 import { DefaultViz, DataViz, DropoutViz, LossViz } from './transformations/DefaultViz';
+import { AttentionViz } from './transformations/AttentionViz';
 
 export function StageDetail({ stage }: { stage: Stage }) {
   const { transformation, insight } = stage;
@@ -73,6 +74,7 @@ function TransformationDispatcher({ transformation }: { transformation: NonNulla
     case 'vae_loss': return <VaeLossViz t={transformation} />;
     case 'data': return <DataViz t={transformation} />;
     case 'loss': return <LossViz t={transformation} />;
+    case 'attention': return <AttentionViz t={transformation} />;
     case 'default': return <DefaultViz t={transformation} />;
     default: return <div className="tfm-empty">Unknown transformation type</div>;
   }

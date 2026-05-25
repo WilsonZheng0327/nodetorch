@@ -287,6 +287,33 @@ export interface AddTransformation {
   outputVector?: { values: number[]; totalLength: number };
 }
 
+/** Attention: per-head attention weight heatmaps with focused-row drill-in */
+export interface AttentionTransformation {
+  type: 'attention';
+  numHeads: number;
+  seqLen: number;          // true sequence length (before downsampling)
+  displaySize: number;     // size of the matrices actually sent (≤ seqLen)
+  causalMask: boolean;
+  perHeadWeights: number[][][];   // [head][query_pos][key_pos] at displaySize
+  avgWeights: number[][];         // [query_pos][key_pos] at displaySize
+  headEntropy?: number[];         // normalized 0-1 per head; low = focused, high = diffuse
+  tokens?: string[];              // per-position labels (only when no downsampling)
+  focusRow?: AttentionFocusRow;   // default-selected query row (last position)
+}
+
+export interface AttentionTop { index: number; weight: number; }
+export interface AttentionFocusRow {
+  queryIndex: number;
+  queryToken: string | null;
+  fullLen: number;
+  shownLen: number;
+  perHeadRow: number[][];       // [head][key_pos]
+  avgRow: number[];             // [key_pos]
+  perHeadTop: AttentionTop[][]; // [head] -> top-K
+  avgTop: AttentionTop[];
+  labels: string[] | null;
+}
+
 /** Generic fallback */
 export interface DefaultTransformation {
   type: 'default';
@@ -317,6 +344,7 @@ export type Transformation =
   | VaeLossTransformation
   | DataTransformation
   | LossTransformation
+  | AttentionTransformation
   | DefaultTransformation;
 
 // --- Stage ---
@@ -342,6 +370,7 @@ export interface SampleInfo {
   actualLabel?: number;
   classNames?: string[];
   tokenIds?: number[];
+  tokens?: string[];
   sampleText?: string;
 }
 

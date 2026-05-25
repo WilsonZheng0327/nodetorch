@@ -530,7 +530,11 @@ def load_sample_by_label(
 
     if isinstance(sample, (tuple, list)) and len(sample) == 2:
         img, label = sample
-        return {"out": img.unsqueeze(0), "labels": torch.tensor([label])}, idx
+        if isinstance(label, torch.Tensor):
+            labels_out = label.unsqueeze(0)
+        else:
+            labels_out = torch.tensor([label])
+        return {"out": img.unsqueeze(0), "labels": labels_out}, idx
     if isinstance(sample, dict):
         return {k: (v.unsqueeze(0) if isinstance(v, torch.Tensor) else v) for k, v in sample.items()}, idx
     return {}, idx

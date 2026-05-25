@@ -5,9 +5,14 @@ import type { ConcatTransformation } from '../types';
 import { FeatureMapsGrid, VectorBars } from './shared';
 
 export function ConcatViz({ t }: { t: ConcatTransformation }) {
+  const allVectors =
+    t.inputs.every((i) => !i.featureMaps && !i.isConstant && !!i.vector) &&
+    !t.outputFmaps && !!t.outputVector;
+  const barHeight = allVectors ? 160 : 100;
+
   return (
     <div className="tfm-concat">
-      <div className="tfm-add-columns">
+      <div className={`tfm-add-columns ${allVectors ? 'tfm-add-columns-flex' : ''}`}>
         {t.inputs.map((inp, i) => (
           <div key={i} className="tfm-add-col">
             <div className="tfm-add-col-label">{inp.label}</div>
@@ -20,7 +25,7 @@ export function ConcatViz({ t }: { t: ConcatTransformation }) {
             ) : (
               <>
                 {inp.featureMaps && <FeatureMapsGrid data={inp.featureMaps} />}
-                {inp.vector && <VectorBars values={inp.vector.values} height={100} />}
+                {inp.vector && <VectorBars values={inp.vector.values} height={barHeight} />}
               </>
             )}
             {i < t.inputs.length - 1 && <div className="tfm-add-op-overlay">|</div>}
@@ -31,7 +36,7 @@ export function ConcatViz({ t }: { t: ConcatTransformation }) {
           <div className="tfm-add-col-label">Output (dim {t.dim})</div>
           {t.outputShape && <div className="tfm-concat-shape">{fmtShape(t.outputShape)}</div>}
           {t.outputFmaps && <FeatureMapsGrid data={t.outputFmaps} />}
-          {t.outputVector && <VectorBars values={t.outputVector.values} height={100} />}
+          {t.outputVector && <VectorBars values={t.outputVector.values} height={barHeight} />}
         </div>
       </div>
     </div>

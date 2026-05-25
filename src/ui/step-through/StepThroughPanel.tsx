@@ -222,11 +222,11 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
         />
       )}
 
-      {loading && <div className="step-through-empty">Running forward pass...</div>}
+      {loading && mode !== 'generate' && <div className="step-through-empty">Running forward pass...</div>}
       {error && <div className="step-through-error">{error}</div>}
 
-      {/* Mode tabs — below sample */}
-      {(forwardResult || backwardResult) && !loading && (
+      {/* Mode tabs — below sample. Stay visible during loading so the user can switch modes. */}
+      {(forwardResult || backwardResult) && (
         <div className="step-through-mode-bar">
           <div className="step-through-mode-tabs">
             <button className={`step-through-mode-tab ${mode === 'forward' ? 'step-through-mode-tab-active' : ''}`} onClick={() => switchMode('forward')}>Forward</button>
@@ -241,19 +241,24 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
         </div>
       )}
 
-      {totalSteps > 0 && !loading && (
+      {/* Generate mode renders independently — keeps its UI mounted during loading
+          so the user sees a spinner on the button, not a panel-wide overlay. */}
+      {mode === 'generate' && (
+        <GenerateView result={genResult} prompt={genPrompt} temperature={genTemp} topK={genTopK} maxTokens={genMaxTokens} loading={loading}
+          onPromptChange={setGenPrompt} onTempChange={setGenTemp} onTopKChange={setGenTopK} onMaxTokensChange={setGenMaxTokens} onGenerate={loadGenerate} />
+      )}
+
+      {mode !== 'generate' && totalSteps > 0 && !loading && (
         <>
           {/* Navigation */}
-          {mode !== 'generate' && (
-            <div className="step-through-controls">
-              <button className="step-through-ctrl" onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))} disabled={currentIdx === 0}>&#x25C0;</button>
-              <input type="range" min={0} max={totalSteps - 1} value={currentIdx} onChange={(e) => setCurrentIdx(parseInt(e.target.value, 10))} className="step-through-slider" />
-              <button className="step-through-ctrl" onClick={() => setCurrentIdx((i) => Math.min(totalSteps - 1, i + 1))} disabled={currentIdx >= totalSteps - 1}>&#x25B6;</button>
-              <span className="step-through-counter">
-                {mode === 'denoise' && denoiseSteps[currentIdx] ? `t=${denoiseSteps[currentIdx].timestep}` : `${currentIdx + 1} / ${totalSteps}`}
-              </span>
-            </div>
-          )}
+          <div className="step-through-controls">
+            <button className="step-through-ctrl" onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))} disabled={currentIdx === 0}>&#x25C0;</button>
+            <input type="range" min={0} max={totalSteps - 1} value={currentIdx} onChange={(e) => setCurrentIdx(parseInt(e.target.value, 10))} className="step-through-slider" />
+            <button className="step-through-ctrl" onClick={() => setCurrentIdx((i) => Math.min(totalSteps - 1, i + 1))} disabled={currentIdx >= totalSteps - 1}>&#x25B6;</button>
+            <span className="step-through-counter">
+              {mode === 'denoise' && denoiseSteps[currentIdx] ? `t=${denoiseSteps[currentIdx].timestep}` : `${currentIdx + 1} / ${totalSteps}`}
+            </span>
+          </div>
 
           {/* Forward */}
           {mode === 'forward' && (
@@ -284,21 +289,12 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
           {mode === 'denoise' && denoiseResult && denoiseSteps[currentIdx] && (
             <DenoiseView step={denoiseSteps[currentIdx]} channels={denoiseResult.channels} />
           )}
-          {mode === 'generate' && (
-            <GenerateView result={genResult} prompt={genPrompt} temperature={genTemp} topK={genTopK} maxTokens={genMaxTokens} loading={loading}
-              onPromptChange={setGenPrompt} onTempChange={setGenTemp} onTopKChange={setGenTopK} onMaxTokensChange={setGenMaxTokens} onGenerate={loadGenerate} />
-          )}
         </>
       )}
 
       {/* Backward loading state */}
       {mode === 'backward' && !backwardResult && loading && (
         <div className="step-through-empty">Running backward pass on same sample...</div>
-      )}
-
-      {mode === 'generate' && !loading && totalSteps === 0 && (
-        <GenerateView result={genResult} prompt={genPrompt} temperature={genTemp} topK={genTopK} maxTokens={genMaxTokens} loading={loading}
-          onPromptChange={setGenPrompt} onTempChange={setGenTemp} onTopKChange={setGenTopK} onMaxTokensChange={setGenMaxTokens} onGenerate={loadGenerate} />
       )}
     </div>
   );
@@ -313,6 +309,7 @@ function SampleHeader({ sample, onPickLabel, onRandom, loading }: {
   loading: boolean;
 }) {
   const classNames = sample.classNames;
+  const hasText = !!sample.sampleText || (!!sample.tokens && sample.tokens.length > 0) || (!!sample.tokenIds && sample.tokenIds.length > 0);
   return (
     <div className="step-through-sample">
       {sample.imagePixels && (
@@ -328,13 +325,13 @@ function SampleHeader({ sample, onPickLabel, onRandom, loading }: {
           </div>
         )}
         {sample.datasetType && <div className="step-through-sample-dataset">{sample.datasetType}</div>}
-        {sample.sampleText && <div className="step-through-sample-text">{sample.sampleText}</div>}
-        {!sample.sampleText && sample.tokenIds && (
-          <div className="step-through-sample-tokens">First tokens: {sample.tokenIds.slice(0, 16).join(', ')}...</div>
-        )}
+        {hasText && <TextSamplePreview sample={sample} />}
       </div>
       <div className="step-through-sample-actions">
-        <button className="step-through-btn" onClick={onRandom} disabled={loading}>Random</button>
+        <button className="step-through-btn" onClick={onRandom} disabled={loading}>
+          {loading && <span className="step-through-spinner" aria-hidden="true" />}
+          New sample
+        </button>
         {classNames && classNames.length <= 20 && (
           <div className="step-through-label-picker">
             <div className="step-through-label-picker-title">By class</div>
@@ -356,6 +353,68 @@ function SampleHeader({ sample, onPickLabel, onRandom, loading }: {
       </div>
     </div>
   );
+}
+
+// Renders text input as collapsible "raw text" + "tokenized" views.
+function TextSamplePreview({ sample }: { sample: SampleInfo }) {
+  const [view, setView] = useState<'text' | 'tokens'>('text');
+  const [expanded, setExpanded] = useState(false);
+
+  const text = sample.sampleText ?? '';
+  const tokens = sample.tokens ?? [];
+  const tokenIds = sample.tokenIds ?? [];
+
+  const tokenCount = tokens.length || tokenIds.length;
+  const hasText = text.length > 0;
+
+  return (
+    <div className="step-through-text-preview">
+      <div className="step-through-text-tabs">
+        {hasText && (
+          <button
+            className={`step-through-text-tab ${view === 'text' ? 'step-through-text-tab-active' : ''}`}
+            onClick={() => setView('text')}
+          >
+            Text · {text.length} chars
+          </button>
+        )}
+        <button
+          className={`step-through-text-tab ${view === 'tokens' ? 'step-through-text-tab-active' : ''}`}
+          onClick={() => setView('tokens')}
+        >
+          Tokens · {tokenCount}
+        </button>
+        <button
+          className="step-through-text-expand"
+          onClick={() => setExpanded((e) => !e)}
+          title={expanded ? 'Collapse' : 'Show full sample'}
+        >
+          {expanded ? 'Collapse' : 'Show all'}
+        </button>
+      </div>
+
+      <div className={`step-through-text-body ${expanded ? 'step-through-text-body-expanded' : ''}`}>
+        {view === 'text' && hasText && <div className="step-through-text-content">{text}</div>}
+        {view === 'tokens' && (
+          <div className="step-through-token-strip">
+            {(tokens.length > 0 ? tokens : tokenIds.map((id) => String(id))).map((tok, i) => (
+              <span key={i} className="step-through-token" title={tokenIds[i] != null ? `id=${tokenIds[i]}` : undefined}>
+                {displayToken(tok)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Make whitespace visible so users can see token boundaries.
+function displayToken(t: string): string {
+  if (t === '\n') return '↵';
+  if (t === ' ') return '␣';
+  if (t === '\t') return '⇥';
+  return t;
 }
 
 // --- Generate view ---
@@ -394,7 +453,10 @@ function GenerateView({ result, prompt, temperature, topK, maxTokens, loading, o
             </div>
           </div>
         </div>
-        <button className="step-through-btn generate-btn" onClick={onGenerate} disabled={loading}>{loading ? 'Generating...' : 'Generate'}</button>
+        <button className="step-through-btn generate-btn" onClick={onGenerate} disabled={loading}>
+          {loading && <span className="step-through-spinner" aria-hidden="true" />}
+          {loading ? 'Generating…' : 'Generate'}
+        </button>
       </div>
       {result && (
         <div className="generate-output">

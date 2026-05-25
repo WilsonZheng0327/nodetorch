@@ -136,9 +136,10 @@ export default function App() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<RF.ReactFlowInstance | null>(null);
 
-  // Arrow keys / WASD for smooth panning
+  // Arrow keys / WASD for smooth panning. Hold Shift for fast pan.
   useEffect(() => {
-    const PAN_SPEED = 8; // pixels per frame
+    const PAN_SPEED = 8;          // pixels per frame
+    const PAN_SPEED_FAST = 28;    // with Shift held
     const keyDirs: Record<string, { x: number; y: number }> = {
       ArrowUp: { x: 0, y: 1 }, ArrowDown: { x: 0, y: -1 },
       ArrowLeft: { x: 1, y: 0 }, ArrowRight: { x: -1, y: 0 },
@@ -147,6 +148,7 @@ export default function App() {
     };
 
     const held = new Set<string>();
+    let shiftHeld = false;
     let frameId: number | null = null;
 
     function tick() {
@@ -160,10 +162,11 @@ export default function App() {
         if (dir) { dx += dir.x; dy += dir.y; }
       }
       if (dx !== 0 || dy !== 0) {
+        const speed = shiftHeld ? PAN_SPEED_FAST : PAN_SPEED;
         const { x, y, zoom } = reactFlowInstance.getViewport();
         reactFlowInstance.setViewport({
-          x: x + dx * PAN_SPEED,
-          y: y + dy * PAN_SPEED,
+          x: x + dx * speed,
+          y: y + dy * speed,
           zoom,
         });
       }
@@ -212,6 +215,11 @@ export default function App() {
         return;
       }
 
+      if (e.key === 'Shift') {
+        shiftHeld = true;
+        return;
+      }
+
       if (keyDirs[e.key]) {
         e.preventDefault();
         held.add(e.key);
@@ -220,14 +228,26 @@ export default function App() {
     }
 
     function onUp(e: KeyboardEvent) {
+      if (e.key === 'Shift') {
+        shiftHeld = false;
+        return;
+      }
       held.delete(e.key);
     }
+
+    // If the window loses focus mid-pan, drop all held keys so the camera stops.
+    function onBlur() {
+      held.clear();
+      shiftHeld = false;
+    }
+    window.addEventListener('blur', onBlur);
 
     window.addEventListener('keydown', onDown);
     window.addEventListener('keyup', onUp);
     return () => {
       window.removeEventListener('keydown', onDown);
       window.removeEventListener('keyup', onUp);
+      window.removeEventListener('blur', onBlur);
       if (frameId) cancelAnimationFrame(frameId);
     };
   }, [reactFlowInstance]);
