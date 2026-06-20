@@ -1,37 +1,8 @@
+/* Inspector content fills the LeftRail body; the rail owns chrome + scroll. */
 .inspector {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 300px;
-  background: #1e1e2e;
-  border: 1px solid #45475a;
-  border-radius: 8px;
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 14px;
-  color: #cdd6f4;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  z-index: 10;
-  max-height: calc(100vh - 24px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #45475a transparent;
-}
-
-.inspector::-webkit-scrollbar {
-  width: 6px;
-}
-
-.inspector::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.inspector::-webkit-scrollbar-thumb {
-  background: #45475a;
-  border-radius: 3px;
-}
-
-.inspector::-webkit-scrollbar-thumb:hover {
-  background: #6c7086;
+  color: var(--text, #cdd6f4);
 }
 
 .inspector-empty {

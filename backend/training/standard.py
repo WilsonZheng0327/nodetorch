@@ -10,7 +10,7 @@ import time
 import torch
 from tqdm import tqdm
 
-from graph_builder import (
+from engine.graph_builder import (
     get_device,
     _safe_float,
     ALL_LOSS_NODES,
@@ -18,8 +18,8 @@ from graph_builder import (
     _probe_tracked_samples,
     _collect_misclassifications,
 )
-from data_loaders import CLASS_NAMES
-from forward_utils import run_forward_pass
+from dataprep.data_loaders import CLASS_NAMES
+from engine.forward_utils import run_forward_pass
 
 from .base import (
     TrainingContext,

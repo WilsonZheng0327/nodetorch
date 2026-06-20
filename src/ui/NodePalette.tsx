@@ -1,11 +1,11 @@
-// Node palette — collapsible sidebar listing all available node types.
+// Node palette — content-only list of all available node types.
 // Organized by nested categories. Drag a node type onto the canvas to add it.
+// Rendered inside LeftRail (which owns the panel chrome, collapse, and tabs).
 
 import './NodePalette.css';
 
-import { useContext, useState, useEffect, type DragEvent } from 'react';
-import { Blocks, ChevronDown, ChevronRight } from 'lucide-react';
-import { tutorialEvent } from './tutorial/TutorialPanel';
+import { useContext, useState, type DragEvent } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { NodeDefinition } from '../core/nodedef';
 import { DomainCtx } from './EngineNode';
 
@@ -15,6 +15,17 @@ interface CategoryNode {
   items: NodeDefinition[];
   children: Map<string, CategoryNode>;
 }
+
+// Explicit ordering for top-level categories. Anything not listed falls after
+// these, alphabetically. Keeps "Custom Block" at the end regardless of name.
+const TOP_LEVEL_ORDER = ['Data', 'ML', 'Custom Block'];
+
+// One-line explanation shown under each top-level ("big") category header.
+const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  Data: 'Datasets that feed the model — image and text sources to train and test on.',
+  ML: 'The network itself — layers, activations, losses, and optimizers.',
+  'Custom Block': 'Reusable sub-graphs you build once and drop into any model.',
+};
 
 function buildCategoryTree(defs: NodeDefinition[]): Map<string, CategoryNode> {
   const root = new Map<string, CategoryNode>();
@@ -40,7 +51,21 @@ function buildCategoryTree(defs: NodeDefinition[]): Map<string, CategoryNode> {
   }
 
   sortTree(root);
-  return root;
+  return orderTopLevel(root);
+}
+
+// Re-order just the root level by TOP_LEVEL_ORDER (sortTree already sorted
+// nested levels alphabetically).
+function orderTopLevel(root: Map<string, CategoryNode>): Map<string, CategoryNode> {
+  const rank = (name: string) => {
+    const i = TOP_LEVEL_ORDER.indexOf(name);
+    return i === -1 ? TOP_LEVEL_ORDER.length : i;
+  };
+  const entries = [...root.entries()].sort((a, b) => {
+    const r = rank(a[0]) - rank(b[0]);
+    return r !== 0 ? r : a[0].localeCompare(b[0]);
+  });
+  return new Map(entries);
 }
 
 function sortTree(level: Map<string, CategoryNode>) {
@@ -77,6 +102,10 @@ function CategoryGroup({ node, depth }: { node: CategoryNode; depth: number }) {
         <span className="palette-folder-icon">{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
         {node.name}
       </button>
+
+      {depth === 0 && CATEGORY_DESCRIPTIONS[node.name] && (
+        <div className="palette-folder-desc">{CATEGORY_DESCRIPTIONS[node.name]}</div>
+      )}
 
       {expanded && (
         <div className="palette-folder-content">
@@ -118,24 +147,7 @@ interface PaletteProps {
 
 export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
   const domain = useContext(DomainCtx);
-  const [collapsed, setCollapsed] = useState(true);
   const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        setCollapsed((c) => {
-          if (c) tutorialEvent('palette-opened');
-          return !c;
-        });
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   if (!domain) return null;
 
@@ -151,70 +163,59 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
   const tree = buildCategoryTree(filteredDefs);
 
   return (
-    <div className="palette">
-      <button
-        className="palette-toggle"
-        onClick={() => { if (collapsed) tutorialEvent('palette-opened'); setCollapsed(!collapsed); }}
-        title={collapsed ? 'Expand palette (Tab)' : 'Collapse palette (Tab)'}
-      >
-        <Blocks size={15} />
-        <span className="palette-toggle-title">Nodes</span>
-        <span className="palette-toggle-hint">Tab</span>
-        <span className="palette-toggle-icon">{collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}</span>
-      </button>
+    <div className="palette-content">
+      <input
+        className="palette-search"
+        type="text"
+        placeholder="Search nodes..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      {Array.from(tree.values()).map((node) => (
+        <CategoryGroup key={node.name} node={node} depth={0} />
+      ))}
 
-      {!collapsed && (
-        <div className="palette-content">
-          <input
-            className="palette-search"
-            type="text"
-            placeholder="Search nodes..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {Array.from(tree.values()).map((node) => (
-            <CategoryGroup key={node.name} node={node} depth={0} />
-          ))}
+      {/* Saved blocks */}
+      {savedBlocks.length > 0 && (!query || savedBlocks.some((b) => b.name.toLowerCase().includes(query))) && (
+        <>
+          <div className="palette-divider" />
+          <div className="palette-folder palette-folder-root">
+            Saved Blocks
+          </div>
+          <div className="palette-folder-desc">
+            Custom blocks you've saved plus shipped presets — drag any onto the canvas.
+          </div>
+          <div className="palette-folder-content">
+            {savedBlocks
+              .filter((b) => !query || b.name.toLowerCase().includes(query))
+              .map((block) => (
+                <div key={block.filename} className="palette-item palette-saved-block">
+                  <div
+                    className="palette-saved-block-drag"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/nodetorch-block', block.filename);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                  >
+                    <span className="palette-item-name">{block.name}</span>
+                    <span className="palette-item-desc">{block.description}</span>
+                  </div>
+                  {!block.preset && <button
+                    className="palette-saved-block-delete"
+                    onClick={() => onDeleteBlock(block.filename)}
+                    title="Delete block"
+                  >
+                    &times;
+                  </button>}
+                </div>
+              ))}
+          </div>
+        </>
+      )}
 
-          {/* Saved blocks */}
-          {savedBlocks.length > 0 && (!query || savedBlocks.some((b) => b.name.toLowerCase().includes(query))) && (
-            <>
-              <div className="palette-folder palette-folder-root">
-                Saved Blocks
-              </div>
-              <div className="palette-folder-content">
-                {savedBlocks
-                  .filter((b) => !query || b.name.toLowerCase().includes(query))
-                  .map((block) => (
-                    <div key={block.filename} className="palette-item palette-saved-block">
-                      <div
-                        className="palette-saved-block-drag"
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('application/nodetorch-block', block.filename);
-                          e.dataTransfer.effectAllowed = 'move';
-                        }}
-                      >
-                        <span className="palette-item-name">{block.name}</span>
-                        <span className="palette-item-desc">{block.description}</span>
-                      </div>
-                      {!block.preset && <button
-                        className="palette-saved-block-delete"
-                        onClick={() => onDeleteBlock(block.filename)}
-                        title="Delete block"
-                      >
-                        &times;
-                      </button>}
-                    </div>
-                  ))}
-              </div>
-            </>
-          )}
-
-          {filteredDefs.length === 0 && savedBlocks.length === 0 && (
-            <div className="palette-empty">No matching nodes</div>
-          )}
-        </div>
+      {filteredDefs.length === 0 && savedBlocks.length === 0 && (
+        <div className="palette-empty">No matching nodes</div>
       )}
     </div>
   );

@@ -6,15 +6,14 @@ import { useMemo, useEffect, useCallback, useState, useRef, type DragEvent } fro
 import { initDomain } from './domain';
 import { useGraph } from './ui/useGraph';
 import { EngineNode, DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './ui/EngineNode';
-import { PropertyInspector } from './ui/inspector/PropertyInspector';
-import { NodePalette } from './ui/NodePalette';
+import { LeftRail } from './ui/sidebar/LeftRail';
+import { ChatRail } from './ui/chat/ChatRail';
 import { Toolbar } from './ui/Toolbar';
 import { TrainingDashboard, type ModelLayerInfo } from './ui/dashboard/TrainingDashboard';
 import { StepThroughPanel } from './ui/step-through/StepThroughPanel';
 import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
 import { createNode as cn, addNode as an, createEdge as ce, addEdge as ae } from './core/graph';
-import { Sun, Moon } from 'lucide-react';
 import { TutorialPanel, tutorialEvent } from './ui/tutorial/TutorialPanel';
 
 const categoryColors: Record<string, string> = {
@@ -82,14 +81,6 @@ export default function App() {
   const [stepThroughOpen, setStepThroughOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const saved = localStorage.getItem('nodetorch-theme');
-    return (saved === 'light') ? 'light' : 'dark';
-  });
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('nodetorch-theme', theme);
-  }, [theme]);
 
   // Only the Train button opens the dashboard automatically.
   const isTraining = graph.trainingActive;
@@ -390,7 +381,8 @@ export default function App() {
     <GraphActionsCtx.Provider value={graphActions}>
     <VizCtx.Provider value={vizCtx}>
     <BackpropCtx.Provider value={graph.backpropAnim}>
-      <div ref={reactFlowWrapper} style={{ width: '100vw', height: '100vh' }}>
+      <div className="app-shell">
+        <div ref={reactFlowWrapper} className="canvas-area">
         <RF.ReactFlow
           nodes={graph.rfNodes}
           edges={graph.rfEdges}
@@ -414,11 +406,14 @@ export default function App() {
           defaultEdgeOptions={{ animated: true }}
         >
           <RF.Background />
-          <RF.Panel position="bottom-right" className="bottom-panel">
+          {/* Minimap + controls, bottom-left of the page (same 300px width as
+              the floating left rail above). */}
+          <RF.Panel position="bottom-left" className="bottom-panel">
             <RF.MiniMap
               className="minimap-themed"
               pannable
               zoomable
+              style={{ width: 180, height: 108, margin: 0 }}
               maskColor="rgba(17, 17, 27, 0.7)"
               nodeColor={(node) => {
                 const inst = graph.graph.nodes.get(node.id);
@@ -429,20 +424,10 @@ export default function App() {
               }}
             />
             <RF.Controls
-              orientation="horizontal"
+              orientation="vertical"
               showInteractive={false}
               className="controls-themed"
-              position="bottom-right"
             />
-          </RF.Panel>
-          <RF.Panel position="bottom-left">
-            <button
-              className="theme-toggle"
-              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
           </RF.Panel>
         </RF.ReactFlow>
         {graph.connectionError && (
@@ -457,18 +442,16 @@ export default function App() {
           onChange={graph.handleWeightsFile}
         />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
-        <TutorialPanel />
-        <NodePalette
+        <LeftRail
           savedBlocks={graph.savedBlocks}
           onDeleteBlock={graph.deleteBlock}
-        />
-        <PropertyInspector
           node={selectedNode}
           selectedCount={selectedNodeIds.length}
           onPropertyChange={graph.updateProperty}
           onSaveBlock={graph.saveBlock}
           graphJson={graph.saveGraph()}
         />
+        <TutorialPanel />
         <TrainingDashboard
           progress={graph.trainingProgress}
           isTraining={isTraining}
@@ -487,6 +470,8 @@ export default function App() {
           onClose={() => setStepThroughOpen(false)}
         />
         <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        <ChatRail />
+        </div>
       </div>
     </BackpropCtx.Provider>
     </VizCtx.Provider>

@@ -11,14 +11,14 @@ import math
 import torch
 from tqdm import tqdm
 
-from graph_builder import (
+from engine.graph_builder import (
     get_device,
     _safe_float,
     OPTIMIZER_NODES,
     ALL_LOSS_NODES,
 )
-from data_loaders import get_shakespeare_vocab, LM_DATASET_TYPES
-from forward_utils import run_forward_pass
+from dataprep.data_loaders import get_shakespeare_vocab, LM_DATASET_TYPES
+from engine.forward_utils import run_forward_pass
 
 from .base import (
     TrainingContext,

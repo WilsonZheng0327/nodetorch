@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import pytest
 
-from node_builders import NODE_BUILDERS
+from engine.node_builders import NODE_BUILDERS
 
 
 class TestConv2d:

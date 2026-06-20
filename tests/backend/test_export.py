@@ -9,7 +9,7 @@ import glob
 import os
 import pytest
 
-from export_python import export_to_python
+from export import export_to_python
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ class TestHelperClassInjection:
         graph = _make_graph(
             nodes=[
                 _n("data", "data.imdb", {"batchSize": 32, "maxLen": 256, "vocabSize": 10000}),
-                _n("tok", "ml.preprocessing.tokenizer", {"mode": "word", "vocabSize": 10000, "maxLen": 128}),
+                _n("tok", "ml.preprocessing.tokenizer_word", {"vocabSize": 10000, "maxLen": 128}),
                 _n("embed", "ml.layers.embedding", {"numEmbeddings": 10000, "embeddingDim": 64}),
                 _n("pool", "ml.structural.sequence_pool", {"mode": "mean"}),
                 _n("fc", "ml.layers.linear", {"outFeatures": 2}),

@@ -32,19 +32,19 @@ import asyncio
 import threading
 import logging
 
-from graph_builder import execute_graph, train_graph, infer_graph, evaluate_test_set, get_layer_detail, get_device_name, set_device, save_model, load_model, save_model_bytes, load_model_bytes
-from export_python import export_to_python
-from step_through import run_step_through
-from activation_max import activation_maximization
-from backprop_sim import simulate_backprop, run_backward_step_through
-from loss_landscape import compute_loss_landscape
-from latent_viz import generate_latent_grid
-from denoise_viz import run_denoise_step_through
-from gan_generate import generate_gan_images
-from text_generate import generate_text
-from tokenizer_preview import preview_tokenizer
-from runs_store import list_runs, load_run, delete_run
-from data_loaders import DATASET_DETAILS, augmentation_preview
+from engine.graph_builder import execute_graph, train_graph, infer_graph, evaluate_test_set, get_layer_detail, get_device_name, set_device, save_model, load_model, save_model_bytes, load_model_bytes
+from export import export_to_python
+from visualize.step_through import run_step_through
+from visualize.activation_max import activation_maximization
+from visualize.backprop_sim import simulate_backprop, run_backward_step_through
+from visualize.loss_landscape import compute_loss_landscape
+from visualize.latent_viz import generate_latent_grid
+from visualize.denoise_viz import run_denoise_step_through
+from generate.gan_generate import generate_gan_images
+from generate.text_generate import generate_text
+from dataprep.tokenizer_preview import preview_tokenizer
+from persistence.runs_store import list_runs, load_run, delete_run
+from dataprep.data_loaders import DATASET_DETAILS, augmentation_preview
 import os
 from pathlib import Path
 

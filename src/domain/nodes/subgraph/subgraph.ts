@@ -10,7 +10,7 @@ export const subgraphNode: NodeDefinition = {
   version: 1,
   displayName: 'Custom Block',
   description: 'A reusable block containing a subgraph',
-  category: ['Block'],
+  category: ['Custom Block'],
   color: '#f97316',
 
   getProperties: () => [

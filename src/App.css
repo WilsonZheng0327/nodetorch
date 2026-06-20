@@ -1,10 +1,43 @@
-/* --- Bottom Panel (Controls + MiniMap) --- */
+/* --- App shell: [LeftRail | canvas | ChatRail] --- */
+
+.app-shell {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Canvas fills the space between the two rails. position:relative so the
+   floating overlays (toolbar, breadcrumb, dashboard, minimap) anchor to the
+   canvas region rather than the full viewport. */
+.canvas-area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+/* --- Bottom Panel (MiniMap + Controls), bottom-left --- */
 
 .bottom-panel {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
   align-items: flex-end;
+}
+
+/* The MiniMap and Controls are React Flow panels with their own absolute
+   positioning (MiniMap defaults to bottom-right, which would push it off the
+   left edge here). Force them into normal flow so they stack inside this
+   bottom-left panel instead. */
+.bottom-panel .react-flow__minimap,
+.bottom-panel .react-flow__controls {
+  position: relative !important;
+  margin: 0 !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
 }
 
 /* Controls — override React Flow's default absolute positioning
@@ -87,26 +120,6 @@
 
 [data-theme="light"] .connection-error-toast {
   background: rgba(210, 15, 57, 0.9);
-}
-
-/* Theme toggle */
-.theme-toggle {
-  background: var(--bg-surface, #1e1e2e);
-  border: 1px solid var(--border, #45475a);
-  border-radius: 8px;
-  color: var(--text-muted, #a6adc8);
-  font-size: 16px;
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.theme-toggle:hover {
-  background: var(--bg-overlay, #313244);
-  color: var(--text, #cdd6f4);
 }
 
 /* Connection rejection toast */

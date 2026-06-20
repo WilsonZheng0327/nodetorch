@@ -1,94 +1,9 @@
-.palette {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-}
-
-.palette-toggle {
-  padding: 8px 12px;
-  background: #1e1e2e;
-  border: 1px solid #45475a;
-  border-radius: 10px;
-  color: #a6adc8;
-  cursor: pointer;
-  font-size: 13px;
-  font-family: 'Inter', system-ui, sans-serif;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  outline: none;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.palette-toggle-title {
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.2px;
-}
-
-.palette-toggle-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1;
-  color: #89b4fa;
-  flex-shrink: 0;
-}
-
-.palette-toggle:hover {
-  background: #313244;
-  color: #cdd6f4;
-  border-color: #89b4fa;
-}
-
-.palette-toggle:hover .palette-toggle-icon {
-  color: #cdd6f4;
-}
-
-.palette-toggle-hint {
-  font-size: 11px;
-  color: #585b70;
-  margin-left: auto;
-}
-
+/* Palette content fills the LeftRail body; the rail owns chrome + scroll. */
 .palette-content {
-  margin-top: 6px;
-  width: 280px;
-  max-height: calc(100vh - 70px);
-  overflow-y: auto;
-  background: #1e1e2e;
-  border: 1px solid #45475a;
-  border-radius: 10px;
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 13px;
-  color: #cdd6f4;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  color: var(--text, #cdd6f4);
   padding: 6px;
-}
-
-.palette-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.palette-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.palette-content::-webkit-scrollbar-thumb {
-  background: #45475a;
-  border-radius: 3px;
-}
-
-.palette-content::-webkit-scrollbar-thumb:hover {
-  background: #6c7086;
 }
 
 .palette-search {
@@ -147,7 +62,7 @@
 }
 
 .palette-folder-root {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -164,6 +79,21 @@
 .palette-folder-root:hover {
   background: none;
   color: #a6adc8;
+}
+
+/* One-line explanation under a top-level category / the Saved Blocks header */
+.palette-folder-desc {
+  padding: 0 10px 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #7f849c;
+}
+
+/* Divider above the Saved Blocks section */
+.palette-divider {
+  height: 1px;
+  margin: 12px 8px 8px;
+  background: #45475a;
 }
 
 .palette-folder-icon {

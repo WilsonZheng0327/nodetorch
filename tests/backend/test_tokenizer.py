@@ -8,22 +8,34 @@ import torch
 import torch.nn as nn
 import pytest
 
-from node_builders import NODE_BUILDERS, TokenizerModule
+from engine.node_builders import NODE_BUILDERS, TokenizerModule
+
+
+# The tokenizer node is split into char/word/BPE variants, all sharing one builder.
+TOKENIZER_TYPES = [
+    "ml.preprocessing.tokenizer_char",
+    "ml.preprocessing.tokenizer_word",
+    "ml.preprocessing.tokenizer_bpe",
+]
 
 
 class TestTokenizerBuilder:
-    def test_registered_in_builders(self):
-        assert "ml.preprocessing.tokenizer" in NODE_BUILDERS
+    @pytest.mark.parametrize("node_type", TOKENIZER_TYPES)
+    def test_registered_in_builders(self, node_type):
+        assert node_type in NODE_BUILDERS
 
-    def test_returns_module(self):
+    @pytest.mark.parametrize("node_type", TOKENIZER_TYPES)
+    def test_returns_module(self, node_type):
         props = {"vocabSize": 100, "maxLen": 32}
-        module = NODE_BUILDERS["ml.preprocessing.tokenizer"](props, {})
+        module = NODE_BUILDERS[node_type](props, {})
         assert isinstance(module, nn.Module)
 
     def test_default_props(self):
-        module = NODE_BUILDERS["ml.preprocessing.tokenizer"]({}, {})
+        # Char/word/BPE share build_tokenizer; vocab defaults to an effectively
+        # uncapped value (corpus-determined), max_len to 256.
+        module = NODE_BUILDERS["ml.preprocessing.tokenizer_word"]({}, {})
         assert isinstance(module, TokenizerModule)
-        assert module.vocab_size == 10000
+        assert module.vocab_size == 1_000_000
         assert module.max_len == 256
 
 

@@ -22,7 +22,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from graph_builder import (
+from engine.graph_builder import (
     get_device,
     _safe_float,
     GAN_NOISE_TYPE,
@@ -31,7 +31,7 @@ from graph_builder import (
     SubGraphModule,
     gather_inputs,
 )
-from forward_utils import run_forward_pass
+from engine.forward_utils import run_forward_pass
 
 from .base import (
     TrainingContext,
@@ -152,7 +152,7 @@ def _find_gan_components(ctx: TrainingContext) -> dict:
     # Build the generator execution order (nodes between noise and gen block output)
     # Only include nodes that are: (a) the noise input or downstream of it, and
     # (b) NOT the discriminator, loss, or optimizer nodes.
-    from graph_builder import OPTIMIZER_NODES
+    from engine.graph_builder import OPTIMIZER_NODES
     gen_order = []
     for nid in ctx.order:
         ntype = nodes[nid]["type"]

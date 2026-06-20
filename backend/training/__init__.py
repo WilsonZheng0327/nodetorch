@@ -17,7 +17,7 @@ from .standard import standard_train
 from .gan import gan_train
 from .diffusion import diffusion_train
 from .autoregressive import autoregressive_train
-from data_loaders import LM_DATASET_TYPES
+from dataprep.data_loaders import LM_DATASET_TYPES
 
 TRAINING_LOOPS: dict[str, callable] = {
     "standard": standard_train,

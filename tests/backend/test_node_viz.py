@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import pytest
 
-from node_viz import (
+from visualize.node_viz import (
     FORWARD_VIZ,
     get_forward_viz,
     get_backward_viz,

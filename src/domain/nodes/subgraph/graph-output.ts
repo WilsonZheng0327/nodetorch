@@ -6,9 +6,9 @@ import type { NodeDefinition } from '../../../core/nodedef';
 export const graphOutputNode: NodeDefinition = {
   type: 'subgraph.output',
   version: 1,
-  displayName: 'Block Output',
+  displayName: 'Custom Block Output',
   description: 'Data leaving this custom block to outside. Place inside a Custom Block to define its output ports.',
-  category: ['Block'],
+  category: ['Custom Block'],
   color: '#8b5cf6',
 
   getProperties: () => [

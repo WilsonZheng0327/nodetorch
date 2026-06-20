@@ -30,7 +30,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from graph_builder import (
+from engine.graph_builder import (
     get_device,
     _safe_float,
     OPTIMIZER_NODES,
@@ -39,7 +39,7 @@ from graph_builder import (
     DIFFUSION_EMBED_TYPE,
     gather_inputs,
 )
-from forward_utils import run_forward_pass
+from engine.forward_utils import run_forward_pass
 
 from .base import (
     TrainingContext,
@@ -157,7 +157,7 @@ def _sample(model_modules, model_order, nodes, edges, scheduler, shape, device, 
             if scheduler_nid:
                 batch_results[scheduler_nid] = {"out": x, "noise": torch.zeros(shape, device=device), "timestep": t_channel}
 
-            from forward_utils import execute_node
+            from engine.forward_utils import execute_node
             for nid in model_order:
                 mod = model_modules.get(nid)
                 if mod is None:
@@ -313,7 +313,7 @@ def diffusion_train(ctx: TrainingContext) -> TrainingResult:
                         scheduler_module, sample_shape, dev,
                     )
                     if sample_images is not None:
-                        from data_loaders import DENORMALIZERS
+                        from dataprep.data_loaders import DENORMALIZERS
                         denorm = DENORMALIZERS.get(ctx.dataset_type)
                         generated_samples = []
                         for i in range(min(8, sample_images.size(0))):

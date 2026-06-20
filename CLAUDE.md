@@ -43,7 +43,7 @@ Layer 2: Type System → src/core/datatypes.ts
 Layer 1: Graph Core  → src/core/graph.ts
 ```
 
-Backend mirrors the engine: `backend/graph_builder.py` does the same topological walk but with real PyTorch tensors.
+Backend mirrors the engine: `backend/engine/graph_builder/` does the same topological walk but with real PyTorch tensors.
 
 ### Key files
 
@@ -56,19 +56,19 @@ Backend mirrors the engine: `backend/graph_builder.py` does the same topological
 - `src/ui/EngineNode.tsx` — generic node renderer (reads NodeDefinition + lastResult.metadata)
 - `src/ui/step-through/` — forward + backward step-through UI (StepThroughPanel, StageDetail, ExtraPanels)
 - `src/ui/dashboard/TrainingDashboard.tsx` — training dashboard with charts, metrics, system info
-- `backend/graph_builder.py` — graph→PyTorch execution, inference, model store
-- `backend/node_builders.py` — per-node-type `nn.Module` builder functions
-- `backend/node_viz.py` — per-node-type visualization registry (forward + backward step-through)
-- `backend/data_loaders.py` — per-dataset loader functions
+Backend is organized into packages by concern (all importable with `pythonpath = backend`):
+
+- `backend/engine/` — execution engine (ML-agnostic graph→PyTorch core)
+  - `engine/graph_builder/` — graph→PyTorch execution, split into submodules: `constants` (node-type sets), `_state` (device + in-memory model store, shared mutable state), `stats` (tensor/param statistics), `build` (topo sort, input routing, module/subgraph construction), `forward` (single forward pass), `detail` (per-node inspector viz), `inference` (infer + test-set eval + tracked-sample helpers). The package `__init__.py` re-exports the full public API, so `from engine.graph_builder import X` is unchanged.
+  - `engine/node_builders.py` — per-node-type `nn.Module` builder functions
+  - `engine/forward_utils.py` — shared single-node / forward-pass execution helpers
+- `backend/dataprep/` — `data_loaders.py` (per-dataset loaders), `bpe.py` (BPE tokenizer, cached per dataset+vocab), `tokenizer_preview.py`. Named `dataprep` (not `datasets`) to avoid shadowing the HuggingFace `datasets` library.
+- `backend/visualize/` — feature-level visualizations: `node_viz.py` (aggregates per-layer viz into `FORWARD_VIZ`/`BACKWARD_VIZ` registries), `step_through.py` (forward step-through), `backprop_sim.py` (backward step-through), `denoise_viz.py` (diffusion denoising), `latent_viz.py` (VAE latent grid), `activation_max.py`, `loss_landscape.py`
+  - `visualize/layers/` — per-layer viz functions, one file per layer family (conv, linear, activation, norm, pool, etc.)
+- `backend/generate/` — `text_generate.py` (autoregressive char/BPE generation), `gan_generate.py` (GAN image generation on demand)
+- `backend/export/` — generates standalone runnable PyTorch training scripts from graphs; entry point `from export import export_to_python`. Split into `templates`, `helpers`, `layers`, `model`, `training_loops`, `datasets`, `exporter`.
+- `backend/persistence/` — `runs_store.py` (training-run persistence)
 - `backend/training/` — training loop plugin system (standard, GAN, diffusion, autoregressive)
-- `backend/bpe.py` — BPE tokenizer (learn merges from corpus, encode/decode, cached per dataset+vocab)
-- `backend/text_generate.py` — autoregressive text generation (char-level and BPE, temperature/top-k sampling)
-- `backend/step_through.py` — forward step-through orchestration (uses node_viz.py for viz)
-- `backend/backprop_sim.py` — backward step-through + simple backprop animation
-- `backend/denoise_viz.py` — diffusion denoising step-through visualization
-- `backend/gan_generate.py` — GAN image generation on demand
-- `backend/latent_viz.py` — VAE latent space grid visualization
-- `backend/export_python.py` — generates standalone runnable PyTorch training scripts from graphs
 - `src/ui/tutorial/` — guided tutorial system (goal-based tasks with auto-detection)
 - `model-presets/` — shipped preset graph JSON files, served via `GET /presets` endpoint
 
@@ -105,17 +105,17 @@ See `docs/training-plugins.md` for the full architecture documentation.
 The `ml.preprocessing.tokenizer` node sits between data and embedding. Three modes:
 - **character** — each character is a token (default for Shakespeare, vocab ~65)
 - **word** — split on whitespace/punctuation, frequency-based vocab (default for IMDb/AG News)
-- **bpe** — Byte-Pair Encoding learned from the dataset (`backend/bpe.py`). BPE merges are cached per (dataset, vocab_size) so training only happens once (~5s on Shakespeare).
+- **bpe** — Byte-Pair Encoding learned from the dataset (`backend/dataprep/bpe.py`). BPE merges are cached per (dataset, vocab_size) so training only happens once (~5s on Shakespeare).
 
 During training, `build_training_context()` detects the tokenizer node's mode. If BPE, it learns merges from the corpus and creates a BPE-encoded dataset. During text generation, `text_generate.py` detects the mode and uses the matching encode/decode functions.
 
 ### Adding a new node type
 
 1. **Frontend**: create file in `src/domain/nodes/<category>/`, export a `NodeDefinition`, add to that folder's `index.ts` array. If it's a new category (like `preprocessing/`), also import in `src/domain/index.ts`.
-2. **Backend builder**: add builder function to `backend/node_builders.py` (layers) or `backend/data_loaders.py` (datasets). Loss nodes also need `LOSS_NODES` in `graph_builder.py`.
-3. **Backend viz**: add forward/backward viz functions to `backend/node_viz.py` registries (`FORWARD_VIZ`, `BACKWARD_VIZ`). Optional — default fallback provides basic shape-based viz.
+2. **Backend builder**: add builder function to `backend/engine/node_builders.py` (layers) or `backend/dataprep/data_loaders.py` (datasets). Loss nodes also need `LOSS_NODES` in `backend/engine/graph_builder/constants.py`.
+3. **Backend viz**: create or edit a file in `backend/visualize/layers/` with the forward/backward viz function, then register it in `backend/visualize/node_viz.py`'s `FORWARD_VIZ` / `BACKWARD_VIZ` registries. Optional — default fallback provides basic shape-based viz.
 
-Additional design docs live in `docs/`: `shape-inference.md`, `training-flow.md`, `training-plugins.md`, `visualization.md`, `multi-output-nodes.md`, `custom-blocks.md`, `copy-paste.md`, `undo-redo.md`.
+Additional design docs live in `docs/`: `backend-architecture.md` (backend overview + "what happens when you press Train" walkthrough), `shape-inference.md`, `training-flow.md`, `training-plugins.md`, `visualization.md`, `multi-output-nodes.md`, `custom-blocks.md`, `copy-paste.md`, `undo-redo.md`.
 
 ### Node metadata convention
 

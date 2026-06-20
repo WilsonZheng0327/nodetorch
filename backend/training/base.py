@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.utils.data
 
-from graph_builder import (
+from engine.graph_builder import (
     build_and_run_graph,
     topological_sort,
     gather_inputs,
@@ -38,9 +38,9 @@ from graph_builder import (
     _probe_tracked_samples,
     _collect_misclassifications,
 )
-from data_loaders import DATA_LOADERS, TRAIN_DATASETS, CLASS_NAMES, get_raw_texts, BPETextDataset, BPELMDataset
-from bpe import get_bpe_tokenizer
-from forward_utils import run_forward_pass
+from dataprep.data_loaders import DATA_LOADERS, TRAIN_DATASETS, CLASS_NAMES, get_raw_texts, BPETextDataset, BPELMDataset
+from dataprep.bpe import get_bpe_tokenizer
+from engine.forward_utils import run_forward_pass
 
 
 # ============================================================================
@@ -292,7 +292,7 @@ def load_bpe_dataset(dataset_type, data_node, optimizer_props, batch_size, token
     )
     logger.info(f"BPE ready: {bpe.vocab_size} tokens, {len(bpe.merges)} merges")
 
-    from data_loaders import LM_DATASET_TYPES
+    from dataprep.data_loaders import LM_DATASET_TYPES
     if dataset_type in LM_DATASET_TYPES:
         seq_len = data_node.get("properties", {}).get("seqLen", 128)
         train_dataset = BPELMDataset(raw_text, bpe, seq_len=seq_len)
@@ -545,7 +545,7 @@ def build_epoch_result(epoch, ctx, avg_loss, accuracy, val_loss, val_accuracy,
 
 def run_final_forward(ctx, modules):
     """Post-training forward pass to get display metadata for each node."""
-    from graph_builder import MULTI_INPUT_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE
+    from engine.graph_builder import MULTI_INPUT_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE
 
     final_results: dict = {}
     node_results: dict = {}
@@ -681,7 +681,7 @@ def save_training_results(ctx: TrainingContext, result: TrainingResult) -> dict:
 
     # Save run to disk
     try:
-        from runs_store import build_run_record, save_run
+        from persistence.runs_store import build_run_record, save_run
         record = build_run_record(
             graph_data=ctx.graph_data,
             epoch_results=result.epoch_results,

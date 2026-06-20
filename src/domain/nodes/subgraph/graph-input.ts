@@ -6,9 +6,9 @@ import type { NodeDefinition } from '../../../core/nodedef';
 export const graphInputNode: NodeDefinition = {
   type: 'subgraph.input',
   version: 1,
-  displayName: 'Block Input',
+  displayName: 'Custom Block Input',
   description: 'Data entering this custom block from outside. Place inside a Custom Block to define its input ports.',
-  category: ['Block'],
+  category: ['Custom Block'],
   color: '#f59e0b',
 
   getProperties: () => [

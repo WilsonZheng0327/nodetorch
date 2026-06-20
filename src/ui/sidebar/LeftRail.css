@@ -1,0 +1,128 @@
+/* Floating card, top-left over the canvas. Leaves room at the bottom-left for
+   the minimap (which sits below it at the same 300px width). */
+.left-rail {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  width: 300px;
+  max-height: calc(100vh - 270px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-surface, #1e1e2e);
+  border: 1px solid var(--border, #45475a);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Tab header — fixed height so it matches the collapsed handle (no jump). */
+.left-rail-tabs {
+  height: 36px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--border, #45475a);
+}
+
+.left-rail-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-faint, #6c7086);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.left-rail-tab:hover {
+  color: var(--text-muted, #a6adc8);
+}
+
+.left-rail-tab-active {
+  color: var(--text, #cdd6f4);
+  border-bottom-color: var(--accent, #89b4fa);
+}
+
+.left-rail-collapse {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  background: none;
+  border: none;
+  color: var(--text-faint, #6c7086);
+  cursor: pointer;
+  outline: none;
+}
+
+.left-rail-collapse:hover {
+  color: var(--text, #cdd6f4);
+}
+
+/* Scrollable body */
+.left-rail-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border, #45475a) transparent;
+}
+
+.left-rail-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.left-rail-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.left-rail-body::-webkit-scrollbar-thumb {
+  background: var(--border, #45475a);
+  border-radius: 3px;
+}
+
+.left-rail-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint, #6c7086);
+}
+
+/* Collapsed handle */
+.left-rail-handle {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  height: 36px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--bg-surface, #1e1e2e);
+  border: 1px solid var(--border, #45475a);
+  border-radius: 10px;
+  color: var(--text-muted, #a6adc8);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  outline: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.left-rail-handle:hover {
+  background: var(--bg-overlay, #313244);
+  border-color: var(--accent, #89b4fa);
+  color: var(--text, #cdd6f4);
+}
