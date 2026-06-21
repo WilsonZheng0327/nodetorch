@@ -18,6 +18,7 @@ const SHORTCUTS: { category: string; items: Shortcut[] }[] = [
     category: 'Canvas',
     items: [
       { keys: 'Tab', description: 'Toggle node palette' },
+      { keys: 'E', description: 'Toggle AI assistant' },
       { keys: 'W / A / S / D', description: 'Pan camera (also arrow keys)' },
       { keys: 'Shift + Arrow / WASD', description: 'Pan camera fast' },
       { keys: 'Scroll', description: 'Zoom in / out' },

@@ -21,6 +21,8 @@ interface Options {
   getGraph: () => unknown;
   /** The node catalog (sent once per connection). */
   catalog: NodeCatalog;
+  /** Saved blocks/presets the agent can add (sent once per connection). */
+  blocks: { filename: string; name: string; description: string }[];
   /** Apply a tool call to the graph; returns an observation string. */
   executeTool: (name: string, args: Record<string, unknown>) => Promise<string>;
   /** Group this turn's edits into a single undo step. */
@@ -43,6 +45,12 @@ function describeTool(name: string, args: Record<string, unknown>): string {
       return `connect ${args.sourceId}.${args.sourcePort} → ${args.targetId}.${args.targetPort}`;
     case 'remove_node':
       return `remove ${args.nodeId}`;
+    case 'enter_block':
+      return `enter block ${args.nodeId}`;
+    case 'exit_block':
+      return 'exit block';
+    case 'save_block':
+      return `save block ${args.nodeId}`;
     default:
       return name;
   }
@@ -162,6 +170,7 @@ export function useAgentChat(opts: Options) {
         };
         if (!catalogSentRef.current) {
           payload.catalog = optsRef.current.catalog;
+          payload.blocks = optsRef.current.blocks;
           catalogSentRef.current = true;
         }
         ws.send(JSON.stringify(payload));

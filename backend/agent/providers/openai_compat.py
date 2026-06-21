@@ -98,17 +98,23 @@ class OpenAICompatProvider(LLMProvider):
         opts = self.config.options or {}
         nudges_left = 2  # corrective retries for malformed tool calls
 
+        turn_prompt = 0
+        turn_completion = 0
         try:
             while True:
-                kwargs: dict = {"model": self.config.model, "messages": convo, "stream": True}
+                kwargs: dict = {
+                    "model": self.config.model,
+                    "messages": convo,
+                    "stream": True,
+                    "stream_options": {"include_usage": True},  # report token usage per request
+                }
                 if oa_tools:
                     kwargs["tools"] = oa_tools
-                    # Force one tool call at a time so the model sees each result
-                    # before the next — e.g. add_node's returned id before connect.
-                    # Avoids guessed ids / duplicate nodes from parallel calls.
-                    kwargs["parallel_tool_calls"] = False
-                # Default to temperature 0: weaker models (e.g. Llama on Groq) are
-                # far more reliable at tool selection deterministically. Overridable.
+                    # Parallel tool calls are allowed (the model names new nodes via
+                    # add_node's `id`, so it can add + connect in one response — far
+                    # fewer round-trips than one call per request).
+                # Default to temperature 0: weaker models are far more reliable at
+                # tool selection deterministically. Overridable via options.
                 temp = opts.get("temperature")
                 kwargs["temperature"] = temp if isinstance(temp, (int, float)) else 0
                 if isinstance(opts.get("max_tokens"), int):
@@ -122,9 +128,12 @@ class OpenAICompatProvider(LLMProvider):
 
                 text_parts: list[str] = []
                 calls: dict[int, dict] = {}  # index -> {id, name, args}
+                usage = None
                 try:
                     stream = await client.chat.completions.create(**kwargs)
                     async for chunk in stream:
+                        if getattr(chunk, "usage", None):
+                            usage = chunk.usage  # final usage-only chunk (empty choices)
                         if not chunk.choices:
                             continue
                         delta = chunk.choices[0].delta
@@ -140,6 +149,13 @@ class OpenAICompatProvider(LLMProvider):
                                     slot["name"] = tc.function.name
                                 if tc.function.arguments:
                                     slot["args"] += tc.function.arguments
+                    if usage:
+                        turn_prompt += usage.prompt_tokens or 0
+                        turn_completion += usage.completion_tokens or 0
+                        logger.info(
+                            "  📊 tokens +%s in / +%s out  (turn total: %d in / %d out)",
+                            usage.prompt_tokens, usage.completion_tokens, turn_prompt, turn_completion,
+                        )
                 except OpenAIError as e:
                     # Some providers (e.g. Groq + Llama) reject a malformed tool call
                     # server-side. Nudge the model to re-issue a clean call and retry.

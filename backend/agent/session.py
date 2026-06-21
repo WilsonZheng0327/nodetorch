@@ -17,6 +17,7 @@ class AgentSession:
     session_id: str
     history: list[dict] = field(default_factory=list)  # [{"role","content"}]
     catalog_text: str = ""
+    blocks_text: str = ""
 
     def add_user(self, content: str) -> None:
         self.history.append({"role": "user", "content": content})

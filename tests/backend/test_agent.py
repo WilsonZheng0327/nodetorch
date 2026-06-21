@@ -92,7 +92,12 @@ def test_summarize_graph_forms():
 
 def test_graph_tools_defined():
     names = {t.name for t in GRAPH_TOOLS}
-    assert names == {"set_node_property", "add_node", "connect", "remove_node"}
+    assert names == {
+        "set_node_property", "add_node", "connect", "remove_node", "remove_edge",
+        "clear_graph", "organize_layout", "add_block",
+        "enter_block", "exit_block", "save_block",
+        "get_graph", "get_node", "validate",
+    }
     for t in GRAPH_TOOLS:
         assert t.parameters["type"] == "object"  # valid JSON-schema shape
 
@@ -223,3 +228,103 @@ def test_run_turn_tool_loop(monkeypatch):
     )
     assert calls == [("set_node_property", {"nodeId": "c1", "key": "outChannels", "value": 64})]
     assert "ok: set c1.outChannels=64" in answer
+
+
+def _run_build_turn(monkeypatch, *, build_calls, validate_results, repair_calls=None):
+    """Run a turn whose stub provider builds, then auto-repairs, returning (calls, answer).
+
+    The stub runs `build_calls` on its first invocation and `repair_calls` on each
+    later (repair-round) invocation. `validate_results` is a list of strings the
+    successive validate() calls return (the last one repeats if exhausted), so a
+    test can simulate "fails, then passes". execute_tool records every call.
+    """
+    runs = {"n": 0}
+
+    class StubBuild(LLMProvider):
+        name = "stub-build"
+
+        async def run(self, *, system, messages, on_text, tools=None, execute_tool=None):
+            runs["n"] += 1
+            calls_this_round = build_calls if runs["n"] == 1 else (repair_calls or [])
+            await on_text("…")
+            for name, args in calls_this_round:
+                await execute_tool(name, args)
+
+    register("stub-build", StubBuild, label="stub", fields=[])
+    monkeypatch.setattr(agent_mod, "load_config", lambda: AgentConfig(provider="stub-build", model="x"))
+
+    reset_session("b")
+    catalog = [{"type": "ml.layers.conv2d", "displayName": "Conv2d", "category": ["ML"], "properties": [], "ports": []}]
+    graph = {"version": "1.0", "graph": {"nodes": [], "edges": []}}
+
+    calls: list = []
+    vresults = iter(validate_results)
+
+    async def on_text(_t):
+        pass
+
+    async def execute_tool(name, args):
+        calls.append((name, args))
+        if name == "validate":
+            return next(vresults, validate_results[-1])
+        return f"ok: {name}"
+
+    answer = asyncio.run(
+        agent_mod.run_turn(
+            session_id="b", message="build a conv", graph=graph, catalog=catalog,
+            on_text=on_text, execute_tool=execute_tool,
+        )
+    )
+    return calls, answer
+
+
+def test_finish_pass_validates_then_tidies_after_a_clean_build(monkeypatch):
+    """A constructive turn that validates clean ends with validate then organize_layout."""
+    calls, answer = _run_build_turn(
+        monkeypatch,
+        build_calls=[("add_node", {"type": "ml.layers.conv2d", "id": "c2"})],
+        validate_results=["ok: no forward validation issues"],
+    )
+    names = [n for n, _ in calls]
+    assert names == ["add_node", "validate", "organize_layout"]
+    assert ("validate", {"mode": "forward"}) in calls
+    assert "⚠️" not in answer  # clean validation → no warning, no repair round
+
+
+def test_finish_pass_auto_repairs_then_converges(monkeypatch):
+    """A failing validation is fed back; the repair round fixes it and no warning shows."""
+    calls, answer = _run_build_turn(
+        monkeypatch,
+        build_calls=[("add_node", {"type": "ml.layers.conv2d", "id": "c2"})],
+        validate_results=["1 forward issue(s):\n- c2: input not connected", "ok: clean"],
+        repair_calls=[("connect", {"sourceId": "d", "sourcePort": "out", "targetId": "c2", "targetPort": "in"})],
+    )
+    names = [n for n, _ in calls]
+    # build → validate(fail) → repair connect → validate(ok) → organize
+    assert names == ["add_node", "validate", "connect", "validate", "organize_layout"]
+    assert "⚠️" not in answer  # converged within the budget
+
+
+def test_finish_pass_gives_up_after_repair_budget_and_reports(monkeypatch):
+    """If repairs never fix it, stop after _MAX_REPAIR_ROUNDS and surface the issue."""
+    calls, answer = _run_build_turn(
+        monkeypatch,
+        build_calls=[("connect", {"sourceId": "a", "sourcePort": "out", "targetId": "b", "targetPort": "in"})],
+        validate_results=["1 forward issue(s):\n- c2: input not connected"],  # always fails
+        repair_calls=[("get_node", {"nodeId": "c2"})],  # model tries but can't fix
+    )
+    # One initial validate + one per repair round = 1 + _MAX_REPAIR_ROUNDS validates.
+    assert [n for n, _ in calls].count("validate") == 1 + agent_mod._MAX_REPAIR_ROUNDS
+    assert [n for n, _ in calls].count("get_node") == agent_mod._MAX_REPAIR_ROUNDS
+    assert "⚠️" in answer and "input not connected" in answer
+
+
+def test_no_finish_pass_without_a_build(monkeypatch):
+    """A property-only turn must NOT trigger validate/organize (don't disturb layout)."""
+    calls, _ = _run_build_turn(
+        monkeypatch,
+        build_calls=[("set_node_property", {"nodeId": "c1", "key": "outChannels", "value": 64})],
+        validate_results=["ok"],
+    )
+    names = [n for n, _ in calls]
+    assert names == ["set_node_property"]  # no validate / organize_layout appended

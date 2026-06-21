@@ -42,7 +42,7 @@ export function LeftRail({
   onSaveBlock,
   graphJson,
 }: Props) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [tab, setTab] = useState<Tab>('nodes');
 
   // Auto-switch tab on selection change: a node selected → Inspector,
@@ -56,9 +56,10 @@ export function LeftRail({
     setTab(nodeId ? 'inspector' : 'nodes');
   }
 
-  // The rail defaults to open on the Nodes tab, so the palette is visible from
-  // the start — emit the tutorial event once so the "Open the node palette"
-  // task reflects reality. (Also fires on Nodes-tab click via showNodes.)
+  // The rail starts collapsed, so the palette isn't visible on mount. If
+  // something opens it on the Nodes tab, emit the tutorial event so the
+  // "Open the node palette" task reflects reality. (Also fires on Nodes-tab
+  // click via showNodes and on expand.)
   useEffect(() => {
     if (!collapsed && tab === 'nodes') tutorialEvent('palette-opened');
     // run once on mount

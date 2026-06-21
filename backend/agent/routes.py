@@ -132,6 +132,7 @@ async def agent_websocket(ws: WebSocket):
                         message=msg.get("message", ""),
                         graph=msg.get("graph"),
                         catalog=msg.get("catalog"),
+                        blocks=msg.get("blocks"),
                         on_text=on_text,
                         execute_tool=execute_tool,
                     )

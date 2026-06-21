@@ -258,6 +258,12 @@ export function useGraph(domain: DomainContext) {
     syncToGraph(resolveGraph(newStack));
   }, [navStack, resolveGraph, syncToGraph]);
 
+  // Pop up one level out of the current subgraph (no-op at the root).
+  const exitSubgraph = useCallback(() => {
+    if (navStack.length === 0) return;
+    navigateTo(navStack.length - 1);
+  }, [navStack, navigateTo]);
+
   // Call this whenever the graph structure or properties change
   const invalidateModel = useCallback(() => {
     if (modelTrained) {
@@ -412,7 +418,7 @@ export function useGraph(domain: DomainContext) {
   // --- Actions the UI can trigger ---
 
   const addNodeToGraph = useCallback(
-    async (type: string, position: { x: number; y: number }): Promise<string | undefined> => {
+    async (type: string, position: { x: number; y: number }, requestedId?: string): Promise<string | undefined> => {
       const def = domain.nodeRegistry.get(type);
       if (!def) return undefined;
 
@@ -422,7 +428,11 @@ export function useGraph(domain: DomainContext) {
         properties[prop.id] = prop.defaultValue;
       }
 
-      const id = `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      // Honor a caller-requested id (e.g. an agent naming the node so it can wire
+      // it in the same batch), as long as it's free; otherwise generate one.
+      const id = requestedId && !getCurrentGraph().nodes.has(requestedId)
+        ? requestedId
+        : `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const node = createNode(id, type, position, properties);
 
       // If this is a subgraph block, create the inner graph with default sentinels
@@ -488,6 +498,25 @@ export function useGraph(domain: DomainContext) {
       tutorialEvent('edge-added');
     },
     [runShape, invalidateModel, getCurrentGraph, snapshot],
+  );
+
+  const removeEdgeByEndpoints = useCallback(
+    async (sourceId: string, sourcePort: string, targetId: string, targetPort: string): Promise<boolean> => {
+      const g = getCurrentGraph();
+      const edge = g.edges.find(
+        (e) =>
+          e.source.nodeId === sourceId && e.source.portId === sourcePort &&
+          e.target.nodeId === targetId && e.target.portId === targetPort,
+      );
+      if (!edge) return false;
+      snapshot();
+      g.edges = g.edges.filter((e) => e.id !== edge.id);
+      markDirty(g, targetId);
+      invalidateModel();
+      await runShape();
+      return true;
+    },
+    [getCurrentGraph, snapshot, invalidateModel, runShape],
   );
 
   const updateProperty = useCallback(
@@ -1330,12 +1359,15 @@ export function useGraph(domain: DomainContext) {
     navStack,
     enterSubgraph,
     navigateTo,
+    exitSubgraph,
     onNodesChange,
     onEdgesChange,
     addNode: addNodeToGraph,
     removeNode: removeNodeFromGraph,
     connect: connectNodes,
     updateProperty,
+    removeEdge: removeEdgeByEndpoints,
+    getCurrentGraph,
     runShape,
     isValidConnection,
     beginBatch,

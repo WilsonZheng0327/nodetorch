@@ -6,7 +6,7 @@
   right: 12px;
   bottom: 12px;
   z-index: 10;
-  width: 360px;
+  /* width set inline (resizable); see ChatRail.tsx */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -17,9 +17,40 @@
   font-family: 'Inter', system-ui, sans-serif;
 }
 
+/* Grab strip along the left edge — drag to resize the panel. Wide hit area
+   (12px) with a slim visible grip centered in it. */
+.chat-rail-resize {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 20;
+}
+
+/* The visible bar: faint at rest, accent on hover/drag. */
+.chat-rail-resize-grip {
+  width: 3px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--border, #45475a);
+  transition: background 0.15s, height 0.15s;
+}
+
+.chat-rail-resize:hover .chat-rail-resize-grip,
+.chat-rail-resize:active .chat-rail-resize-grip {
+  background: var(--accent, #89b4fa);
+  height: 64px;
+}
+
 /* Fixed height so it matches the collapsed handle (no jump on toggle). */
 .chat-rail-header {
-  height: 36px;
+  height: 44px;
   box-sizing: border-box;
   flex-shrink: 0;
   display: flex;
@@ -114,6 +145,79 @@
   align-self: flex-start;
   background: var(--bg-overlay, #313244);
   color: var(--text, #cdd6f4);
+}
+
+/* Rendered markdown inside an assistant bubble */
+.chat-rail-md {
+  white-space: normal;
+}
+.chat-rail-md > :first-child {
+  margin-top: 0;
+}
+.chat-rail-md > :last-child {
+  margin-bottom: 0;
+}
+.chat-rail-md p {
+  margin: 0 0 8px;
+}
+.chat-rail-md ul,
+.chat-rail-md ol {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+.chat-rail-md li {
+  margin: 2px 0;
+}
+.chat-rail-md h1,
+.chat-rail-md h2,
+.chat-rail-md h3,
+.chat-rail-md h4 {
+  margin: 10px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.chat-rail-md a {
+  color: var(--accent, #89b4fa);
+  text-decoration: underline;
+}
+.chat-rail-md strong {
+  font-weight: 600;
+}
+.chat-rail-md code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.chat-rail-md pre {
+  margin: 0 0 8px;
+  padding: 9px 11px;
+  background: rgba(0, 0, 0, 0.32);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.chat-rail-md pre code {
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.chat-rail-md blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border, #45475a);
+  color: var(--text-muted, #a6adc8);
+}
+.chat-rail-md table {
+  border-collapse: collapse;
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.chat-rail-md th,
+.chat-rail-md td {
+  border: 1px solid var(--border, #45475a);
+  padding: 2px 6px;
 }
 
 /* Empty state */
@@ -299,7 +403,7 @@
   top: 12px;
   right: 12px;
   z-index: 10;
-  height: 36px;
+  height: 44px;
   box-sizing: border-box;
   display: flex;
   flex-direction: row;
