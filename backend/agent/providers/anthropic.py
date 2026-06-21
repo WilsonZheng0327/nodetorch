@@ -1,18 +1,18 @@
 """Native Anthropic (Claude) adapter.
 
-Uses the official `anthropic` SDK with streaming. Defaults to claude-opus-4-8.
+Uses the official `anthropic` SDK with streaming + tool use. Defaults to
+claude-opus-4-8.
 """
 from __future__ import annotations
 
-from typing import AsyncIterator
-
 from agent.config import AgentConfig
 from agent.providers.base import (
+    ExecuteTool,
     LLMProvider,
+    OnText,
     ProviderCapabilities,
     ProviderError,
-    StreamEvent,
-    TextDelta,
+    ToolSpec,
 )
 from agent.providers.registry import register
 
@@ -25,9 +25,15 @@ class AnthropicProvider(LLMProvider):
         supports_tools=True, supports_streaming=True, context_window=200_000
     )
 
-    async def stream_chat(
-        self, *, system: str, messages: list[dict]
-    ) -> AsyncIterator[StreamEvent]:
+    async def run(
+        self,
+        *,
+        system: str,
+        messages: list[dict],
+        on_text: OnText,
+        tools: list[ToolSpec] | None = None,
+        execute_tool: ExecuteTool | None = None,
+    ) -> None:
         from anthropic import AsyncAnthropic, AnthropicError
 
         key = self.config.resolved_api_key()
@@ -39,15 +45,41 @@ class AnthropicProvider(LLMProvider):
         opts = self.config.options or {}
         max_tokens = opts.get("max_tokens") if isinstance(opts.get("max_tokens"), int) else 4096
 
-        kwargs: dict = {"model": model, "max_tokens": max_tokens, "messages": messages}
-        if system:
-            kwargs["system"] = system
+        convo = list(messages)
+        an_tools = [
+            {"name": t.name, "description": t.description, "input_schema": t.parameters}
+            for t in (tools or [])
+        ]
 
         try:
-            async with client.messages.stream(**kwargs) as stream:
-                async for text in stream.text_stream:
-                    if text:
-                        yield TextDelta(text)
+            while True:
+                kwargs: dict = {"model": model, "max_tokens": max_tokens, "messages": convo}
+                if system:
+                    kwargs["system"] = system
+                if an_tools:
+                    kwargs["tools"] = an_tools
+
+                async with client.messages.stream(**kwargs) as stream:
+                    async for event in stream:
+                        if event.type == "content_block_delta" and getattr(event.delta, "type", None) == "text_delta":
+                            if event.delta.text:
+                                await on_text(event.delta.text)
+                    final = await stream.get_final_message()
+
+                tool_uses = [b for b in final.content if b.type == "tool_use"]
+                if not tool_uses:
+                    return  # final answer streamed
+
+                if execute_tool is None:
+                    raise ProviderError("Model requested a tool but tool execution is unavailable")
+
+                # Echo the assistant's content (incl. tool_use blocks), then the results.
+                convo.append({"role": "assistant", "content": final.content})
+                results = []
+                for tu in tool_uses:
+                    result = await execute_tool(tu.name, tu.input)
+                    results.append({"type": "tool_result", "tool_use_id": tu.id, "content": result})
+                convo.append({"role": "user", "content": results})
         except AnthropicError as e:
             raise ProviderError(str(e)) from e
         finally:

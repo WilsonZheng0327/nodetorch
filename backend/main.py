@@ -8,6 +8,7 @@ import warnings
 warnings.filterwarnings("ignore", message="dtype.*align")
 
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,6 +17,12 @@ from agent import routes as agent_routes
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nodetorch")
+# Quiet httpx's per-request "200 OK" lines (noise); keep openai's retry/backoff
+# logs (a separate "openai" logger) and our own "nodetorch.agent" logs.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+# AGENT_DEBUG=1 dumps the full agent request (system + messages + tools) per turn.
+if os.environ.get("AGENT_DEBUG"):
+    logging.getLogger("nodetorch.agent").setLevel(logging.DEBUG)
 
 app = FastAPI(title="NodeTorch Backend")
 

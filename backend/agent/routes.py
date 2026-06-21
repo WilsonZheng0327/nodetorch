@@ -9,7 +9,7 @@ from agent.providers import list_providers
 from agent.providers.base import ProviderError
 from api._ws import ws_reader
 
-logger = logging.getLogger("nodetorch")
+logger = logging.getLogger("nodetorch.agent")
 
 router = APIRouter(tags=["agent"])
 
@@ -56,12 +56,18 @@ async def agent_test():
 
 @router.websocket("/agent")
 async def agent_websocket(ws: WebSocket):
-    """Streaming chat. Mirrors /ws: a reader task feeds a queue so the loop can
-    dispatch chat turns and cancels concurrently.
+    """Streaming chat with graph-edit tools. Mirrors /ws: a reader task feeds a
+    queue so the loop can dispatch chat turns, tool results, and cancels.
 
-    Client → { type: 'chat', message, graph?, catalog?, sessionId? } | { type: 'cancel' }
-    Server → { type: 'text_delta', text } … then { type: 'done' } | { type: 'error', error }
-             | { type: 'cancelled' }
+    Client → { type: 'chat', message, graph?, catalog?, sessionId? }
+           | { type: 'tool_result', id, result }
+           | { type: 'cancel' }
+    Server → { type: 'text_delta', text }
+           | { type: 'tool_call', id, name, args }   (browser applies it, replies tool_result)
+           … then { type: 'done' } | { type: 'error', error } | { type: 'cancelled' }
+
+    Tool execution lives in the browser (useGraph), so each tool call is sent to
+    the client and the matching tool_result is awaited via a pending-futures map.
     """
     await ws.accept()
     logger.info("Agent WebSocket connected")
@@ -69,9 +75,27 @@ async def agent_websocket(ws: WebSocket):
     msg_queue: asyncio.Queue = asyncio.Queue()
     reader_task = asyncio.create_task(ws_reader(ws, msg_queue))
     current_task: asyncio.Task | None = None
+    pending: dict[str, asyncio.Future] = {}
+    tool_seq = 0
 
     async def send(obj: dict):
         await ws.send_text(json.dumps(obj))
+
+    async def execute_tool(name: str, args: dict) -> str:
+        """Forward a tool call to the browser and await its result string."""
+        nonlocal tool_seq
+        tool_seq += 1
+        tid = f"t{tool_seq}"
+        logger.info("  🔧 %s(%s)", name, json.dumps(args))
+        await send({"type": "tool_call", "id": tid, "name": name, "args": args})
+        fut = asyncio.get_running_loop().create_future()
+        pending[tid] = fut
+        try:
+            result = await fut
+            logger.info("  ↳ %s", result)
+            return result
+        finally:
+            pending.pop(tid, None)
 
     try:
         while True:
@@ -80,6 +104,12 @@ async def agent_websocket(ws: WebSocket):
 
             if mtype == "_disconnect":
                 break
+
+            if mtype == "tool_result":
+                fut = pending.get(msg.get("id"))
+                if fut and not fut.done():
+                    fut.set_result(msg.get("result", ""))
+                continue
 
             if mtype == "cancel":
                 if current_task and not current_task.done():
@@ -103,6 +133,7 @@ async def agent_websocket(ws: WebSocket):
                         graph=msg.get("graph"),
                         catalog=msg.get("catalog"),
                         on_text=on_text,
+                        execute_tool=execute_tool,
                     )
                     await send({"type": "done"})
                 except asyncio.CancelledError:

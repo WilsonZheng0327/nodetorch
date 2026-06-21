@@ -1,22 +1,25 @@
 // ChatRail — the integrated AI assistant panel. The agent loop runs in the
-// backend; this renders the conversation and streams replies via useAgentChat.
-// v1 is explain-only: it answers questions about the current graph.
+// backend; this renders the conversation, streams replies, and executes the
+// agent's graph-edit tool calls locally via useGraph (see graphTools).
 
 import './ChatRail.css';
 
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, ChevronRight, ChevronLeft, ArrowUp, Square, Settings } from 'lucide-react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Sparkles, ChevronRight, ChevronLeft, ArrowUp, Square, Settings, Wrench } from 'lucide-react';
 import { DomainCtx } from '../EngineNode';
 import { buildNodeCatalog } from '../../domain/catalog';
 import { useAgentChat } from './useAgentChat';
+import { executeGraphTool, type GraphToolApi } from './graphTools';
 import { AgentSettings } from './AgentSettings';
 
 interface Props {
   /** Returns the current serialized graph JSON string (e.g. graph.saveGraph). */
   getGraphJson: () => string;
+  /** Graph action surface for executing the agent's edits. */
+  graph: GraphToolApi & { beginBatch: () => void; endBatch: () => void };
 }
 
-export function ChatRail({ getGraphJson }: Props) {
+export function ChatRail({ getGraphJson, graph }: Props) {
   const domain = useContext(DomainCtx);
   const [collapsed, setCollapsed] = useState(false);
   const [input, setInput] = useState('');
@@ -34,12 +37,24 @@ export function ChatRail({ getGraphJson }: Props) {
     [getGraphJson],
   );
 
-  const { messages, status, error, send, cancel } = useAgentChat({ getGraph, catalog });
+  const executeTool = useCallback(
+    (name: string, args: Record<string, unknown>) =>
+      domain ? executeGraphTool(graph, domain, name, args) : Promise.resolve('error: assistant not ready'),
+    [graph, domain],
+  );
+
+  const { messages, status, error, send, cancel } = useAgentChat({
+    getGraph,
+    catalog,
+    executeTool,
+    beginBatch: graph.beginBatch,
+    endBatch: graph.endBatch,
+  });
 
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [messages]);
+  }, [messages, status]);
 
   const streaming = status === 'streaming';
 
@@ -51,11 +66,7 @@ export function ChatRail({ getGraphJson }: Props) {
 
   if (collapsed) {
     return (
-      <button
-        className="chat-rail-handle"
-        onClick={() => setCollapsed(false)}
-        title="Open AI assistant"
-      >
+      <button className="chat-rail-handle" onClick={() => setCollapsed(false)} title="Open AI assistant">
         <ChevronLeft size={16} />
         <Sparkles size={15} />
       </button>
@@ -70,18 +81,10 @@ export function ChatRail({ getGraphJson }: Props) {
           AI Assistant
         </span>
         <div className="chat-rail-header-actions">
-          <button
-            className="chat-rail-icon-btn"
-            onClick={() => setSettingsOpen(true)}
-            title="Provider settings"
-          >
+          <button className="chat-rail-icon-btn" onClick={() => setSettingsOpen(true)} title="Provider settings">
             <Settings size={15} />
           </button>
-          <button
-            className="chat-rail-collapse"
-            onClick={() => setCollapsed(true)}
-            title="Collapse assistant"
-          >
+          <button className="chat-rail-collapse" onClick={() => setCollapsed(true)} title="Collapse assistant">
             <ChevronRight size={16} />
           </button>
         </div>
@@ -91,26 +94,34 @@ export function ChatRail({ getGraphJson }: Props) {
         {messages.length === 0 ? (
           <div className="chat-rail-empty">
             <Sparkles size={22} />
-            <p className="chat-rail-empty-title">Ask about your model</p>
+            <p className="chat-rail-empty-title">Ask me to build or explain</p>
             <p className="chat-rail-empty-desc">
-              I can read your graph and explain what it does, why it might not
-              train, or what a node means. Pick a provider in settings (a paid
-              API key or a local model), then ask away.
+              I can read your graph, explain it, and edit it — add or remove
+              nodes, wire them up, and change properties. Pick a provider in
+              settings (a paid API key or a local model), then ask away.
             </p>
             <button className="chat-rail-empty-btn" onClick={() => setSettingsOpen(true)}>
               <Settings size={13} /> Configure provider
             </button>
           </div>
         ) : (
-          messages.map((m, i) => {
-            const isStreamingPlaceholder =
-              streaming && i === messages.length - 1 && m.role === 'assistant' && m.content === '';
-            return (
-              <div key={i} className={`chat-rail-msg chat-rail-msg-${m.role}`}>
-                {isStreamingPlaceholder ? <span className="chat-rail-typing">…</span> : m.content}
+          messages.map((m, i) =>
+            m.role === 'tool' ? (
+              <div key={i} className={`chat-rail-tool ${m.error ? 'chat-rail-tool-error' : ''}`}>
+                <Wrench size={12} />
+                {m.content}
               </div>
-            );
-          })
+            ) : (
+              <div key={i} className={`chat-rail-msg chat-rail-msg-${m.role}`}>
+                {m.content}
+              </div>
+            ),
+          )
+        )}
+        {streaming && (
+          <div className="chat-rail-working">
+            <span className="chat-rail-typing">●●●</span> working…
+          </div>
         )}
       </div>
 
@@ -119,7 +130,7 @@ export function ChatRail({ getGraphJson }: Props) {
       <div className="chat-rail-input-row">
         <textarea
           className="chat-rail-input"
-          placeholder="Ask about your model…"
+          placeholder="Ask me to build or change your model…"
           rows={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -135,12 +146,7 @@ export function ChatRail({ getGraphJson }: Props) {
             <Square size={14} />
           </button>
         ) : (
-          <button
-            className="chat-rail-send"
-            onClick={submit}
-            disabled={!input.trim()}
-            title="Send"
-          >
+          <button className="chat-rail-send" onClick={submit} disabled={!input.trim()} title="Send">
             <ArrowUp size={16} />
           </button>
         )}

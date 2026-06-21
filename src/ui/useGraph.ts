@@ -157,12 +157,28 @@ export function useGraph(domain: DomainContext) {
   const undoStack = useRef<string[]>([]);
   const redoStack = useRef<string[]>([]);
   const isUndoRedo = useRef(false);
+  // While a batch is active (e.g. one agent turn), individual mutations don't
+  // snapshot — beginBatch takes a single snapshot so the whole batch is one undo.
+  const batchActive = useRef(false);
 
   const snapshot = useCallback(() => {
-    if (isUndoRedo.current) return;
+    if (isUndoRedo.current || batchActive.current) return;
     undoStack.current.push(JSON.stringify(serializeGraphData(graphRef.current)));
     redoStack.current = [];
     if (undoStack.current.length > 50) undoStack.current.shift();
+  }, []);
+
+  // Group a sequence of mutations into a single undo step. beginBatch records
+  // one snapshot (pre-batch state) and suppresses per-mutation snapshots until
+  // endBatch. Used to make an entire agent turn revert with one Ctrl+Z.
+  const beginBatch = useCallback(() => {
+    if (batchActive.current) return;
+    snapshot();
+    batchActive.current = true;
+  }, [snapshot]);
+
+  const endBatch = useCallback(() => {
+    batchActive.current = false;
   }, []);
 
   // --- Saved blocks ---
@@ -396,9 +412,9 @@ export function useGraph(domain: DomainContext) {
   // --- Actions the UI can trigger ---
 
   const addNodeToGraph = useCallback(
-    async (type: string, position: { x: number; y: number }) => {
+    async (type: string, position: { x: number; y: number }): Promise<string | undefined> => {
       const def = domain.nodeRegistry.get(type);
-      if (!def) return;
+      if (!def) return undefined;
 
       // Build default properties from the definition
       const properties: Record<string, any> = {};
@@ -434,6 +450,7 @@ export function useGraph(domain: DomainContext) {
       if (type.startsWith('ml.optimizers.')) tutorialEvent('node-added-optimizer');
       if (type.startsWith('ml.layers.batchnorm')) tutorialEvent('node-added-batchnorm');
       if (type.startsWith('ml.layers.maxpool') || type.startsWith('ml.layers.avgpool')) tutorialEvent('node-added-pool');
+      return id;
     },
     [domain, runShape, invalidateModel, getCurrentGraph, snapshot],
   );
@@ -1321,6 +1338,8 @@ export function useGraph(domain: DomainContext) {
     updateProperty,
     runShape,
     isValidConnection,
+    beginBatch,
+    endBatch,
     saveGraph,
     loadGraph,
     clearGraph,

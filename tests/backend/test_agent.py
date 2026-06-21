@@ -12,9 +12,10 @@ from agent.catalog import format_catalog
 from agent.config import AgentConfig, load_config, save_config
 from agent.context import summarize_graph
 from agent.providers import create, list_providers
-from agent.providers.base import LLMProvider, ProviderError, TextDelta
+from agent.providers.base import LLMProvider, ProviderError
 from agent.providers.registry import register
 from agent.session import get_session, reset_session
+from agent.tools import GRAPH_TOOLS
 
 
 def test_config_roundtrip_hides_key(tmp_path, monkeypatch):
@@ -89,19 +90,27 @@ def test_summarize_graph_forms():
     assert "c1" in summarize_graph(g["graph"])
 
 
-def test_run_turn_streams_and_stores_history(monkeypatch):
-    class Stub(LLMProvider):
-        name = "stub-test"
+def test_graph_tools_defined():
+    names = {t.name for t in GRAPH_TOOLS}
+    assert names == {"set_node_property", "add_node", "connect", "remove_node"}
+    for t in GRAPH_TOOLS:
+        assert t.parameters["type"] == "object"  # valid JSON-schema shape
 
-        async def stream_chat(self, *, system, messages):
+
+def test_run_turn_explain_only(monkeypatch):
+    class Stub(LLMProvider):
+        name = "stub-explain"
+
+        async def run(self, *, system, messages, on_text, tools=None, execute_tool=None):
             assert "NodeTorch Assistant" in system  # persona present
             assert "Conv2d" in system  # catalog present
             assert "Current graph" in messages[-1]["content"]  # graph in last user turn
+            assert not tools  # no execute_tool given → explain-only, no tools
             for word in ["Hello", " world"]:
-                yield TextDelta(word)
+                await on_text(word)
 
-    register("stub-test", Stub, label="stub", fields=[])
-    monkeypatch.setattr(agent_mod, "load_config", lambda: AgentConfig(provider="stub-test", model="x"))
+    register("stub-explain", Stub, label="stub", fields=[])
+    monkeypatch.setattr(agent_mod, "load_config", lambda: AgentConfig(provider="stub-explain", model="x"))
 
     reset_session("t")
     catalog = [{"type": "ml.layers.conv2d", "displayName": "Conv2d", "category": ["ML"], "properties": [], "ports": []}]
@@ -112,16 +121,105 @@ def test_run_turn_streams_and_stores_history(monkeypatch):
     async def on_text(t):
         out.append(t)
 
-    async def run():
-        return await agent_mod.run_turn(
-            session_id="t", message="hi", graph=graph, catalog=catalog, on_text=on_text
-        )
-
-    answer = asyncio.run(run())
-    assert answer == "Hello world"
-    assert "".join(out) == "Hello world"
+    answer = asyncio.run(
+        agent_mod.run_turn(session_id="t", message="hi", graph=graph, catalog=catalog, on_text=on_text)
+    )
+    assert answer == "Hello world" == "".join(out)
 
     sess = get_session("t")
     assert len(sess.history) == 2
     assert sess.history[0]["role"] == "user" and sess.history[1]["role"] == "assistant"
     assert sess.catalog_text  # catalog cached on the session
+
+
+def test_openai_compat_retries_malformed_tool_call():
+    """A 'Failed to call a function' error is nudged + retried, not surfaced raw."""
+    from types import SimpleNamespace as NS
+
+    from openai import OpenAIError
+    from agent.providers.openai_compat import OpenAICompatProvider
+
+    def text_chunk(t):
+        return NS(choices=[NS(delta=NS(content=t, tool_calls=None))])
+
+    class FakeStream:
+        def __init__(self, chunks):
+            self._chunks = list(chunks)
+
+        def __aiter__(self):
+            self._it = iter(self._chunks)
+            return self
+
+        async def __anext__(self):
+            try:
+                return next(self._it)
+            except StopIteration:
+                raise StopAsyncIteration
+
+    class FakeCompletions:
+        def __init__(self):
+            self.calls = 0
+
+        async def create(self, **kw):
+            self.calls += 1
+            if self.calls == 1:
+                raise OpenAIError("Failed to call a function. Please adjust your prompt.")
+            return FakeStream([text_chunk("Recovered "), text_chunk("answer.")])
+
+    fake = NS(chat=NS(completions=FakeCompletions()))
+
+    async def _close():
+        pass
+
+    fake.close = _close
+
+    prov = OpenAICompatProvider(AgentConfig(provider="openai_compat", model="x"))
+    prov._client = lambda: fake
+
+    out: list[str] = []
+
+    async def on_text(t):
+        out.append(t)
+
+    asyncio.run(prov.run(system="s", messages=[{"role": "user", "content": "hi"}], on_text=on_text, tools=GRAPH_TOOLS, execute_tool=lambda n, a: None))
+    assert "".join(out) == "Recovered answer."  # recovered after the retry
+    assert fake.chat.completions.calls == 2  # one failed, one succeeded
+
+
+def test_run_turn_tool_loop(monkeypatch):
+    """With an execute_tool bridge, tools are passed and the loop calls them."""
+
+    class StubTool(LLMProvider):
+        name = "stub-tool"
+
+        async def run(self, *, system, messages, on_text, tools=None, execute_tool=None):
+            assert any(t.name == "set_node_property" for t in (tools or []))  # tools passed
+            assert "EDIT the graph" in system  # editing persona active
+            await on_text("editing… ")
+            result = await execute_tool("set_node_property", {"nodeId": "c1", "key": "outChannels", "value": 64})
+            await on_text(f"({result})")
+
+    register("stub-tool", StubTool, label="stub", fields=[])
+    monkeypatch.setattr(agent_mod, "load_config", lambda: AgentConfig(provider="stub-tool", model="x"))
+
+    reset_session("e")
+    catalog = [{"type": "ml.layers.conv2d", "displayName": "Conv2d", "category": ["ML"], "properties": [], "ports": []}]
+    graph = {"version": "1.0", "graph": {"nodes": [{"id": "c1", "type": "ml.layers.conv2d", "properties": {}}], "edges": []}}
+
+    calls: list = []
+
+    async def on_text(_t):
+        pass
+
+    async def execute_tool(name, args):
+        calls.append((name, args))
+        return "ok: set c1.outChannels=64"
+
+    answer = asyncio.run(
+        agent_mod.run_turn(
+            session_id="e", message="set channels to 64", graph=graph, catalog=catalog,
+            on_text=on_text, execute_tool=execute_tool,
+        )
+    )
+    assert calls == [("set_node_property", {"nodeId": "c1", "key": "outChannels", "value": 64})]
+    assert "ok: set c1.outChannels=64" in answer

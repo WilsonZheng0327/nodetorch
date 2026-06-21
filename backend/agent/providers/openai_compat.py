@@ -7,17 +7,60 @@ base_url + model + api_key.
 """
 from __future__ import annotations
 
-from typing import AsyncIterator
+import json
+import logging
 
 from agent.config import AgentConfig
 from agent.providers.base import (
+    ExecuteTool,
     LLMProvider,
+    OnText,
     ProviderCapabilities,
     ProviderError,
-    StreamEvent,
-    TextDelta,
+    ToolSpec,
 )
 from agent.providers.registry import register
+
+logger = logging.getLogger("nodetorch.agent")
+
+# Substrings that mark a malformed-tool-call rejection (model emitted a tool call
+# the provider couldn't parse/validate). Weaker models (e.g. Llama on Groq) hit
+# these intermittently; we nudge and retry rather than surfacing the raw error.
+_MALFORMED_TOOL_ERRORS = (
+    "failed to call a function",
+    "tool call validation failed",
+    "not in request.tools",
+    "invalid tool call",
+)
+
+
+def _is_malformed_tool_error(text: str) -> bool:
+    low = text.lower()
+    return any(s in low for s in _MALFORMED_TOOL_ERRORS)
+
+
+def _failed_generation(e) -> str | None:
+    """The raw (malformed) text the model produced — Groq returns it in
+    error.failed_generation on a rejected tool call. Robust to where the SDK
+    surfaces it (e.body, nested under 'error', or on the raw response)."""
+    candidates: list = []
+    body = getattr(e, "body", None)
+    candidates.append(body)
+    if isinstance(body, dict):
+        candidates.append(body.get("error"))
+    resp = getattr(e, "response", None)
+    if resp is not None:
+        try:
+            j = resp.json()
+            candidates.append(j)
+            if isinstance(j, dict):
+                candidates.append(j.get("error"))
+        except Exception:
+            pass
+    for c in candidates:
+        if isinstance(c, dict) and isinstance(c.get("failed_generation"), str):
+            return c["failed_generation"]
+    return None
 
 
 class OpenAICompatProvider(LLMProvider):
@@ -32,35 +75,122 @@ class OpenAICompatProvider(LLMProvider):
         api_key = self.config.resolved_api_key() or "sk-no-key-required"
         return AsyncOpenAI(base_url=self.config.base_url or None, api_key=api_key)
 
-    async def stream_chat(
-        self, *, system: str, messages: list[dict]
-    ) -> AsyncIterator[StreamEvent]:
+    async def run(
+        self,
+        *,
+        system: str,
+        messages: list[dict],
+        on_text: OnText,
+        tools: list[ToolSpec] | None = None,
+        execute_tool: ExecuteTool | None = None,
+    ) -> None:
         if not self.config.model:
             raise ProviderError("No model configured")
 
         from openai import OpenAIError
 
         client = self._client()
-        full_messages = (
-            [{"role": "system", "content": system}] if system else []
-        ) + messages
-
-        kwargs: dict = {"model": self.config.model, "messages": full_messages, "stream": True}
+        convo = ([{"role": "system", "content": system}] if system else []) + list(messages)
+        oa_tools = [
+            {"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.parameters}}
+            for t in (tools or [])
+        ]
         opts = self.config.options or {}
-        if isinstance(opts.get("temperature"), (int, float)):
-            kwargs["temperature"] = opts["temperature"]
-        if isinstance(opts.get("max_tokens"), int):
-            kwargs["max_tokens"] = opts["max_tokens"]
+        nudges_left = 2  # corrective retries for malformed tool calls
 
         try:
-            stream = await client.chat.completions.create(**kwargs)
-            async for chunk in stream:
-                if not chunk.choices:
-                    continue
-                text = getattr(chunk.choices[0].delta, "content", None)
-                if text:
-                    yield TextDelta(text)
+            while True:
+                kwargs: dict = {"model": self.config.model, "messages": convo, "stream": True}
+                if oa_tools:
+                    kwargs["tools"] = oa_tools
+                    # Force one tool call at a time so the model sees each result
+                    # before the next — e.g. add_node's returned id before connect.
+                    # Avoids guessed ids / duplicate nodes from parallel calls.
+                    kwargs["parallel_tool_calls"] = False
+                # Default to temperature 0: weaker models (e.g. Llama on Groq) are
+                # far more reliable at tool selection deterministically. Overridable.
+                temp = opts.get("temperature")
+                kwargs["temperature"] = temp if isinstance(temp, (int, float)) else 0
+                if isinstance(opts.get("max_tokens"), int):
+                    kwargs["max_tokens"] = opts["max_tokens"]
+
+                logger.debug(
+                    "→ model request: model=%s tools=%d messages=%d temp=%s",
+                    self.config.model, len(oa_tools), len(convo), kwargs.get("temperature"),
+                )
+                logger.debug("  request messages: %s", json.dumps(convo)[:4000])
+
+                text_parts: list[str] = []
+                calls: dict[int, dict] = {}  # index -> {id, name, args}
+                try:
+                    stream = await client.chat.completions.create(**kwargs)
+                    async for chunk in stream:
+                        if not chunk.choices:
+                            continue
+                        delta = chunk.choices[0].delta
+                        if getattr(delta, "content", None):
+                            text_parts.append(delta.content)
+                            await on_text(delta.content)
+                        for tc in getattr(delta, "tool_calls", None) or []:
+                            slot = calls.setdefault(tc.index, {"id": "", "name": "", "args": ""})
+                            if tc.id:
+                                slot["id"] = tc.id
+                            if tc.function:
+                                if tc.function.name:
+                                    slot["name"] = tc.function.name
+                                if tc.function.arguments:
+                                    slot["args"] += tc.function.arguments
+                except OpenAIError as e:
+                    # Some providers (e.g. Groq + Llama) reject a malformed tool call
+                    # server-side. Nudge the model to re-issue a clean call and retry.
+                    if _is_malformed_tool_error(str(e)) and nudges_left > 0:
+                        nudges_left -= 1
+                        logger.warning("⚠ malformed tool call; nudging + retry (%d left): %s", nudges_left, str(e)[:160])
+                        logger.debug("   error.body=%r", getattr(e, "body", None))
+                        fg = _failed_generation(e)
+                        if fg:
+                            logger.warning("   ↳ model actually emitted:\n%s", fg[:1500])
+                        convo.append({
+                            "role": "user",
+                            "content": "(Your previous tool call was rejected as malformed. Make ONE tool call with the function name and its arguments as separate, valid JSON that exactly matches the tool's schema — correct field names and value types. Do not put arguments inside the function name.)",
+                        })
+                        continue
+                    raise
+
+                if not calls:
+                    return  # final answer streamed
+
+                if execute_tool is None:
+                    raise ProviderError("Model requested a tool but tool execution is unavailable")
+
+                # Echo the assistant's tool calls, then append each tool result.
+                convo.append(
+                    {
+                        "role": "assistant",
+                        "content": "".join(text_parts) or None,
+                        "tool_calls": [
+                            {"id": s["id"], "type": "function", "function": {"name": s["name"], "arguments": s["args"] or "{}"}}
+                            for s in calls.values()
+                        ],
+                    }
+                )
+                for s in calls.values():
+                    try:
+                        args = json.loads(s["args"] or "{}")
+                    except json.JSONDecodeError:
+                        args = {}
+                    result = await execute_tool(s["name"], args)
+                    convo.append({"role": "tool", "tool_call_id": s["id"], "content": result})
         except OpenAIError as e:
+            if _is_malformed_tool_error(str(e)):
+                fg = _failed_generation(e)
+                if fg:
+                    logger.warning("✗ tool call still malformed after retries. Model emitted:\n%s", fg[:1500])
+                raise ProviderError(
+                    "The model produced an invalid tool call (some models do this on complex "
+                    "requests). Try rephrasing or splitting the request into smaller steps, or "
+                    "use a more capable model."
+                ) from e
             raise ProviderError(str(e)) from e
         finally:
             await client.close()
@@ -69,7 +199,7 @@ class OpenAICompatProvider(LLMProvider):
 register(
     "openai_compat",
     OpenAICompatProvider,
-    label="OpenAI-compatible",
+    label="OpenAI-compatible (OpenAI, OpenRouter, Ollama, LM Studio, vLLM…)",
     fields=[
         {
             "key": "base_url",

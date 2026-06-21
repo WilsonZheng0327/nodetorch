@@ -111,8 +111,15 @@ export function AgentSettings({ open, onClose, onSaved }: Props) {
   }
 
   return (
-    <div className="agent-settings-backdrop" onClick={onClose}>
-      <div className="agent-settings" onClick={(e) => e.stopPropagation()}>
+    // Close only when the press STARTS on the backdrop itself — not when a
+    // drag (e.g. selecting text) begins inside the panel and ends out here.
+    <div
+      className="agent-settings-backdrop"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="agent-settings">
         <div className="agent-settings-header">
           <span>AI Assistant — Provider</span>
           <button className="agent-settings-x" onClick={onClose} title="Close">

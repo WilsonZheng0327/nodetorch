@@ -176,6 +176,43 @@
   letter-spacing: 2px;
 }
 
+/* Tool-call activity chip */
+.chat-rail-tool {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 92%;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted, #a6adc8);
+  background: var(--bg-overlay, #313244);
+  border: 1px solid var(--border, #45475a);
+  border-radius: 8px;
+  word-break: break-word;
+}
+.chat-rail-tool svg {
+  flex-shrink: 0;
+  color: var(--accent, #89b4fa);
+}
+.chat-rail-tool-error {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.chat-rail-tool-error svg {
+  color: #ef4444;
+}
+
+/* "working…" indicator while a turn streams */
+.chat-rail-working {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-faint, #6c7086);
+}
+
 /* Error banner above the input */
 .chat-rail-error {
   margin: 0 12px;
