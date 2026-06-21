@@ -6,3 +6,8 @@ websockets
 tqdm
 datasets
 python-multipart
+
+# AI agent — provider-agnostic LLM clients (see backend/agent/)
+openai
+anthropic
+httpx

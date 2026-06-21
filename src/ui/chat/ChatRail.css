@@ -42,6 +42,13 @@
   color: var(--accent, #89b4fa);
 }
 
+.chat-rail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.chat-rail-icon-btn,
 .chat-rail-collapse {
   display: flex;
   align-items: center;
@@ -53,6 +60,12 @@
   color: var(--text-faint, #6c7086);
   cursor: pointer;
   outline: none;
+  border-radius: 6px;
+}
+
+.chat-rail-icon-btn:hover {
+  color: var(--text, #cdd6f4);
+  background: var(--bg-overlay, #313244);
 }
 
 .chat-rail-collapse:hover {
@@ -141,6 +154,39 @@
   border-radius: 999px;
 }
 
+.chat-rail-empty-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: var(--bg-overlay, #313244);
+  border: 1px solid var(--border, #45475a);
+  border-radius: 8px;
+  color: var(--text, #cdd6f4);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.chat-rail-empty-btn:hover {
+  border-color: var(--accent, #89b4fa);
+}
+
+.chat-rail-typing {
+  color: var(--text-faint, #6c7086);
+  letter-spacing: 2px;
+}
+
+/* Error banner above the input */
+.chat-rail-error {
+  margin: 0 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  border-radius: 8px;
+}
+
 /* Input */
 .chat-rail-input-row {
   display: flex;
@@ -199,6 +245,15 @@
   background: var(--bg-overlay, #313244);
   color: var(--text-faint, #6c7086);
   cursor: not-allowed;
+}
+
+.chat-rail-stop {
+  background: var(--bg-overlay, #313244);
+  border: 1px solid var(--border, #45475a);
+  color: var(--text, #cdd6f4);
+}
+.chat-rail-stop:hover {
+  border-color: var(--accent, #89b4fa);
 }
 
 /* Collapsed handle */

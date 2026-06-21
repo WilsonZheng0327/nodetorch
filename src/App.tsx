@@ -470,7 +470,7 @@ export default function App() {
           onClose={() => setStepThroughOpen(false)}
         />
         <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-        <ChatRail />
+        <ChatRail getGraphJson={() => graph.saveGraph()} />
         </div>
       </div>
     </BackpropCtx.Provider>

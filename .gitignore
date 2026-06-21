@@ -33,6 +33,7 @@ backend/storage/datasets/
 backend/storage/weights/
 backend/storage/runs/
 backend/storage/blocks/
+backend/storage/agent_config.json
 /data/
 backend/data/
 test_diffusion_output/
