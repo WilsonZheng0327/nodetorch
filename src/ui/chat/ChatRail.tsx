@@ -210,7 +210,7 @@ export function ChatRail({ getGraphJson, graph }: Props) {
         <textarea
           className="chat-rail-input"
           placeholder="Ask me to build or change your model…"
-          rows={1}
+          rows={3}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {

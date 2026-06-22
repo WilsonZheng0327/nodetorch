@@ -96,7 +96,7 @@ def test_graph_tools_defined():
         "set_node_property", "add_node", "connect", "remove_node", "remove_edge",
         "clear_graph", "organize_layout", "add_block",
         "enter_block", "exit_block", "save_block",
-        "get_graph", "get_node", "validate",
+        "get_graph", "get_node", "get_training_results", "validate",
     }
     for t in GRAPH_TOOLS:
         assert t.parameters["type"] == "object"  # valid JSON-schema shape

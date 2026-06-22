@@ -7,11 +7,17 @@ import type * as RF from '@xyflow/react';
 import type { Graph, NodeInstance } from '../../core/graph';
 import type { NodeRegistry } from '../../core/nodedef';
 import { validateForward, validateTraining } from '../../core/validation';
+import type { EpochRecord } from '../useGraph';
 
 /** The subset of useGraph the tool executor needs. */
 export interface GraphToolApi {
   /** Live current graph (root or active subgraph) — read fresh each call. */
   getCurrentGraph: () => Graph;
+  /** Per-epoch training metrics from the most recent run this session. */
+  trainingProgress: EpochRecord[];
+  /** Whether a trained model is in memory, and whether the graph has since changed. */
+  modelTrained: boolean;
+  modelStale: boolean;
   updateProperty: (nodeId: string, key: string, value: unknown) => Promise<void>;
   addNode: (type: string, position: { x: number; y: number }, requestedId?: string) => Promise<string | undefined>;
   connect: (connection: RF.Connection) => Promise<void>;
@@ -63,8 +69,60 @@ function describeNode(n: NodeInstance): string {
   const parts = [`${n.id} (${n.type})`, `props: ${props || '(none)'}`];
   if (md?.outputShape) parts.push(`outputShape: [${(md.outputShape as unknown[]).join(', ')}]`);
   if (md?.paramCount != null) parts.push(`params: ${md.paramCount}`);
+  // Final training metrics land on the optimizer node after a run (see useGraph).
+  if (typeof md?.finalLoss === 'number') parts.push(`finalLoss: ${md.finalLoss.toFixed(4)}`);
+  if (typeof md?.finalAccuracy === 'number') parts.push(`finalAccuracy: ${(md.finalAccuracy * 100).toFixed(1)}%`);
   if (md?.error) parts.push(`ERROR: ${md.error}`);
   return parts.join('\n');
+}
+
+/** Format a metric: numbers to 4dp, accuracies as percentages, missing as "—". */
+function fmtMetric(v: unknown, pct = false): string {
+  if (typeof v !== 'number' || Number.isNaN(v)) return '—';
+  return pct ? `${(v * 100).toFixed(1)}%` : v.toFixed(4);
+}
+
+/** The full per-epoch training history (loss/accuracy/val/perplexity curves).
+ *  This lives in UI state, not the graph, so it's invisible to the other tools —
+ *  this is the agent's only window onto how training actually went. */
+function getTrainingResults(graph: GraphToolApi): string {
+  const epochs = graph.trainingProgress;
+  if (!epochs.length) {
+    return graph.modelTrained
+      ? 'a trained model is in memory, but no per-epoch history is available this session (it may have been loaded from a saved run)'
+      : 'no training results yet — the model has not been trained this session';
+  }
+
+  // Pick columns from what the run actually produced (classification vs LM differ).
+  const has = (k: string) => epochs.some((e) => typeof e[k] === 'number');
+  const cols: { key: string; label: string; pct?: boolean }[] = [{ key: 'loss', label: 'loss' }];
+  if (has('accuracy')) cols.push({ key: 'accuracy', label: 'acc', pct: true });
+  if (has('valLoss')) cols.push({ key: 'valLoss', label: 'valLoss' });
+  if (has('valAccuracy')) cols.push({ key: 'valAccuracy', label: 'valAcc', pct: true });
+  if (has('perplexity')) cols.push({ key: 'perplexity', label: 'ppl' });
+  if (has('valPerplexity')) cols.push({ key: 'valPerplexity', label: 'valPpl' });
+
+  const row = (e: EpochRecord) =>
+    `epoch ${e.epoch}: ` + cols.map((c) => `${c.label}=${fmtMetric(e[c.key], c.pct)}`).join(', ');
+
+  // Cap output so a long run can't flood the context: show all if small, else
+  // the first and last 15 epochs (enough to read the trend and the final state).
+  const CAP = 30;
+  let lines: string[];
+  if (epochs.length <= CAP) {
+    lines = epochs.map(row);
+  } else {
+    lines = [
+      ...epochs.slice(0, 15).map(row),
+      `… (${epochs.length - 30} epochs omitted) …`,
+      ...epochs.slice(-15).map(row),
+    ];
+  }
+
+  const stale = graph.modelStale
+    ? '\n(NOTE: the graph was edited after training — these results no longer reflect the current graph)'
+    : '';
+  return `Training results — ${epochs.length} epoch(s):\n${lines.join('\n')}${stale}`;
 }
 
 export async function executeGraphTool(graph: GraphToolApi, domain: Domain, name: string, args: Args): Promise<string> {
@@ -99,6 +157,8 @@ export async function executeGraphTool(graph: GraphToolApi, domain: Domain, name
         return summarizeGraph(graph.getCurrentGraph());
       case 'get_node':
         return getNode(graph, args);
+      case 'get_training_results':
+        return getTrainingResults(graph);
       case 'validate':
         return validate(graph, domain, args);
       default:
@@ -212,7 +272,22 @@ function getNode(graph: GraphToolApi, args: Args) {
 function validate(graph: GraphToolApi, domain: Domain, args: Args) {
   const mode = args.mode === 'training' ? 'training' : 'forward';
   const g = graph.getCurrentGraph();
-  const errors = mode === 'training' ? validateTraining(g, domain.nodeRegistry) : validateForward(g, domain.nodeRegistry);
-  if (!errors.length) return `ok: no ${mode} validation issues`;
-  return `${errors.length} ${mode} issue(s):\n` + errors.map((e) => `- ${e.nodeId ? e.nodeId + ': ' : ''}${e.message}`).join('\n');
+
+  // Structural checks (ports connected, required nodes present, reachability).
+  const structural = mode === 'training'
+    ? validateTraining(g, domain.nodeRegistry)
+    : validateForward(g, domain.nodeRegistry);
+  const lines = structural.map((e) => `- ${e.nodeId ? e.nodeId + ': ' : ''}${e.message}`);
+
+  // Shape checks. validateForward/Training never run the shape math, so a node
+  // can be fully wired (structurally valid) yet still have a red shape error in
+  // its lastResult — e.g. a 4-D tensor reaching CrossEntropyLoss. Surface those
+  // here so the finish-pass / auto-repair loop actually sees them.
+  for (const [nodeId, node] of g.nodes) {
+    const err = (node.lastResult?.metadata as Record<string, unknown> | undefined)?.error;
+    if (typeof err === 'string' && err) lines.push(`- ${nodeId}: ${err}`);
+  }
+
+  if (!lines.length) return `ok: no ${mode} validation issues`;
+  return `${lines.length} ${mode} issue(s):\n` + lines.join('\n');
 }

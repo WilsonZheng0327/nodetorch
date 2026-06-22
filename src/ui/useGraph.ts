@@ -19,6 +19,25 @@ import type { DomainContext } from '../domain';
 import { validateForward, validateTraining } from '../core/validation';
 import { getNodePorts } from '../core/ports';
 
+/** One epoch's worth of streamed training metrics (appended per `epoch` message).
+ *  The scalar metrics are named; heavier per-epoch payloads (gradient flow,
+ *  tracked/generated samples, per-class accuracy) ride along via the index
+ *  signature without being enumerated here. */
+export interface EpochRecord {
+  epoch: number;
+  totalEpochs?: number;
+  loss: number;
+  accuracy?: number;
+  valLoss?: number;
+  valAccuracy?: number;
+  learningRate?: number;
+  time?: number;
+  perplexity?: number;
+  valPerplexity?: number;
+  trainingMode?: string;
+  [key: string]: unknown;
+}
+
 // Navigation breadcrumb entry
 interface NavEntry {
   graphId: string;
@@ -782,7 +801,7 @@ export function useGraph(domain: DomainContext) {
     }
   }, [modelTrained, saveGraph]);
 
-  const [trainingProgress, setTrainingProgress] = useState<{ epoch: number; loss: number; accuracy: number }[]>([]);
+  const [trainingProgress, setTrainingProgress] = useState<EpochRecord[]>([]);
 
   // Full history of per-epoch visualization snapshots (indexed by epoch number)
   const [snapshotHistory, setSnapshotHistory] = useState<Record<string, any>[]>([]);

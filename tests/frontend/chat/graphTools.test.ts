@@ -59,6 +59,9 @@ function makeApi() {
     },
     // fake validation: reject only the sentinel 'bad' target port
     isValidConnection: (c) => c.targetHandle !== 'bad',
+    trainingProgress: [],
+    modelTrained: false,
+    modelStale: false,
   };
   return { api, g, flags };
 }
@@ -148,6 +151,38 @@ describe('executeGraphTool', () => {
     const { api } = makeApi();
     expect(await executeGraphTool(api, domain, 'validate', { mode: 'forward' })).toMatch(/forward/);
     expect(await executeGraphTool(api, domain, 'validate', { mode: 'training' })).toMatch(/training/);
+  });
+
+  it('validate surfaces per-node shape errors, not just structural ones', async () => {
+    const { api } = makeApi();
+    // A structurally-fine node carrying a shape error in its lastResult — the
+    // kind validateForward/Training are blind to (e.g. 4-D into CrossEntropyLoss).
+    const g = api.getCurrentGraph();
+    const c1 = g.nodes.get('c1')!;
+    c1.lastResult = { outputs: {}, metadata: { error: 'Predictions should be [B, C]' } };
+    const report = await executeGraphTool(api, domain, 'validate', { mode: 'forward' });
+    expect(report).toMatch(/c1: Predictions should be/);
+    expect(report).not.toMatch(/^ok/);
+  });
+
+  it('get_training_results reports state and formats the epoch history', async () => {
+    const { api } = makeApi();
+    // Untrained → says so.
+    expect(await executeGraphTool(api, domain, 'get_training_results', {})).toMatch(/not been trained/);
+
+    // With history → a per-epoch table picking columns from the metrics present.
+    api.trainingProgress = [
+      { epoch: 1, loss: 0.9, accuracy: 0.6, valLoss: 1.0, valAccuracy: 0.55 },
+      { epoch: 2, loss: 0.4, accuracy: 0.85, valLoss: 0.7, valAccuracy: 0.8 },
+    ];
+    api.modelTrained = true;
+    const report = await executeGraphTool(api, domain, 'get_training_results', {});
+    expect(report).toMatch(/2 epoch\(s\)/);
+    expect(report).toMatch(/epoch 2: loss=0\.4000, acc=85\.0%, valLoss=0\.7000, valAcc=80\.0%/);
+
+    // Stale flag surfaces a warning.
+    api.modelStale = true;
+    expect(await executeGraphTool(api, domain, 'get_training_results', {})).toMatch(/stale|no longer reflect/i);
   });
 
   it('reports unknown tools', async () => {

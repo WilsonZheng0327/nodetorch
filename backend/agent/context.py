@@ -49,7 +49,11 @@ already exists rather than rebuilding it.
 You can also READ the graph (no changes):
 - get_graph() — re-read the current nodes & edges (the snapshot above can go stale \
 after you've made edits).
-- get_node(nodeId) — a node's properties, output shape, parameter count, and any error.
+- get_node(nodeId) — a node's properties, output shape, parameter count, final \
+training metrics (finalLoss/finalAccuracy on the optimizer), and any error.
+- get_training_results() — the per-epoch training history (loss / accuracy / \
+validation / perplexity curves) of the latest run. Call this for any question \
+about how training went — convergence, plateaus, overfitting, final numbers.
 - validate(mode) — list exactly what's wrong: mode "forward" (can it run a forward \
 pass) or "training" (everything needed to train). Use this to DIAGNOSE before you \
 claim something is fixed or ready to train.

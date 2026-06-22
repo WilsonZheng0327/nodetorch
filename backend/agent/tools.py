@@ -165,6 +165,17 @@ GRAPH_TOOLS: list[ToolSpec] = [
         },
     ),
     ToolSpec(
+        name="get_training_results",
+        description=(
+            "Read the per-epoch training history of the most recent run this session "
+            "(loss, accuracy, and validation/perplexity curves where applicable). Use "
+            "this to answer questions about how training went — convergence, plateaus, "
+            "overfitting (train vs validation divergence), or the final numbers. Says so "
+            "if the model hasn't been trained, or if the graph changed after training."
+        ),
+        parameters={"type": "object", "properties": {}},
+    ),
+    ToolSpec(
         name="validate",
         description="Run the pre-flight checks and return the exact problems (missing connections, shape mismatches, missing data/loss/optimizer, etc.). mode='forward' checks a forward pass; mode='training' checks everything needed to train.",
         parameters={

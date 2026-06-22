@@ -341,7 +341,7 @@
   flex: 1;
   min-width: 0;
   resize: none;
-  max-height: 120px;
+  max-height: 200px;
   padding: 9px 11px;
   background: var(--bg-overlay, #313244);
   border: 1px solid var(--border, #45475a);
@@ -352,6 +352,23 @@
   line-height: 1.4;
   outline: none;
   box-sizing: border-box;
+  /* Pretty thin scrollbar once the textarea grows past max-height
+     (matches .chat-rail-messages above). */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border, #45475a) transparent;
+}
+
+.chat-rail-input::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-rail-input::-webkit-scrollbar-thumb {
+  background: var(--border, #45475a);
+  border-radius: 3px;
+}
+
+.chat-rail-input::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .chat-rail-input::placeholder {
