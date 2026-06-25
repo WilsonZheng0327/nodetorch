@@ -101,7 +101,7 @@ interface Props {
 }
 
 export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs, modelSummary, testResult, open: openProp, onOpenChange }: Props) {
-  const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'epochs' | 'summary' | 'runs' | 'system'>('loss');
+  const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'samples' | 'test' | 'epochs' | 'summary' | 'runs' | 'system'>('loss');
   const [savedRuns, setSavedRuns] = useState<SavedRun[] | null>(null);
   const [runsLoading, setRunsLoading] = useState(false);
   const [compareRun, setCompareRun] = useState<FullRun | null>(null);
@@ -1038,7 +1038,6 @@ function TrackedSamplesView({ progress }: { progress: EpochData[] }) {
   }
 
   // Get sample info from the first epoch (images don't change)
-  const sampleCount = progress[0].trackedSamples!.length;
   const firstProbes = progress[0].trackedSamples!;
 
   return (
@@ -1056,7 +1055,7 @@ function TrackedSamplesView({ progress }: { progress: EpochData[] }) {
   );
 }
 
-function TrackedSampleRow({ sampleIdx, sample, probes, epochs }: {
+function TrackedSampleRow({ sample, probes, epochs }: {
   sampleIdx: number;
   sample: TrackedSampleProbe;
   probes: (TrackedSampleProbe | undefined)[];

@@ -101,7 +101,6 @@ export function VectorBars({ values, height = 180, label }: { values: number[]; 
     // Always include 0, and add ~15% padding above 0 if all values are on one side
     let vmin = Math.min(dataMin, 0);
     let vmax = Math.max(dataMax, 0);
-    const dataRange = vmax - vmin || 1;
     if (dataMax <= 0) vmax = Math.abs(vmin) * 0.15;  // all negative: show some space above 0
     if (dataMin >= 0) vmin = -vmax * 0.08;            // all positive: show a sliver below 0
     const range = vmax - vmin || 1;

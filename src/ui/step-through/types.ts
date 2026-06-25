@@ -34,7 +34,7 @@ export interface Conv2dTransformation {
     kernelW: number;
   } | null;
   // Interactive detail
-  rawInputs?: number[][][][];   // [in_ch][H][W] actual float values per input channel
+  rawInputs?: number[][][];     // [in_ch][H][W] actual float values per input channel
   rawInputH?: number;
   rawInputW?: number;
   rawOutputs?: number[][][];    // [filter][H][W] actual float values per filter

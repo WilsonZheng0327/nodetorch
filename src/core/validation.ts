@@ -65,7 +65,6 @@ const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse', 'ml.loss.vae', 'ml.l
 const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam', 'ml.optimizers.adamw'];
 const DATA_TYPES = ['data.mnist', 'data.cifar10', 'data.cifar100', 'data.fashion_mnist', 'data.imdb', 'data.ag_news', 'data.tiny_shakespeare'];
 const GAN_INPUT_TYPES = ['ml.gan.noise_input'];
-const DIFFUSION_TYPES = ['ml.diffusion.noise_scheduler'];
 
 export function validateTraining(graph: Graph, registry: NodeRegistry): ValidationError[] {
   // Start with forward validation
@@ -75,10 +74,6 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
   // Detect GAN mode
   const ganLossNodes = [...graph.nodes.values()].filter((n) => n.type === 'ml.loss.gan');
   const isGanMode = ganLossNodes.length > 0;
-
-  // Detect diffusion mode
-  const diffusionSchedulerNodes = [...graph.nodes.values()].filter((n) => n.type === 'ml.diffusion.noise_scheduler');
-  const isDiffusionMode = diffusionSchedulerNodes.length > 0;
 
   // Must have exactly one data node
   const dataNodes = [...graph.nodes.values()].filter((n) => DATA_TYPES.includes(n.type));

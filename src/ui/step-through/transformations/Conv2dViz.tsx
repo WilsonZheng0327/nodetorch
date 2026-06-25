@@ -6,7 +6,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { Conv2dTransformation } from '../types';
-import { FeatureMapsGrid, GrayscaleCanvas } from './shared';
+import { GrayscaleCanvas } from './shared';
 
 export function Conv2dViz({ t }: { t: Conv2dTransformation }) {
   const hasInteractive = t.rawInputs && t.allKernels && t.rawOutputs;
@@ -84,7 +84,7 @@ export function Conv2dViz({ t }: { t: Conv2dTransformation }) {
 
 function ConvInteractive({ rawInputs, allKernels, rawOutput, bias, inH, inW, outH, outW, kH, kW, stride, padding,
   selectedFilter, selectedInCh, numInCh, posR, posC, onMove, onSelectInCh }: {
-  rawInputs: number[][][][]; allKernels: number[][][][]; rawOutput: number[][];
+  rawInputs: number[][][]; allKernels: number[][][][]; rawOutput: number[][];
   bias: number; inH: number; inW: number; outH: number; outW: number;
   kH: number; kW: number; stride: number[]; padding: number[];
   selectedFilter: number; selectedInCh: number; numInCh: number;
@@ -158,7 +158,7 @@ function ConvInteractive({ rawInputs, allKernels, rawOutput, bias, inH, inW, out
 
 function TransposeConvInteractive({ rawInputs, allKernels, rawOutput, inH, inW, outH, outW, kH, kW, stride, padding,
   selectedFilter, selectedInCh, numInCh, posR, posC, onMove, onSelectInCh }: {
-  rawInputs: number[][][][]; allKernels: number[][][][]; rawOutput: number[][];
+  rawInputs: number[][][]; allKernels: number[][][][]; rawOutput: number[][];
   inH: number; inW: number; outH: number; outW: number;
   kH: number; kW: number; stride: number[]; padding: number[];
   selectedFilter: number; selectedInCh: number; numInCh: number;

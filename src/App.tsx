@@ -9,11 +9,10 @@ import { EngineNode, DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './u
 import { LeftRail } from './ui/sidebar/LeftRail';
 import { ChatRail } from './ui/chat/ChatRail';
 import { Toolbar } from './ui/Toolbar';
-import { TrainingDashboard, type ModelLayerInfo } from './ui/dashboard/TrainingDashboard';
+import { TrainingDashboard, type ModelLayerInfo, type EpochData } from './ui/dashboard/TrainingDashboard';
 import { StepThroughPanel } from './ui/step-through/StepThroughPanel';
 import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
-import { createNode as cn, addNode as an, createEdge as ce, addEdge as ae } from './core/graph';
 import { TutorialPanel, tutorialEvent } from './ui/tutorial/TutorialPanel';
 import { apiUrl } from './api/base';
 
@@ -275,74 +274,6 @@ export default function App() {
     [reactFlowInstance, graph],
   );
 
-  // Helper: build an identity ResBlock (same channels in/out, stride 1)
-  // Input → Conv(3×3) → BN → ReLU → Conv(3×3) → BN → Add(skip) → ReLU → Output
-  function buildResBlock(block: { subgraph: any }, channels: number) {
-    const inner = block.subgraph;
-    inner.nodes.get('output')!.position = { x: 1100, y: 100 };
-
-    const conv1 = cn('conv1', 'ml.layers.conv2d', { x: 150, y: 100 }, { outChannels: channels, kernelSize: 3, stride: 1, padding: 1 });
-    const bn1 = cn('bn1', 'ml.layers.batchnorm2d', { x: 300, y: 100 }, {});
-    const relu1 = cn('relu1', 'ml.activations.relu', { x: 440, y: 100 }, {});
-    const conv2 = cn('conv2', 'ml.layers.conv2d', { x: 580, y: 100 }, { outChannels: channels, kernelSize: 3, stride: 1, padding: 1 });
-    const bn2 = cn('bn2', 'ml.layers.batchnorm2d', { x: 730, y: 100 }, {});
-    const add = cn('add', 'ml.structural.add', { x: 870, y: 100 }, {});
-    const relu2 = cn('relu2', 'ml.activations.relu', { x: 990, y: 100 }, {});
-
-    [conv1, bn1, relu1, conv2, bn2, add, relu2].forEach((n) => an(inner, n));
-
-    ae(inner, ce('r1', 'input', 'in', 'conv1', 'in'));
-    ae(inner, ce('r2', 'conv1', 'out', 'bn1', 'in'));
-    ae(inner, ce('r3', 'bn1', 'out', 'relu1', 'in'));
-    ae(inner, ce('r4', 'relu1', 'out', 'conv2', 'in'));
-    ae(inner, ce('r5', 'conv2', 'out', 'bn2', 'in'));
-    ae(inner, ce('r6', 'bn2', 'out', 'add', 'a'));
-    ae(inner, ce('r7', 'input', 'in', 'add', 'b'));       // identity skip
-    ae(inner, ce('r8', 'add', 'out', 'relu2', 'in'));
-    ae(inner, ce('r9', 'relu2', 'out', 'output', 'out'));
-  }
-
-  // Helper: build a downsampling ResBlock (channels double, spatial halved via stride 2)
-  // Main path: Conv(3×3, stride 2) → BN → ReLU → Conv(3×3) → BN
-  // Skip path: Conv(1×1, stride 2) → BN  (projection shortcut)
-  // Add → ReLU → Output
-  function buildResBlockDown(block: { subgraph: any }, outChannels: number) {
-    const inner = block.subgraph;
-    inner.nodes.get('output')!.position = { x: 1300, y: 100 };
-
-    // Main path
-    const conv1 = cn('conv1', 'ml.layers.conv2d', { x: 150, y: 60 }, { outChannels: outChannels, kernelSize: 3, stride: 2, padding: 1 });
-    const bn1 = cn('bn1', 'ml.layers.batchnorm2d', { x: 300, y: 60 }, {});
-    const relu1 = cn('relu1', 'ml.activations.relu', { x: 440, y: 60 }, {});
-    const conv2 = cn('conv2', 'ml.layers.conv2d', { x: 580, y: 60 }, { outChannels: outChannels, kernelSize: 3, stride: 1, padding: 1 });
-    const bn2 = cn('bn2', 'ml.layers.batchnorm2d', { x: 730, y: 60 }, {});
-
-    // Projection shortcut (1×1 conv to match channels + stride 2 to match spatial)
-    const projConv = cn('proj_conv', 'ml.layers.conv2d', { x: 300, y: 250 }, { outChannels: outChannels, kernelSize: 1, stride: 2, padding: 0 });
-    const projBn = cn('proj_bn', 'ml.layers.batchnorm2d', { x: 500, y: 250 }, {});
-
-    // Merge
-    const add = cn('add', 'ml.structural.add', { x: 900, y: 100 }, {});
-    const relu2 = cn('relu2', 'ml.activations.relu', { x: 1060, y: 100 }, {});
-
-    [conv1, bn1, relu1, conv2, bn2, projConv, projBn, add, relu2].forEach((n) => an(inner, n));
-
-    // Main path
-    ae(inner, ce('r1', 'input', 'in', 'conv1', 'in'));
-    ae(inner, ce('r2', 'conv1', 'out', 'bn1', 'in'));
-    ae(inner, ce('r3', 'bn1', 'out', 'relu1', 'in'));
-    ae(inner, ce('r4', 'relu1', 'out', 'conv2', 'in'));
-    ae(inner, ce('r5', 'conv2', 'out', 'bn2', 'in'));
-    ae(inner, ce('r6', 'bn2', 'out', 'add', 'a'));
-    // Projection skip
-    ae(inner, ce('r7', 'input', 'in', 'proj_conv', 'in'));
-    ae(inner, ce('r8', 'proj_conv', 'out', 'proj_bn', 'in'));
-    ae(inner, ce('r9', 'proj_bn', 'out', 'add', 'b'));
-    // Merge → output
-    ae(inner, ce('r10', 'add', 'out', 'relu2', 'in'));
-    ae(inner, ce('r11', 'relu2', 'out', 'output', 'out'));
-  }
-
   // Build a full ResNet-34 for CIFAR-100
   // Architecture: [3, 4, 6, 3] BasicBlocks at [64, 128, 256, 512] channels
   // CIFAR-adapted stem: 3×3 conv stride 1 (no 7×7 stride 2, no maxpool)
@@ -446,8 +377,10 @@ export default function App() {
           graphJson={graph.saveGraph()}
         />
         <TutorialPanel />
+        {/* EpochRecord (useGraph) and EpochData describe the same streamed
+            per-epoch data; they should be unified into one shared type. */}
         <TrainingDashboard
-          progress={graph.trainingProgress}
+          progress={graph.trainingProgress as EpochData[]}
           isTraining={isTraining}
           batchProgress={graph.batchProgress}
           selectedEpoch={graph.selectedEpoch}

@@ -13,7 +13,9 @@ NodeTorch — node-based visual tool for building, inspecting, and understanding
 npm install              # install dependencies
 npm run dev              # dev server at http://localhost:5173
 npm run build            # type-check + production build (tsc -b && vite build)
-npx tsc --noEmit         # type-check only
+npm run typecheck        # type-check only (tsc -b). NOTE: `tsc --noEmit` checks
+                         # NOTHING here — the root tsconfig is a solution file
+                         # (files: []), so real checking needs build mode (-b).
 npm run lint             # ESLint (flat config, TS/TSX only)
 
 # Backend (from repo root, uses .venv)
