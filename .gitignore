@@ -28,18 +28,12 @@ __pycache__/
 *.pyc
 .venv/
 
-# Ephemeral storage (datasets, weights, runs, blocks)
-backend/storage/datasets/
-backend/storage/weights/
-backend/storage/runs/
-backend/storage/blocks/
-backend/storage/agent_config.json
-/data/
-backend/data/
+# Unified storage (repo-root storage/). Everything here is ephemeral and
+# gitignored EXCEPT block-templates/, which ships shipped block presets.
+/storage/*
+!/storage/block-templates/
 test_diffusion_output/
-storage/
 test_diffusion.py
-test_diffusion_output/
 
 # Generated export scripts
 /*.py

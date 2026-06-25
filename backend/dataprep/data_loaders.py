@@ -17,8 +17,9 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-# All downloaded datasets go here
-DATASETS_DIR = "./storage/datasets"
+# All downloaded datasets go here. Single source of truth in paths.py (anchored to
+# the repo-root storage/, not the launch directory).
+from paths import DATASETS_DIR
 
 # Dataset types that signal autoregressive/language model training mode
 LM_DATASET_TYPES = {"data.tiny_shakespeare"}

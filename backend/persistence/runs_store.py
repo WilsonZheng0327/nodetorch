@@ -15,9 +15,10 @@ but we save the optimizer + data node config so users know how each run differed
 from __future__ import annotations
 import json
 import time
-from pathlib import Path
 
-RUNS_DIR = Path("./storage/runs")
+from paths import STORAGE_DIR
+
+RUNS_DIR = STORAGE_DIR / "runs"
 RUNS_DIR.mkdir(parents=True, exist_ok=True)
 
 

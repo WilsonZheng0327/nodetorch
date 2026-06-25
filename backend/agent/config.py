@@ -18,11 +18,12 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
 
-# backend/storage/agent_config.json — anchored to this file so it is independent
-# of the process working directory.
-_CONFIG_PATH = Path(__file__).resolve().parent.parent / "storage" / "agent_config.json"
+from paths import STORAGE_DIR
+
+# Lives in the unified repo-root storage/ (anchored in paths.py, independent of the
+# process working directory) so API keys never reach the browser.
+_CONFIG_PATH = STORAGE_DIR / "agent_config.json"
 
 DEFAULT_PROVIDER = "openai_compat"
 

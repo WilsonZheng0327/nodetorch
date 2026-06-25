@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from fastapi import APIRouter
 
-from paths import BLOCKS_DIR, PRESETS_DIR
+from paths import BLOCKS_DIR, BLOCK_TEMPLATES_DIR
 
 logger = logging.getLogger("nodetorch")
 
@@ -43,8 +43,8 @@ async def list_blocks():
     """List all saved and preset blocks."""
     blocks = []
     # Preset blocks (shipped, read-only)
-    if PRESETS_DIR.exists():
-        for f in PRESETS_DIR.glob("*.json"):
+    if BLOCK_TEMPLATES_DIR.exists():
+        for f in BLOCK_TEMPLATES_DIR.glob("*.json"):
             try:
                 data = json.loads(f.read_text())
                 blocks.append({
@@ -85,7 +85,7 @@ async def save_block(block_data: dict):
 async def load_block(filename: str):
     """Load a block definition (from presets or user blocks)."""
     if filename.startswith("preset:"):
-        filepath = PRESETS_DIR / filename[7:]
+        filepath = BLOCK_TEMPLATES_DIR / filename[7:]
     else:
         filepath = BLOCKS_DIR / filename
     if not filepath.exists():
