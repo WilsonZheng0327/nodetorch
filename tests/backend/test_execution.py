@@ -1,0 +1,153 @@
+"""Integration tests for the graph-execution walks.
+
+These drive the per-node-type dispatch end-to-end on real shipped presets:
+  build_modules / build_and_run_graph (forward)  — engine/graph_builder/forward.py
+  infer_graph, evaluate_test_set                 — engine/graph_builder/inference.py
+  run_final_forward (via train_graph)            — training/base.py
+
+Those walks currently have ZERO coverage, yet they're the duplicated
+forward-dispatch we want to unify. This suite is the safety net for that
+refactor: it pins current behavior so a behavior-preserving change stays green.
+
+Only MNIST / FashionMNIST presets are used (small, already-cached datasets), but
+they cover nearly every irregular dispatch branch: conv, linear, dropout,
+reparameterize + VAE loss, GAN noise_input + subgraph.block, diffusion
+noise_scheduler + concat.
+"""
+import glob
+import json
+import math
+import os
+
+import pytest
+import torch.nn as nn
+
+from engine.graph_builder import (
+    build_modules,
+    execute_graph,
+    infer_graph,
+    evaluate_test_set,
+    train_graph,
+    _model_store,
+)
+
+PRESETS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "model-presets")
+
+
+def load_preset(name: str) -> dict:
+    with open(os.path.join(PRESETS_DIR, f"{name}.json")) as f:
+        return json.load(f)
+
+
+def node_ids(graph_data: dict) -> set[str]:
+    return {n["id"] for n in graph_data["graph"]["nodes"]}
+
+
+# MNIST/FashionMNIST presets — fast (cached) data, covering the irregular branches.
+FAST_PRESETS = [
+    "mlp-mnist",          # baseline: linear / flatten / dropout / relu
+    "lenet5-mnist",       # conv2d / pooling
+    "cnn-fashion-mnist",  # conv on a second dataset
+    "autoencoder-mnist",  # reconstruction (no classifier head)
+    "vae-mnist",          # reparameterize + VAE loss (multi-input)
+    "gan-mnist",          # GAN noise_input + subgraph.block
+    "diffusion-mnist",    # diffusion noise_scheduler + concat
+]
+
+
+# --- Forward walk (no training needed) ---
+
+@pytest.mark.parametrize("name", FAST_PRESETS)
+def test_forward_walk_handles_every_node(name):
+    """build_and_run_graph must produce a result for EVERY node, whatever its
+    type. This is the core regression check: if the dispatch ever drops or fails
+    to handle a node type (the drift we're guarding against), a node goes missing
+    here."""
+    g = load_preset(name)
+    results = execute_graph(g)
+
+    assert isinstance(results, dict) and results, f"{name}: no results"
+    missing = node_ids(g) - set(results)
+    assert not missing, f"{name}: nodes not handled by the forward walk: {sorted(missing)}"
+    for nid, r in results.items():
+        assert "outputs" in r and "metadata" in r, f"{name}: malformed result for {nid}"
+
+
+def test_mlp_forward_produces_correct_shapes():
+    """Pin exact forward behavior on the baseline classifier."""
+    g = load_preset("mlp-mnist")
+    results = execute_graph(g)
+
+    errors = {nid: r["metadata"]["error"] for nid, r in results.items() if r["metadata"].get("error")}
+    assert not errors, f"unexpected forward errors: {errors}"
+
+    # Data node emits an output shape; the final linear emits 10 logits.
+    assert results["mnist"]["metadata"].get("outputShape")
+    assert results["linear3"]["metadata"]["outputShape"][-1] == 10
+
+
+def test_build_modules_creates_trainable_layers():
+    g = load_preset("mlp-mnist")
+    modules = build_modules(g)
+    assert isinstance(modules.get("linear1"), nn.Module)
+    assert isinstance(modules.get("linear3"), nn.Module)
+
+
+def test_gan_preset_runs_its_subgraph_block():
+    """gan-mnist contains a subgraph.block — exercise the recursive branch."""
+    g = load_preset("gan-mnist")
+    block_ids = [n["id"] for n in g["graph"]["nodes"] if n["type"] == "subgraph.block"]
+    assert block_ids, "expected gan-mnist to contain a subgraph.block"
+    results = execute_graph(g)
+    for bid in block_ids:
+        assert bid in results, f"subgraph block {bid} not handled"
+
+
+# --- Train → infer → test (one shared 1-epoch run) ---
+
+@pytest.fixture(scope="module")
+def trained_mlp():
+    """Train mlp-mnist for a single fast epoch and leave it in the model store, so
+    the infer/test walks have a trained model to read."""
+    _model_store.clear()
+    g = load_preset("mlp-mnist")
+    for n in g["graph"]["nodes"]:
+        if n["type"].startswith("ml.optimizers"):
+            n["properties"]["epochs"] = 1      # one epoch
+        if n["type"].startswith("data."):
+            n["properties"]["batchSize"] = 512  # fewer iterations → faster
+    epochs: list[dict] = []
+    result = train_graph(g, on_epoch=epochs.append)
+    return g, result, epochs
+
+
+def test_train_graph_one_epoch_smoke(trained_mlp):
+    g, result, epochs = trained_mlp
+    assert "error" not in result, result.get("error")
+    assert len(epochs) >= 1, "no epoch was reported"
+    assert math.isfinite(epochs[-1]["loss"]), "final loss is not finite"
+    assert "current" in _model_store, "training did not populate the model store"
+
+
+def test_infer_graph_predicts_after_training(trained_mlp):
+    g, _, _ = trained_mlp
+    out = infer_graph(g)
+    assert "error" not in out, out.get("error")
+    assert out["prediction"] is not None
+    assert "nodeResults" in out
+
+
+def test_evaluate_test_set_after_training(trained_mlp):
+    g, _, _ = trained_mlp
+    out = evaluate_test_set(g)
+    assert "error" not in out, out.get("error")
+    assert 0.0 <= out["testAccuracy"] <= 1.0
+    assert out["testSamples"] > 0
+
+
+# --- Coverage note ---
+
+def test_fast_presets_all_exist():
+    """Guard against a preset being renamed out from under the suite."""
+    available = {os.path.basename(p)[:-5] for p in glob.glob(os.path.join(PRESETS_DIR, "*.json"))}
+    assert set(FAST_PRESETS) <= available, f"missing presets: {set(FAST_PRESETS) - available}"
