@@ -226,96 +226,18 @@ def build_modules(graph_data: dict) -> dict[str, nn.Module]:
     for downstream layers) but discards the outputs. Much lighter than
     build_and_run_graph for cases where you only need the module architecture.
     """
+    # Shares the per-node-type dispatch with the forward walk (runners.py); we
+    # just discard the display metadata and keep the built modules. Local import
+    # avoids an import cycle (runners imports from this module).
+    from engine.graph_builder.runners import RunContext, run_node
+
     graph = graph_data["graph"]
     nodes = {n["id"]: n for n in graph["nodes"]}
     edges = graph["edges"]
     order = topological_sort(nodes, edges)
 
-    modules: dict[str, nn.Module] = {}
-    results: dict[str, dict] = {}
-    dev = get_device()
-
+    ctx = RunContext(edges=edges, results={}, modules={}, use_trained=False)
     with torch.no_grad():
         for node_id in order:
-            node = nodes[node_id]
-            node_type = node["type"]
-            props = node.get("properties", {})
-
-            loader = DATA_LOADERS.get(node_type)
-            if loader:
-                tensors = loader(props)
-                results[node_id] = {k: (v.to(dev) if isinstance(v, torch.Tensor) else v) for k, v in tensors.items()}
-                continue
-
-            if node_type in OPTIMIZER_NODES:
-                continue
-
-            # GAN noise input: produce dummy noise for shape inference
-            if node_type == GAN_NOISE_TYPE:
-                builder = NODE_BUILDERS.get(node_type)
-                if builder:
-                    module = builder(props, {})
-                    modules[node_id] = module.to(dev)
-                    batch_size = props.get("batchSize", 64)
-                    latent_dim = props.get("latentDim", 100)
-                    results[node_id] = {"out": torch.randn(batch_size, latent_dim, device=dev)}
-                continue
-
-            # Diffusion noise scheduler: build module and produce dummy output
-            if node_type == DIFFUSION_SCHEDULER_TYPE:
-                inputs = gather_inputs(node_id, edges, results)
-                builder = NODE_BUILDERS.get(node_type)
-                if builder:
-                    input_shapes = {k: list(v.shape) for k, v in inputs.items() if isinstance(v, torch.Tensor)}
-                    module = builder(props, input_shapes)
-                    modules[node_id] = module.to(dev)
-                    if "images" in inputs:
-                        images = inputs["images"]
-                        t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=dev)
-                        results[node_id] = {"out": images.clone(), "noise": torch.zeros_like(images), "timestep": t_channel}
-                continue
-
-            # Diffusion timestep embedding: no input, fixed output
-            if node_type == DIFFUSION_EMBED_TYPE:
-                builder = NODE_BUILDERS.get(node_type)
-                if builder:
-                    module = builder(props, {})
-                    modules[node_id] = module.to(dev)
-                    embed_dim = props.get("embedDim", 128)
-                    results[node_id] = {"out": torch.zeros(1, embed_dim, device=dev)}
-                continue
-
-            inputs = gather_inputs(node_id, edges, results)
-            input_shapes = {k: list(v.shape) for k, v in inputs.items() if isinstance(v, torch.Tensor)}
-
-            if node_type == SUBGRAPH_TYPE:
-                subgraph_data = node.get("subgraph")
-                if subgraph_data:
-                    sg_module = build_subgraph_module(subgraph_data, input_shapes)
-                    modules[node_id] = sg_module.to(dev)
-                    sg_out = sg_module(**inputs)
-                    first_key = next(iter(sg_out), None)
-                    if first_key:
-                        results[node_id] = {"out": sg_out[first_key]}
-                continue
-
-            builder = NODE_BUILDERS.get(node_type)
-            if not builder:
-                continue
-
-            try:
-                module = builder(props, input_shapes)
-                modules[node_id] = module.to(dev)
-
-                if node_type in LOSS_NODES:
-                    if "predictions" in inputs and "labels" in inputs:
-                        results[node_id] = {"out": module(inputs["predictions"], inputs["labels"])}
-                elif node_type in MULTI_INPUT_NODES:
-                    results[node_id] = {"out": module(**{k: v for k, v in inputs.items()})}
-                elif "in" in inputs:
-                    raw = module(inputs["in"])
-                    results[node_id] = raw if isinstance(raw, dict) else {"out": raw}
-            except Exception:
-                continue
-
-    return modules
+            run_node(nodes[node_id], ctx)
+    return ctx.modules
