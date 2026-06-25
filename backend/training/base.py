@@ -6,6 +6,7 @@ All training loop plugins use these building blocks. Adding a new paradigm
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+import logging
 import threading
 import time
 import inspect
@@ -21,6 +22,7 @@ from engine.graph_builder import (
     get_device,
     _safe_float,
     _model_store,
+    snapshot_trained_model,
     _last_run,
     ALL_LOSS_NODES,
     OPTIMIZER_NODES,
@@ -667,6 +669,14 @@ def run_final_forward(ctx, modules):
 def save_training_results(ctx: TrainingContext, result: TrainingResult) -> dict:
     """Store training results in global state and return the response dict."""
     _model_store["current"] = result.modules
+
+    # Snapshot the trained model to disk so it survives a backend restart (the
+    # in-memory store is wiped on restart, which would otherwise lose the run and
+    # break inference). Best-effort: never let a disk hiccup fail training.
+    try:
+        snapshot_trained_model(ctx.graph_data)
+    except Exception as e:
+        logging.getLogger("nodetorch").warning(f"Model snapshot failed: {e}")
 
     _last_run.clear()
     _last_run["modules"] = result.modules

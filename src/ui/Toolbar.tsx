@@ -1,7 +1,7 @@
 // Toolbar — save/load graph, run forward pass, train.
 
 import { useRef, useState, useEffect } from 'react';
-import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, HardDriveDownload, HardDriveUpload, GraduationCap, FileCode } from 'lucide-react';
+import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, ChevronDown, GraduationCap, FileCode } from 'lucide-react';
 import { tutorialEvent } from './tutorial/TutorialPanel';
 import './Toolbar.css';
 
@@ -18,31 +18,41 @@ interface Props {
   onHideAllViz: () => void;
   onStepThrough: () => void;
   onSimulateBackprop: () => void;
-  onSaveModel: () => Promise<void>;
-  onLoadModel: () => Promise<void>;
+  onSaveModel: () => Promise<void>;            // bundle: graph + weights (.ntmodel)
+  onLoadModel: (file: File) => Promise<void>;  // bundle: replaces graph + weights
+  onSaveWeights: () => Promise<void>;          // weights only (.pt)
+  onLoadWeights: (file: File) => Promise<void>; // weights onto the current graph
   onExportPython: () => Promise<void>;
   status: { type: 'idle' | 'running' | 'success' | 'error'; message?: string };
   modelTrained: boolean;
   modelStale: boolean;
 }
 
-export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, onSaveModel, onLoadModel, onExportPython, status, modelTrained, modelStale }: Props) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, onSaveModel, onLoadModel, onSaveWeights, onLoadWeights, onExportPython, status, modelTrained, modelStale }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);       // graph (.json)
+  const modelInputRef = useRef<HTMLInputElement>(null);      // model bundle (.ntmodel)
+  const weightsInputRef = useRef<HTMLInputElement>(null);    // weights (.pt)
   const [busy, setBusy] = useState(false);
   const [presets, setPresets] = useState<{filename: string; name: string}[]>([]);
   const [presetsOpen, setPresetsOpen] = useState(false);
   const presetsRef = useRef<HTMLDivElement>(null);
+  // Save / Load are each a single button opening a 3-item dropdown (Graph / Model / Weights).
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [loadOpen, setLoadOpen] = useState(false);
+  const saveMenuRef = useRef<HTMLDivElement>(null);
+  const loadMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!presetsOpen) return;
+    if (!presetsOpen && !saveOpen && !loadOpen) return;
     const handler = (e: PointerEvent | MouseEvent) => {
-      if (presetsRef.current && !presetsRef.current.contains(e.target as Node)) {
-        setPresetsOpen(false);
-      }
+      const t = e.target as Node;
+      if (presetsRef.current && !presetsRef.current.contains(t)) setPresetsOpen(false);
+      if (saveMenuRef.current && !saveMenuRef.current.contains(t)) setSaveOpen(false);
+      if (loadMenuRef.current && !loadMenuRef.current.contains(t)) setLoadOpen(false);
     };
     document.addEventListener('pointerdown', handler, true);
     return () => document.removeEventListener('pointerdown', handler, true);
-  }, [presetsOpen]);
+  }, [presetsOpen, saveOpen, loadOpen]);
 
   async function openPresets() {
     if (presetsOpen) { setPresetsOpen(false); return; }
@@ -121,6 +131,23 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
     e.target.value = '';
   }
 
+  // Loading a model bundle replaces both the graph and the weights — confirm first.
+  function handleModelFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!window.confirm('Loading a model will replace your current graph and weights. Continue?')) return;
+    handleAction(() => onLoadModel(file));
+  }
+
+  // Loading weights only keeps the current graph (architecture must match) — no warning.
+  function handleWeightsFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    handleAction(() => onLoadWeights(file));
+  }
+
   async function handleAction(fn: () => Promise<void>) {
     setBusy(true);
     try {
@@ -167,12 +194,30 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
           Infer{modelStale ? ' !' : ''}
         </button>
         <div className="toolbar-separator" />
-        <button className="toolbar-btn toolbar-btn-icon" onClick={handleSave} title="Save graph to file">
-          <Download size={15} />
-        </button>
-        <button className="toolbar-btn toolbar-btn-icon" onClick={handleLoad} title="Load graph from file">
-          <Upload size={15} />
-        </button>
+        <div ref={saveMenuRef} style={{ position: 'relative' }}>
+          <button className="toolbar-btn toolbar-btn-icon" onClick={() => { setSaveOpen((o) => !o); setLoadOpen(false); }} title="Save graph, model, or weights">
+            <Download size={15} /><ChevronDown size={11} />
+          </button>
+          {saveOpen && (
+            <div className="toolbar-presets-dropdown">
+              <button className="toolbar-presets-item" onClick={() => { setSaveOpen(false); handleSave(); }}>Graph (.json)</button>
+              <button className="toolbar-presets-item" disabled={!modelTrained} title={!modelTrained ? 'Train a model first' : undefined} onClick={() => { setSaveOpen(false); handleAction(onSaveModel); }}>Model (.ntmodel)</button>
+              <button className="toolbar-presets-item" disabled={!modelTrained} title={!modelTrained ? 'Train a model first' : undefined} onClick={() => { setSaveOpen(false); handleAction(onSaveWeights); }}>Weights (.pt)</button>
+            </div>
+          )}
+        </div>
+        <div ref={loadMenuRef} style={{ position: 'relative' }}>
+          <button className="toolbar-btn toolbar-btn-icon" onClick={() => { setLoadOpen((o) => !o); setSaveOpen(false); }} title="Load graph, model, or weights">
+            <Upload size={15} /><ChevronDown size={11} />
+          </button>
+          {loadOpen && (
+            <div className="toolbar-presets-dropdown">
+              <button className="toolbar-presets-item" onClick={() => { setLoadOpen(false); handleLoad(); }}>Graph (.json)</button>
+              <button className="toolbar-presets-item" onClick={() => { setLoadOpen(false); modelInputRef.current?.click(); }}>Model (.ntmodel)</button>
+              <button className="toolbar-presets-item" onClick={() => { setLoadOpen(false); weightsInputRef.current?.click(); }}>Weights (.pt)</button>
+            </div>
+          )}
+        </div>
         <div ref={presetsRef} style={{ position: 'relative' }}>
           <button className="toolbar-btn toolbar-btn-icon" onClick={openPresets} title="Load a model preset">
             <BookOpen size={15} />
@@ -207,12 +252,6 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
           <Undo2 size={15} />
         </button>
         <div className="toolbar-separator" />
-        <button className="toolbar-btn toolbar-btn-icon" onClick={() => handleAction(onSaveModel)} disabled={busy || !modelTrained} title="Save trained weights to disk">
-          <HardDriveDownload size={15} />
-        </button>
-        <button className="toolbar-btn toolbar-btn-icon" onClick={() => handleAction(onLoadModel)} disabled={busy} title="Load trained weights from disk">
-          <HardDriveUpload size={15} />
-        </button>
         <button className="toolbar-btn toolbar-btn-icon" onClick={() => handleAction(onExportPython)} disabled={busy} title="Export as standalone Python file">
           <FileCode size={15} />
         </button>
@@ -220,13 +259,9 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
         <button className="toolbar-btn toolbar-btn-icon" onClick={() => window.dispatchEvent(new Event('nodetorch-tutorial-reopen'))} title="Open tutorial">
           <GraduationCap size={15} />
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          style={{ display: 'none' }}
-          onChange={handleFileChange}
-        />
+        <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileChange} />
+        <input ref={modelInputRef} type="file" accept=".ntmodel" style={{ display: 'none' }} onChange={handleModelFile} />
+        <input ref={weightsInputRef} type="file" accept=".pt" style={{ display: 'none' }} onChange={handleWeightsFile} />
       </div>
       {status.message && status.type !== 'idle' && (
         <div className={`toolbar-status toolbar-status-${status.type}`}>

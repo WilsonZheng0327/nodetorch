@@ -21,6 +21,7 @@ from engine.graph_builder._state import (
     get_device, set_device, get_device_name,
     has_trained_model, get_trained_modules,
     save_model, save_model_bytes, load_model_bytes, load_model,
+    save_bundle_bytes, load_bundle_bytes, snapshot_trained_model, ensure_trained_model,
     _model_store, _last_run,
 )
 from engine.graph_builder.stats import (

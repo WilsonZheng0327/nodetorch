@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 import main
 
 
-# The full set of registered route paths after the APIRouter split (41 total),
+# The full set of registered route paths after the APIRouter split,
 # built from the endpoint → module mapping.
 EXPECTED_PATHS = {
     # system
@@ -38,6 +38,8 @@ EXPECTED_PATHS = {
     "/saved-models",
     "/download-weights",
     "/upload-weights",
+    "/download-model",
+    "/upload-model",
     # data
     "/dataset/{dataset_type:path}",
     "/tokenizer/preview",
@@ -81,8 +83,8 @@ def test_registered_routes_exactly_match_expected():
     assert paths == EXPECTED_PATHS
 
 
-def test_route_count_is_41():
-    """41 endpoints total — counts each method on shared paths separately."""
+def test_route_count():
+    """Total endpoint count — counts each method on shared paths separately."""
     builtin = {"/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"}
     http_endpoints = 0
     ws_endpoints = 0
@@ -96,7 +98,7 @@ def test_route_count_is_41():
             http_endpoints += len(methods - {"HEAD", "OPTIONS"})
         else:
             ws_endpoints += 1
-    assert http_endpoints + ws_endpoints == 41
+    assert http_endpoints + ws_endpoints == 43
 
 
 def test_health():

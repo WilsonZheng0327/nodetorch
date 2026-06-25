@@ -2,7 +2,10 @@ import json
 import logging
 from fastapi import APIRouter, UploadFile, Form
 
-from engine.graph_builder import save_model, load_model, save_model_bytes, load_model_bytes
+from engine.graph_builder import (
+    save_model, load_model, save_model_bytes, load_model_bytes,
+    save_bundle_bytes, load_bundle_bytes,
+)
 from paths import STORAGE_DIR
 
 logger = logging.getLogger("nodetorch")
@@ -74,4 +77,36 @@ async def upload_weights(file: UploadFile, graph: str = Form(...)):
         return result
     except Exception as e:
         logger.error(f"Upload weights failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@router.post("/download-model")
+async def download_model(request: dict):
+    """Download a self-contained model bundle (graph + weights) as a .ntmodel file.
+    The frontend sends the current graph; the backend pairs it with the trained
+    weights so the bundle reloads on its own."""
+    from fastapi.responses import Response
+    graph_data = request.get("graph")
+    if graph_data is None:
+        return {"status": "error", "error": "Missing graph"}
+    data = save_bundle_bytes(graph_data)
+    if data is None:
+        return {"status": "error", "error": "No trained model to save"}
+    return Response(content=data, media_type="application/octet-stream",
+                    headers={"Content-Disposition": "attachment; filename=model.ntmodel"})
+
+
+@router.post("/upload-model")
+async def upload_model(file: UploadFile):
+    """Upload a .ntmodel bundle, load its weights, and return the embedded graph so
+    the frontend can put the architecture on the canvas. Self-contained — no graph
+    needs to be sent."""
+    logger.info("Upload model requested")
+    try:
+        result = load_bundle_bytes(await file.read())
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return result  # { status: "ok", graph: <SerializedGraph> }
+    except Exception as e:
+        logger.error(f"Upload model failed: {e}")
         return {"status": "error", "error": str(e)}

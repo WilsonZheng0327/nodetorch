@@ -49,4 +49,16 @@ app.include_router(agent_routes.router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    # NODETORCH_DEV=1 enables hot reload — the server restarts on Python changes
+    # so you don't have to stop/start it by hand while developing. reload needs
+    # the app as an import string (not the app object); the reloader spawns a
+    # child process that imports it, so we put this dir on PYTHONPATH (inherited
+    # by the child) to make "main" importable no matter which directory you
+    # launched from. Default (unset) runs the app object directly — no watcher.
+    if os.environ.get("NODETORCH_DEV") == "1":
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        os.environ["PYTHONPATH"] = backend_dir + os.pathsep + os.environ.get("PYTHONPATH", "")
+        uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, reload_dirs=[backend_dir])
+    else:
+        uvicorn.run(app, host="0.0.0.0", port=8000)

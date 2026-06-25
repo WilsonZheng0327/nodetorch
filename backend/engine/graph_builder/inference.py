@@ -15,7 +15,7 @@ from engine.graph_builder.constants import (
     GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE, SUBGRAPH_TYPE,
 )
 from engine.graph_builder._state import (
-    get_device, has_trained_model, get_trained_modules, _last_run,
+    get_device, has_trained_model, get_trained_modules, ensure_trained_model, _last_run,
 )
 from engine.graph_builder.build import topological_sort, gather_inputs
 from engine.graph_builder.stats import tensor_info, _safe_float
@@ -27,7 +27,10 @@ def evaluate_test_set(graph_data: dict) -> dict:
     Returns test loss, test accuracy, per-class accuracy, and sample count.
     Only works for classification models (2D predictions).
     """
-    if not has_trained_model():
+    # Lazy-load the on-disk snapshot if the in-memory store is empty (e.g. the
+    # backend restarted since training). ensure_trained_model() returns whether a
+    # model is available afterward.
+    if not ensure_trained_model():
         return {"error": "No trained model — train first"}
 
     # Diffusion and GAN models don't support standard test evaluation
@@ -204,7 +207,10 @@ def infer_graph(graph_data: dict) -> dict:
     Loads a single sample, runs through stored trained modules,
     returns per-node results + prediction.
     """
-    if not has_trained_model():
+    # Lazy-load the on-disk snapshot if the in-memory store is empty (e.g. the
+    # backend restarted since training). ensure_trained_model() returns whether a
+    # model is available afterward.
+    if not ensure_trained_model():
         return {"error": "No trained model — train first"}
 
     # Diffusion and GAN models don't support standard inference

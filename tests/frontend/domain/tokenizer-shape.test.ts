@@ -1,82 +1,68 @@
-// Unit tests for the Tokenizer node's shape executor.
-// Verifies output shape computation, metadata, and edge cases.
+// Unit tests for the Tokenizer nodes' shape executors.
+// The tokenizer was split from one node with a `mode` property into three
+// distinct node types (char / word / bpe); each bakes the mode into its type
+// and reports it as a fixed "Mode" metadata label. All three share the same
+// shape behavior: [B, L] in → [B, maxLen] out.
 
 import { describe, it, expect } from 'vitest';
 
-import { tokenizerNode } from '../../../src/domain/nodes/preprocessing/tokenizer';
+import { tokenizerCharNode } from '../../../src/domain/nodes/preprocessing/tokenizer-char';
+import { tokenizerWordNode } from '../../../src/domain/nodes/preprocessing/tokenizer-word';
+import { tokenizerBpeNode } from '../../../src/domain/nodes/preprocessing/tokenizer-bpe';
 
 /** Shorthand to grab the shape executor. */
 function shapeExecutor(node: { executors: Record<string, { execute: Function }> }) {
   return node.executors.shape;
 }
 
-// ---------------------------------------------------------------------------
-// Tokenizer shape executor
-// ---------------------------------------------------------------------------
+const TOKENIZERS = [
+  { node: tokenizerCharNode, label: 'Character-level' },
+  { node: tokenizerWordNode, label: 'Word-level' },
+  { node: tokenizerBpeNode, label: 'Byte-Pair Encoding' },
+];
 
-describe('Tokenizer shape executor', () => {
-  const executor = shapeExecutor(tokenizerNode);
+describe.each(TOKENIZERS)('Tokenizer shape executor — $label', ({ node, label }) => {
+  const executor = shapeExecutor(node);
 
   it('outputs [B, maxLen] from [B, L] input', async () => {
     const result = await executor.execute({
       inputs: { in: [32, 256] },
-      properties: { mode: 'word', vocabSize: 10000, maxLen: 128 },
+      properties: { vocabSize: 10000, maxLen: 128 },
     });
     expect(result.outputs.out).toEqual([32, 128]);
   });
 
-  it('preserves batch dimension', async () => {
+  it('preserves the batch dimension', async () => {
     const result = await executor.execute({
       inputs: { in: [64, 512] },
-      properties: { mode: 'character', vocabSize: 100, maxLen: 256 },
+      properties: { vocabSize: 100, maxLen: 256 },
     });
     expect(result.outputs.out).toEqual([64, 256]);
   });
 
-  it('returns empty outputs when no input', async () => {
+  it('returns empty outputs when there is no input', async () => {
     const result = await executor.execute({
       inputs: {},
-      properties: { mode: 'word', vocabSize: 10000, maxLen: 128 },
+      properties: { vocabSize: 10000, maxLen: 128 },
     });
     expect(result.outputs).toEqual({});
   });
 
-  it('includes metadata with mode and vocab info', async () => {
+  it('reports its mode and output shape in metadata', async () => {
     const result = await executor.execute({
       inputs: { in: [32, 256] },
-      properties: { mode: 'bpe', vocabSize: 50000, maxLen: 512 },
+      properties: { vocabSize: 50000, maxLen: 512 },
     });
-    expect(result.metadata).toBeDefined();
     expect(result.metadata.outputShape).toEqual([32, 512]);
     expect(result.metadata.shapes).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ label: 'Mode', value: 'Byte-Pair Encoding' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ label: 'Mode', value: label })]),
     );
-  });
-
-  it('maps mode names to readable labels', async () => {
-    const modes = [
-      { mode: 'character', expected: 'Character-level' },
-      { mode: 'word', expected: 'Word-level' },
-      { mode: 'bpe', expected: 'Byte-Pair Encoding' },
-    ];
-    for (const { mode, expected } of modes) {
-      const result = await executor.execute({
-        inputs: { in: [1, 10] },
-        properties: { mode, vocabSize: 100, maxLen: 10 },
-      });
-      const modeShape = result.metadata.shapes.find(
-        (s: { label: string }) => s.label === 'Mode',
-      );
-      expect(modeShape?.value).toBe(expected);
-    }
   });
 
   it('works with maxLen=1 (minimum)', async () => {
     const result = await executor.execute({
       inputs: { in: [8, 1000] },
-      properties: { mode: 'word', vocabSize: 5000, maxLen: 1 },
+      properties: { vocabSize: 5000, maxLen: 1 },
     });
     expect(result.outputs.out).toEqual([8, 1]);
   });

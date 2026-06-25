@@ -28,7 +28,9 @@ npx vitest run tests/frontend/core/graph.test.ts  # single frontend test file
 
 Test locations: `tests/frontend/` (vitest, configured in `vite.config.ts`) and `tests/backend/` (pytest, configured in `pytest.ini` with `pythonpath = backend`).
 
-Backend must be restarted manually after Python changes — no hot reload.
+Backend has no hot reload by default — restart it manually after Python changes.
+Set `NODETORCH_DEV=1` to enable uvicorn auto-reload during development
+(`NODETORCH_DEV=1 .venv/bin/python backend/main.py`).
 
 ## Architecture
 
@@ -115,7 +117,7 @@ During training, `build_training_context()` detects the tokenizer node's mode. I
 2. **Backend builder**: add builder function to `backend/engine/node_builders.py` (layers) or `backend/dataprep/data_loaders.py` (datasets). Loss nodes also need `LOSS_NODES` in `backend/engine/graph_builder/constants.py`.
 3. **Backend viz**: create or edit a file in `backend/visualize/layers/` with the forward/backward viz function, then register it in `backend/visualize/node_viz.py`'s `FORWARD_VIZ` / `BACKWARD_VIZ` registries. Optional — default fallback provides basic shape-based viz.
 
-Additional design docs live in `docs/`: `backend-architecture.md` (backend overview + "what happens when you press Train" walkthrough), `shape-inference.md`, `training-flow.md`, `training-plugins.md`, `visualization.md`, `multi-output-nodes.md`, `custom-blocks.md`, `copy-paste.md`, `undo-redo.md`.
+Additional design docs live in `docs/`: `frontend-architecture.md` (the 6-layer frontend stack — what each layer does, why, and a "what happens when you edit a node" walkthrough), `backend-architecture.md` (backend overview + "what happens when you press Train" walkthrough), `shape-inference.md`, `training-flow.md`, `training-plugins.md`, `visualization.md`, `multi-output-nodes.md`, `custom-blocks.md`, `copy-paste.md`, `undo-redo.md`.
 
 ### Node metadata convention
 

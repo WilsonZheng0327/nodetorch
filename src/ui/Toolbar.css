@@ -44,6 +44,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 1px;  /* small space when a button pairs an icon with a dropdown chevron */
 }
 
 .toolbar-btn-infer {
@@ -175,4 +176,13 @@
 
 .toolbar-presets-item:hover {
   background: #313244;
+}
+
+.toolbar-presets-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolbar-presets-item:disabled:hover {
+  background: none;
 }

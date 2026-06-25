@@ -18,6 +18,14 @@ import {
 import type { DomainContext } from '../domain';
 import { validateForward, validateTraining } from '../core/validation';
 import { getNodePorts } from '../core/ports';
+import {
+  type SerializedGraph,
+  serializeGraph,
+  serializeGraphData,
+  deserializeGraph,
+  deserializeGraphData,
+  validateSerializedGraph,
+} from '../core/serialization';
 
 /** One epoch's worth of streamed training metrics (appended per `epoch` message).
  *  The scalar metrics are named; heavier per-epoch payloads (gradient flow,
@@ -76,70 +84,6 @@ function toRFEdges(graph: Graph): RF.Edge[] {
   }));
 }
 
-// --- Serialization ---
-
-interface SerializedNode {
-  id: string;
-  type: string;
-  position: { x: number; y: number };
-  properties: Record<string, any>;
-  subgraph?: SerializedGraphData;
-}
-
-interface SerializedGraphData {
-  id: string;
-  name: string;
-  nodes: SerializedNode[];
-  edges: { id: string; source: { nodeId: string; portId: string }; target: { nodeId: string; portId: string } }[];
-}
-
-interface SerializedGraph {
-  version: '1.0';
-  graph: SerializedGraphData;
-}
-
-function serializeGraphData(graph: Graph): SerializedGraphData {
-  return {
-    id: graph.id,
-    name: graph.name,
-    nodes: Array.from(graph.nodes.values()).map((n) => ({
-      id: n.id,
-      type: n.type,
-      position: n.position,
-      properties: n.properties,
-      ...(n.subgraph ? { subgraph: serializeGraphData(n.subgraph) } : {}),
-    })),
-    edges: graph.edges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-    })),
-  };
-}
-
-function serializeGraph(graph: Graph): SerializedGraph {
-  return { version: '1.0', graph: serializeGraphData(graph) };
-}
-
-function deserializeGraphData(data: SerializedGraphData): Graph {
-  const graph = createGraph(data.id, data.name);
-  for (const n of data.nodes) {
-    const node = createNode(n.id, n.type, n.position, n.properties);
-    if (n.subgraph) {
-      node.subgraph = deserializeGraphData(n.subgraph);
-    }
-    addNode(graph, node);
-  }
-  for (const e of data.edges) {
-    addGraphEdge(graph, { id: e.id, source: e.source, target: e.target });
-  }
-  return graph;
-}
-
-function deserializeGraph(data: SerializedGraph): Graph {
-  return deserializeGraphData(data.graph);
-}
-
 // --- Friendly error translation ---
 
 /** Translate common PyTorch errors into student-friendly messages. */
@@ -156,6 +100,31 @@ function friendlyError(msg: string): string {
   if (msg.includes('is not a valid device')) return 'Selected device not available. Switch to CPU in the dashboard System tab.';
   if (msg.includes('negative dimension')) return 'Layer produced a negative dimension — kernel/stride/padding combination is too large for the input size.';
   return msg;
+}
+
+/** Save a blob to disk: use the File System Access API (lets the user pick a name
+ *  and location) when available, otherwise fall back to a plain download. */
+async function downloadBlob(blob: Blob, suggestedName: string, description: string, ext: string): Promise<void> {
+  if ('showSaveFilePicker' in window) {
+    try {
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName,
+        types: [{ description, accept: { 'application/octet-stream': [ext] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch {
+      return; // user cancelled the picker
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = suggestedName;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // --- The hook ---
@@ -566,11 +535,25 @@ export function useGraph(domain: DomainContext) {
 
   const loadGraph = useCallback(
     async (json: string) => {
-      const data: SerializedGraph = JSON.parse(json);
+      let data: SerializedGraph;
+      try {
+        data = JSON.parse(json);
+      } catch {
+        setStatus({ type: 'error', message: 'Could not read graph file — it is not valid JSON.' });
+        return;
+      }
+      // Pre-flight the file before touching the canvas, so a malformed / outdated /
+      // unknown-node graph fails with a readable message instead of throwing
+      // half-way through deserialization and leaving a broken graph behind.
+      const issues = validateSerializedGraph(data, (t) => domain.nodeRegistry.get(t) !== undefined);
+      if (issues.length > 0) {
+        setStatus({ type: 'error', message: `Cannot load this graph:\n${issues.join('\n')}` });
+        return;
+      }
       graphRef.current = deserializeGraph(data);
       await runShape();
     },
-    [runShape],
+    [runShape, domain],
   );
 
   // Save a subgraph node as a reusable block
@@ -931,7 +914,58 @@ export function useGraph(domain: DomainContext) {
     }
   }, [saveGraph]);
 
+  const flashSuccess = useCallback((message: string) => {
+    setStatus({ type: 'success', message });
+    setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
+  }, []);
+
+  // Save a self-contained model bundle (.ntmodel = graph + weights). Always reloads
+  // correctly because the architecture travels with the weights. The frontend sends
+  // the current graph; the backend pairs it with the trained weights.
   const saveModel = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:8000/download-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed to download' }));
+        setStatus({ type: 'error', message: err.error ?? 'No trained model to save' });
+        return;
+      }
+      await downloadBlob(await res.blob(), 'model.ntmodel', 'NodeTorch Model', '.ntmodel');
+      flashSuccess('Model saved');
+    } catch {
+      setStatus({ type: 'error', message: 'Cannot connect to backend' });
+    }
+  }, [saveGraph, flashSuccess]);
+
+  // Load a model bundle (.ntmodel): replaces the canvas graph AND restores weights.
+  // The graph is embedded in the file, so the backend returns it for the canvas.
+  const loadModel = useCallback(async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('http://localhost:8000/upload-model', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.status === 'ok' && data.graph) {
+        await loadGraph(JSON.stringify(data.graph));
+        setModelTrained(true);
+        setModelStale(false);
+        flashSuccess(`Model loaded from "${file.name}"`);
+      } else {
+        setStatus({ type: 'error', message: friendlyError(data.error ?? 'Failed to load model') });
+        setTimeout(() => setStatus((s) => s.type === 'error' ? { type: 'idle' } : s), 5000);
+      }
+    } catch {
+      setStatus({ type: 'error', message: 'Cannot connect to backend' });
+    }
+  }, [loadGraph, flashSuccess]);
+
+  // Save just the trained weights (.pt). Loads back onto the CURRENT graph via
+  // loadWeights — the architecture must match (use Save/Load Model to avoid that).
+  const saveWeights = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:8000/download-weights');
       if (!res.ok) {
@@ -939,64 +973,26 @@ export function useGraph(domain: DomainContext) {
         setStatus({ type: 'error', message: err.error ?? 'No trained model to save' });
         return;
       }
-      const blob = await res.blob();
-
-      // Use File System Access API if available
-      if ('showSaveFilePicker' in window) {
-        try {
-          const handle = await (window as any).showSaveFilePicker({
-            suggestedName: 'weights.pt',
-            types: [{ description: 'PyTorch Weights', accept: { 'application/octet-stream': ['.pt'] } }],
-          });
-          const writable = await handle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-          setStatus({ type: 'success', message: 'Weights saved' });
-          setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
-          return;
-        } catch {
-          return; // user cancelled
-        }
-      }
-
-      // Fallback: auto-download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'weights.pt';
-      a.click();
-      URL.revokeObjectURL(url);
-      setStatus({ type: 'success', message: 'Weights saved' });
-      setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
+      await downloadBlob(await res.blob(), 'weights.pt', 'PyTorch Weights', '.pt');
+      flashSuccess('Weights saved');
     } catch {
       setStatus({ type: 'error', message: 'Cannot connect to backend' });
     }
-  }, []);
+  }, [flashSuccess]);
 
-  const weightsInputRef = useRef<HTMLInputElement>(null);
-  const loadModel = useCallback(async () => {
-    weightsInputRef.current?.click();
-  }, []);
-
-  const handleWeightsFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-
+  // Load weights (.pt) onto the current graph. Sends the current graph so the
+  // backend can rebuild the modules and pour the weights in (architecture must match).
+  const loadWeights = useCallback(async (file: File) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('graph', saveGraph());
-      const res = await fetch('http://localhost:8000/upload-weights', {
-        method: 'POST',
-        body: formData,
-      });
+      const res = await fetch('http://localhost:8000/upload-weights', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.status === 'ok') {
         setModelTrained(true);
         setModelStale(false);
-        setStatus({ type: 'success', message: `Weights loaded from "${file.name}"` });
-        setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
+        flashSuccess(`Weights loaded from "${file.name}"`);
       } else {
         setStatus({ type: 'error', message: friendlyError(data.error ?? 'Failed to load weights') });
         setTimeout(() => setStatus((s) => s.type === 'error' ? { type: 'idle' } : s), 5000);
@@ -1005,7 +1001,7 @@ export function useGraph(domain: DomainContext) {
     } catch {
       setStatus({ type: 'error', message: 'Cannot connect to backend' });
     }
-  }, [saveGraph, runShape]);
+  }, [saveGraph, runShape, flashSuccess]);
 
   const trainWsRef = useRef<WebSocket | null>(null);
 
@@ -1402,8 +1398,8 @@ export function useGraph(domain: DomainContext) {
     cancelTrain,
     saveModel,
     loadModel,
-    weightsInputRef,
-    handleWeightsFile,
+    saveWeights,
+    loadWeights,
     status,
     modelTrained,
     modelStale,
