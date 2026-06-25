@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from 'react';
 import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, ChevronDown, GraduationCap, FileCode } from 'lucide-react';
 import { tutorialEvent } from './tutorial/TutorialPanel';
 import './Toolbar.css';
+import { apiUrl } from '../api/base';
 
 interface Props {
   onSave: () => string;
@@ -57,7 +58,7 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
   async function openPresets() {
     if (presetsOpen) { setPresetsOpen(false); return; }
     try {
-      const res = await fetch('http://localhost:8000/presets');
+      const res = await fetch(apiUrl('/presets'));
       const data = await res.json();
       if (data.status === 'ok') setPresets(data.presets);
     } catch { /* backend not running */ }
@@ -66,7 +67,7 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
 
   async function loadPreset(filename: string) {
     try {
-      const res = await fetch('http://localhost:8000/presets/load', {
+      const res = await fetch(apiUrl('/presets/load'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename }),

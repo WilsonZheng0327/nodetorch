@@ -26,6 +26,7 @@ import {
   deserializeGraphData,
   validateSerializedGraph,
 } from '../core/serialization';
+import { apiUrl, wsUrl } from '../api/base';
 
 /** One epoch's worth of streamed training metrics (appended per `epoch` message).
  *  The scalar metrics are named; heavier per-epoch payloads (gradient flow,
@@ -180,7 +181,7 @@ export function useGraph(domain: DomainContext) {
   // Load saved blocks list from backend
   const refreshBlocks = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/blocks');
+      const res = await fetch(apiUrl('/blocks'));
       const data = await res.json();
       if (data.status === 'ok') setSavedBlocks(data.blocks);
     } catch { /* backend not running */ }
@@ -569,7 +570,7 @@ export function useGraph(domain: DomainContext) {
     };
 
     try {
-      const res = await fetch('http://localhost:8000/blocks/save', {
+      const res = await fetch(apiUrl('/blocks/save'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(blockData),
@@ -588,7 +589,7 @@ export function useGraph(domain: DomainContext) {
   // Delete a saved block
   const deleteBlock = useCallback(async (filename: string) => {
     try {
-      await fetch(`http://localhost:8000/blocks/${filename}`, { method: 'DELETE' });
+      await fetch(apiUrl(`/blocks/${filename}`), { method: 'DELETE' });
       await refreshBlocks();
     } catch { /* ignore */ }
   }, [refreshBlocks]);
@@ -596,7 +597,7 @@ export function useGraph(domain: DomainContext) {
   // Add a saved block to the graph as a new subgraph node
   const addBlockFromTemplate = useCallback(async (filename: string, position: { x: number; y: number }) => {
     try {
-      const res = await fetch(`http://localhost:8000/blocks/${filename}`);
+      const res = await fetch(apiUrl(`/blocks/${filename}`));
       const data = await res.json();
       if (data.status !== 'ok') return;
 
@@ -627,7 +628,7 @@ export function useGraph(domain: DomainContext) {
 
     let response: Response;
     try {
-      response = await fetch('http://localhost:8000/forward', {
+      response = await fetch(apiUrl('/forward'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(graphData),
@@ -698,7 +699,7 @@ export function useGraph(domain: DomainContext) {
 
     let response: Response;
     try {
-      response = await fetch('http://localhost:8000/infer', {
+      response = await fetch(apiUrl('/infer'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(graphData),
@@ -764,7 +765,7 @@ export function useGraph(domain: DomainContext) {
     }
     setStatus({ type: 'running', message: 'Evaluating on test set...' });
     try {
-      const res = await fetch('http://localhost:8000/evaluate-test', {
+      const res = await fetch(apiUrl('/evaluate-test'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
@@ -833,7 +834,7 @@ export function useGraph(domain: DomainContext) {
   const simulateBackprop = useCallback(async () => {
     setStatus({ type: 'running', message: 'Simulating backprop...' });
     try {
-      const res = await fetch('http://localhost:8000/simulate-backprop', {
+      const res = await fetch(apiUrl('/simulate-backprop'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
@@ -869,7 +870,7 @@ export function useGraph(domain: DomainContext) {
 
   const exportPython = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/export-python', {
+      const res = await fetch(apiUrl('/export-python'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
@@ -924,7 +925,7 @@ export function useGraph(domain: DomainContext) {
   // the current graph; the backend pairs it with the trained weights.
   const saveModel = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/download-model', {
+      const res = await fetch(apiUrl('/download-model'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
@@ -947,7 +948,7 @@ export function useGraph(domain: DomainContext) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('http://localhost:8000/upload-model', { method: 'POST', body: formData });
+      const res = await fetch(apiUrl('/upload-model'), { method: 'POST', body: formData });
       const data = await res.json();
       if (data.status === 'ok' && data.graph) {
         await loadGraph(JSON.stringify(data.graph));
@@ -967,7 +968,7 @@ export function useGraph(domain: DomainContext) {
   // loadWeights — the architecture must match (use Save/Load Model to avoid that).
   const saveWeights = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/download-weights');
+      const res = await fetch(apiUrl('/download-weights'));
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Failed to download' }));
         setStatus({ type: 'error', message: err.error ?? 'No trained model to save' });
@@ -987,7 +988,7 @@ export function useGraph(domain: DomainContext) {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('graph', saveGraph());
-      const res = await fetch('http://localhost:8000/upload-weights', { method: 'POST', body: formData });
+      const res = await fetch(apiUrl('/upload-weights'), { method: 'POST', body: formData });
       const data = await res.json();
       if (data.status === 'ok') {
         setModelTrained(true);
@@ -1030,7 +1031,7 @@ export function useGraph(domain: DomainContext) {
     const graphData = serializeGraph(graphRef.current);
 
     return new Promise<void>((resolve) => {
-      const ws = new WebSocket('ws://localhost:8000/ws');
+      const ws = new WebSocket(wsUrl('/ws'));
       trainWsRef.current = ws;
 
       function applyResults(results: any) {

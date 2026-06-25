@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import './LayerDetail.css';
 import { TokenizerDetail } from './TokenizerDetail';
+import { apiUrl } from '../../api/base';
 
 const TOKENIZER_TYPES = new Set([
   'ml.preprocessing.tokenizer_char',
@@ -68,7 +69,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
 
   const runLatentGrid = () => {
     setLatentGridLoading(true);
-    fetch('http://localhost:8000/latent-grid', {
+    fetch(apiUrl('/latent-grid'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ graph: JSON.parse(graphJson), gridSize: 10, latentRange: 3.0 }),
@@ -84,7 +85,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
 
   const runLandscape = () => {
     setLandscapeLoading(true);
-    fetch('http://localhost:8000/loss-landscape', {
+    fetch(apiUrl('/loss-landscape'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ graph: JSON.parse(graphJson), gridSize: 21, alphaRange: 10.0 }),
@@ -100,7 +101,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
 
   const runActivationMax = () => {
     setActMaxLoading(true);
-    fetch('http://localhost:8000/activation-max', {
+    fetch(apiUrl('/activation-max'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ graph: JSON.parse(graphJson), nodeId, numFilters: 8, iterations: 25 }),
@@ -124,7 +125,7 @@ export function LayerDetail({ nodeId, nodeType, graphJson, onClose }: Props) {
     }
     setLoading(true);
     setError(null);
-    fetch('http://localhost:8000/layer-detail', {
+    fetch(apiUrl('/layer-detail'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ graph: JSON.parse(graphJson), nodeId }),

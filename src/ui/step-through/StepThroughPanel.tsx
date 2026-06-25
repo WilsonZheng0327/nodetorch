@@ -6,6 +6,7 @@ import type { StepThroughResult, BackwardStepThroughResult, StepThroughMode, Den
 import { StageTimeline } from './StageTimeline';
 import { StageDetail } from './StageDetail';
 import './StepThroughPanel.css';
+import { apiUrl } from '../../api/base';
 
 interface Props {
   open: boolean;
@@ -41,7 +42,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     setBackwardResult(null); // invalidate backward for new sample
     const body: Record<string, unknown> = { graph: JSON.parse(graphJson) };
     if (filterLabel != null) body.filterLabel = filterLabel;
-    fetch('http://localhost:8000/step-through', {
+    fetch(apiUrl('/step-through'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -68,7 +69,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     setError(null);
     const body: Record<string, unknown> = { graph: JSON.parse(graphJson) };
     if (sampleIdx != null) body.sampleIdx = sampleIdx;
-    fetch('http://localhost:8000/backward-step-through', {
+    fetch(apiUrl('/backward-step-through'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -90,7 +91,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     setLoading(true);
     setError(null);
     if (isGANGraph) {
-      fetch('http://localhost:8000/gan-generate', {
+      fetch(apiUrl('/gan-generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ graph: JSON.parse(graphJson), numSamples: 8 }),
@@ -109,7 +110,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
         .catch(() => setError('Cannot connect to backend'))
         .finally(() => setLoading(false));
     } else {
-      fetch('http://localhost:8000/denoise-step-through', {
+      fetch(apiUrl('/denoise-step-through'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ graph: JSON.parse(graphJson), numSamples: 4, captureEvery: Math.max(1, Math.floor(100 / 50)) }),
@@ -127,7 +128,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const loadGenerate = useCallback(() => {
     setLoading(true);
     setError(null);
-    fetch('http://localhost:8000/generate-text', {
+    fetch(apiUrl('/generate-text'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ graph: JSON.parse(graphJson), prompt: genPrompt || '', maxTokens: genMaxTokens, temperature: genTemp, topK: genTopK }),

@@ -3,6 +3,7 @@
 // Handles both image datasets (MNIST, CIFAR) and text datasets (IMDb, AG News).
 
 import { useState, useEffect, useRef } from 'react';
+import { apiUrl } from '../../api/base';
 
 interface DatasetInfo {
   name: string;
@@ -58,7 +59,7 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`http://localhost:8000/dataset/${datasetType}`)
+    fetch(apiUrl(`/dataset/${datasetType}`))
       .then((r) => r.json())
       .then((data) => {
         if (data.status === 'ok') {
@@ -80,7 +81,7 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
       setAugPreview(null);
       return;
     }
-    fetch('http://localhost:8000/augmentation-preview', {
+    fetch(apiUrl('/augmentation-preview'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

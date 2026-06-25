@@ -3,6 +3,7 @@
 // corpus, then renders a searchable/sortable table.
 
 import { useState, useEffect, useMemo } from 'react';
+import { apiUrl } from '../../api/base';
 
 type VocabEntry = { id: number; token: string; freq: number; special?: boolean };
 
@@ -46,7 +47,7 @@ export function TokenizerDetail({ nodeType, nodeProperties, datasetType }: Props
     if (!datasetType) return;
     setLoading(true);
     setError(null);
-    fetch('http://localhost:8000/tokenizer/preview', {
+    fetch(apiUrl('/tokenizer/preview'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -95,7 +96,7 @@ export function TokenizerDetail({ nodeType, nodeProperties, datasetType }: Props
       setSampleResult(null);
       return;
     }
-    fetch('http://localhost:8000/tokenizer/preview', {
+    fetch(apiUrl('/tokenizer/preview'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

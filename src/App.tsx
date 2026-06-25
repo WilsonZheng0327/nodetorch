@@ -15,6 +15,7 @@ import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
 import { createNode as cn, addNode as an, createEdge as ce, addEdge as ae } from './core/graph';
 import { TutorialPanel, tutorialEvent } from './ui/tutorial/TutorialPanel';
+import { apiUrl } from './api/base';
 
 const categoryColors: Record<string, string> = {
   Data: '#f59e0b',
@@ -352,7 +353,7 @@ export default function App() {
   useEffect(() => {
     if (demoLoaded.current) return;
     demoLoaded.current = true;
-    fetch('http://localhost:8000/presets/load', {
+    fetch(apiUrl('/presets/load'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: 'mlp-mnist.json' }),

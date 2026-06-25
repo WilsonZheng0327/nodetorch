@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import './TrainingDashboard.css';
+import { apiUrl } from '../../api/base';
 
 export interface TrackedSampleProbe {
   idx: number;
@@ -116,7 +117,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
 
   // Fetch system info on mount
   useEffect(() => {
-    fetch('http://localhost:8000/system-info')
+    fetch(apiUrl('/system-info'))
       .then((r) => r.json())
       .then((data) => setSystemInfo(data))
       .catch(() => {/* backend not running */});
@@ -130,7 +131,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
   // Fetch runs when tab becomes runs, and after training completes
   const fetchRuns = () => {
     setRunsLoading(true);
-    fetch('http://localhost:8000/runs')
+    fetch(apiUrl('/runs'))
       .then((r) => r.json())
       .then((data) => {
         if (data.status === 'ok') setSavedRuns(data.runs);
@@ -153,7 +154,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
   }, [isTraining]);
 
   const loadCompareRun = (id: string) => {
-    fetch(`http://localhost:8000/runs/${id}`)
+    fetch(apiUrl(`/runs/${id}`))
       .then((r) => r.json())
       .then((data) => {
         if (data.status === 'ok') setCompareRun(data.run);
@@ -162,7 +163,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
   };
 
   const deleteRun = (id: string) => {
-    fetch(`http://localhost:8000/runs/${id}`, { method: 'DELETE' })
+    fetch(apiUrl(`/runs/${id}`), { method: 'DELETE' })
       .then(() => {
         setSavedRuns((prev) => prev ? prev.filter((r) => r.id !== id) : null);
         if (compareRun?.id === id) setCompareRun(null);
@@ -430,7 +431,7 @@ function SystemInfoPanel({ info }: { info: SystemInfo | null }) {
 
   function handleDeviceChange(device: string) {
     setCurrentDevice(device);
-    fetch('http://localhost:8000/set-device', {
+    fetch(apiUrl('/set-device'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ device }),

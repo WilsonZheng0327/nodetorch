@@ -6,8 +6,9 @@ import './AgentSettings.css';
 
 import { useEffect, useState } from 'react';
 import { X, Check, Loader2 } from 'lucide-react';
+import { API_BASE } from '../../api/base';
 
-const API = 'http://localhost:8000';
+const API = API_BASE;
 
 interface ProviderField {
   key: string;

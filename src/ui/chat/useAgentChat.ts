@@ -5,8 +5,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeCatalog } from '../../domain/catalog';
+import { wsUrl } from '../../api/base';
 
-const AGENT_WS_URL = 'ws://localhost:8000/agent';
+const AGENT_WS_URL = wsUrl('/agent');
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool';
