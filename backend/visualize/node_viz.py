@@ -7,6 +7,7 @@ Adding a new node's viz: create or edit a file in backend/viz/, then register it
 """
 
 from __future__ import annotations
+from typing import Protocol
 import torch.nn as nn
 
 from engine.graph_builder import ALL_LOSS_NODES
@@ -37,7 +38,34 @@ from visualize.layers.misc import (
 # Forward viz registry
 # ============================================================================
 
-FORWARD_VIZ: dict[str, callable] = {
+class ForwardVizFn(Protocol):
+    """Computes a node's forward-pass visualization payload.
+
+    Registered per node type in ``FORWARD_VIZ`` and dispatched by
+    ``get_forward_viz``. Returns a ``{"transformation": ...}`` dict describing
+    what the layer did to its input, for the step-through UI.
+
+    Parameters
+    ----------
+    node_type:
+        The node's type string (e.g. ``"ml.layers.conv2d"``).
+    module:
+        The node's ``nn.Module`` (or ``None`` for module-less nodes).
+    input_tensor, output:
+        The node's primary input / output tensor (either may be ``None``).
+    inputs, out_dict:
+        All named input / output tensors, port id -> tensor.
+
+    Returns
+    -------
+    dict
+        e.g. ``{"transformation": {...}}``.
+    """
+
+    def __call__(self, node_type: str, module, input_tensor, output, inputs: dict, out_dict: dict) -> dict: ...
+
+
+FORWARD_VIZ: dict[str, ForwardVizFn] = {
     # Convolutions
     "ml.layers.conv2d": forward_viz_conv2d,
     "ml.layers.conv1d": forward_viz_conv2d,

@@ -13,13 +13,70 @@
 # No changes needed in graph_builder.py.
 
 import random as _random
+from typing import Protocol
+
 import torch
+import torch.utils.data
 import torchvision
 import torchvision.transforms as transforms
 
 # All downloaded datasets go here. Single source of truth in paths.py (anchored to
 # the repo-root storage/, not the launch directory).
 from paths import DATASETS_DIR
+
+
+# --- Registry value contracts (one documented Protocol per dataset registry) ---
+
+class BatchLoader(Protocol):
+    """Loads ONE batch from a dataset, for shape inference / a forward pass.
+
+    Registered per dataset type in ``DATA_LOADERS``.
+
+    Parameters
+    ----------
+    props:
+        The data node's properties, e.g. ``{"batchSize": 64}``.
+
+    Returns
+    -------
+    dict[str, torch.Tensor]
+        Output port id -> tensor, e.g. ``{"out": images, "labels": labels}``.
+    """
+
+    def __call__(self, props: dict) -> dict[str, torch.Tensor]: ...
+
+
+class DatasetFactory(Protocol):
+    """Builds the full (un-batched) ``Dataset`` for a dataset type.
+
+    Registered in ``TRAIN_DATASETS`` / ``TEST_DATASETS`` and consumed by the
+    training loop's ``DataLoader``.
+    """
+
+    def __call__(self) -> torch.utils.data.Dataset: ...
+
+
+class Denormalizer(Protocol):
+    """Undoes a dataset's normalization on one image, for pixel preview.
+
+    Parameters
+    ----------
+    img:
+        A normalized ``[C, H, W]`` image tensor.
+
+    Returns
+    -------
+    torch.Tensor
+        The de-normalized image, values back in display range.
+    """
+
+    def __call__(self, img: torch.Tensor) -> torch.Tensor: ...
+
+
+class DatasetDetailFn(Protocol):
+    """Returns UI metadata for a dataset (labels, sample images, stats)."""
+
+    def __call__(self) -> dict: ...
 
 # Dataset types that signal autoregressive/language model training mode
 LM_DATASET_TYPES = {"data.tiny_shakespeare"}
@@ -546,7 +603,7 @@ def load_sample_by_label(
 # graph_builder.py uses these — no if/else chains needed.
 
 # Load a batch: (props) → { port_id: tensor }
-DATA_LOADERS: dict[str, callable] = {
+DATA_LOADERS: dict[str, BatchLoader] = {
     "data.mnist": load_mnist,
     "data.cifar10": load_cifar10,
     "data.cifar100": load_cifar100,
@@ -557,7 +614,7 @@ DATA_LOADERS: dict[str, callable] = {
 }
 
 # Get full training dataset: () → Dataset
-TRAIN_DATASETS: dict[str, callable] = {
+TRAIN_DATASETS: dict[str, DatasetFactory] = {
     "data.mnist": train_dataset_mnist,
     "data.cifar10": train_dataset_cifar10,
     "data.cifar100": train_dataset_cifar100,
@@ -568,7 +625,7 @@ TRAIN_DATASETS: dict[str, callable] = {
 }
 
 # Undo normalization for image preview: (tensor [C,H,W]) → tensor [C,H,W] in 0-1
-DENORMALIZERS: dict[str, callable] = {
+DENORMALIZERS: dict[str, Denormalizer] = {
     "data.mnist": denormalize_mnist,
     "data.cifar10": denormalize_cifar10,
     "data.cifar100": denormalize_cifar100,
@@ -768,7 +825,7 @@ def detail_ag_news() -> dict:
 
 
 # Get dataset detail info: () → dict
-DATASET_DETAILS: dict[str, callable] = {
+DATASET_DETAILS: dict[str, DatasetDetailFn] = {
     "data.mnist": detail_mnist,
     "data.cifar10": detail_cifar10,
     "data.cifar100": detail_cifar100,
@@ -813,7 +870,7 @@ def test_dataset_imdb(**kwargs) -> torch.utils.data.Dataset:
 def test_dataset_ag_news(**kwargs) -> torch.utils.data.Dataset:
     return AGNewsDataset(vocab_size=kwargs.get("vocabSize", 10000), max_len=kwargs.get("maxLen", 128), split="test")
 
-TEST_DATASETS: dict[str, callable] = {
+TEST_DATASETS: dict[str, DatasetFactory] = {
     "data.mnist": test_dataset_mnist,
     "data.cifar10": test_dataset_cifar10,
     "data.cifar100": test_dataset_cifar100,

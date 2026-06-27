@@ -16,8 +16,39 @@
 # NODE_BUILDERS registry maps node type strings → builder functions.
 # graph_builder.py looks up builders from this registry.
 
+from typing import Protocol
+
 import torch
 import torch.nn as nn
+
+
+class TorchModuleBuilder(Protocol):
+    """Builds the PyTorch module for one node type.
+
+    Each node type registers a builder in ``NODE_BUILDERS``; the graph's
+    forward/build walk calls it to construct that node's ``nn.Module`` from the
+    node's config. Builders return a *fresh, randomly-initialized* module — they
+    don't load trained weights (that's the inference walk's job).
+
+    Parameters
+    ----------
+    props:
+        The node's property values from the graph, e.g.
+        ``{"outChannels": 16, "kernelSize": 3}``.
+    input_shapes:
+        Maps each input port id to that input's shape, e.g.
+        ``{"in": [B, C, H, W]}`` — used to size shape-dependent layers (a
+        ``Linear``'s ``in_features``, a ``Conv2d``'s ``in_channels``). Empty
+        (``{}``) for input-less nodes (e.g. the GAN noise input), which build
+        from ``props`` alone.
+
+    Returns
+    -------
+    nn.Module
+        The constructed module.
+    """
+
+    def __call__(self, props: dict, input_shapes: dict) -> nn.Module: ...
 
 
 # --- Layers (no wrapper needed — single tensor in, single tensor out) ---
@@ -688,7 +719,7 @@ def build_tokenizer(props: dict, input_shapes: dict) -> nn.Module:
 
 # --- Registry ---
 
-NODE_BUILDERS: dict[str, callable] = {
+NODE_BUILDERS: dict[str, TorchModuleBuilder] = {
     # Preprocessing
     "ml.preprocessing.tokenizer_char": build_tokenizer,
     "ml.preprocessing.tokenizer_word": build_tokenizer,

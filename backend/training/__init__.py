@@ -12,6 +12,8 @@ Adding a new training paradigm:
   4. Add detection logic to detect_training_mode()
 """
 
+from typing import Protocol
+
 from .base import TrainingContext, TrainingResult, build_training_context, save_training_results
 from .standard import standard_train
 from .gan import gan_train
@@ -19,7 +21,29 @@ from .diffusion import diffusion_train
 from .autoregressive import autoregressive_train
 from dataprep.data_loaders import LM_DATASET_TYPES
 
-TRAINING_LOOPS: dict[str, callable] = {
+
+class TrainingLoop(Protocol):
+    """Runs one training paradigm end-to-end.
+
+    Registered per paradigm in ``TRAINING_LOOPS`` (standard / gan / diffusion /
+    autoregressive); ``run_training`` auto-detects the paradigm and dispatches.
+
+    Parameters
+    ----------
+    ctx:
+        The built ``TrainingContext`` (model modules, data, optimizer config,
+        and the epoch/batch callbacks).
+
+    Returns
+    -------
+    TrainingResult
+        Final modules, per-epoch results, and any error.
+    """
+
+    def __call__(self, ctx: TrainingContext) -> TrainingResult: ...
+
+
+TRAINING_LOOPS: dict[str, TrainingLoop] = {
     "standard": standard_train,
     "gan": gan_train,
     "diffusion": diffusion_train,

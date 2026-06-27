@@ -149,3 +149,4 @@ Nodes communicate display data through `metadata` on `ExecutionResult`:
 - `metadata` on ExecutionResult is unstructured — each node emits whatever makes sense for visualization.
 - All React Flow imports use `import * as RF from '@xyflow/react'` namespace style for clarity.
 - Frontend uses JSDoc (`/** */`) on all core interfaces and functions for hover documentation.
+- Backend registry/callback contracts use a documented `typing.Protocol` with a `__call__`, not a bare `Callable`/`callable`. Where a registry maps keys to functions (e.g. `NODE_BUILDERS: dict[str, TorchModuleBuilder]`, dataset loaders, the viz/runner registries), type its values as a Protocol whose docstring + named `__call__` params show on hover at every call site, and whose annotation makes the type checker verify each registered function matches the contract. Reserve this for these `type → behavior` boundaries — a one-off lambda doesn't need it.
