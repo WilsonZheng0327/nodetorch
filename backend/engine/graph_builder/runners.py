@@ -10,9 +10,10 @@ two jobs have different audiences:
     and stores the raw tensors on ``ctx.results``. This is the single dispatch —
     so node-type handling can't drift between walks.
   - **describe** is per-walk formatting of an ``Execution`` into a
-    ``node_result``. The forward walk wants full metadata (weights, activations);
-    inference wants predictions; ``build_modules`` wants nothing. Only this half
-    differs, and it never re-runs a tensor — it just reads the ``Execution``.
+    ``node_result``. The inspection walk wants full metadata (weights,
+    activations); inference wants predictions; ``build_modules`` wants nothing.
+    Only this half differs, and it never re-runs a tensor — it just reads the
+    ``Execution``.
 
 So a walk is ``describe_X(node, execute(node, ctx))``; ``build_modules`` is just
 ``execute(node, ctx)``. This is the backend counterpart of the frontend's
@@ -319,8 +320,10 @@ def _inner_snapshots(sg_module) -> dict:
     return snaps
 
 
-def describe_forward(node: dict, exe: Execution) -> NodeResult:
-    """Forward-walk presentation: full display metadata for each node."""
+def describe_inspection(node: dict, exe: Execution) -> NodeResult:
+    """Inspection-walk presentation: full display metadata for each node
+    (weights, activations, batchnorm, inner snapshots). The standalone
+    build-fresh-and-inspect pass; not the training forward."""
     if exe.kind == "error":
         return {"outputs": {}, "metadata": {"error": exe.extra["msg"]}}
     if exe.kind == "skip":
@@ -363,6 +366,8 @@ def describe_forward(node: dict, exe: Execution) -> NodeResult:
     return {"outputs": outputs, "metadata": _layer_meta(exe.module, exe.primary)}
 
 
-def run_node(node: dict, ctx: RunContext) -> NodeResult:
-    """Execute a node and format it for the forward walk (execute + describe_forward)."""
-    return describe_forward(node, execute(node, ctx))
+def inspect_node(node: dict, ctx: RunContext) -> NodeResult:
+    """Run a node and format it for the standalone inspection walk
+    (execute + describe_inspection). This is one specific composition — the
+    universal per-node step is ``execute``, not this."""
+    return describe_inspection(node, execute(node, ctx))

@@ -1,7 +1,7 @@
 """Integration tests for the graph-execution walks.
 
 These drive the per-node-type dispatch end-to-end on real shipped presets:
-  build_modules / build_and_run_graph (forward)  — engine/graph_builder/forward.py
+  build_modules / inspect_graph (forward)         — engine/graph_builder/forward.py
   infer_graph, evaluate_test_set                 — engine/graph_builder/inference.py
   run_final_forward (via train_graph)            — training/base.py
 
@@ -24,7 +24,7 @@ import torch.nn as nn
 
 from engine.graph_builder import (
     build_modules,
-    execute_graph,
+    inspect_graph,
     infer_graph,
     evaluate_test_set,
     train_graph,
@@ -64,7 +64,7 @@ def test_forward_walk_handles_every_node(name):
     to handle a node type (the drift we're guarding against), a node goes missing
     here."""
     g = load_preset(name)
-    results = execute_graph(g)
+    results = inspect_graph(g)
 
     assert isinstance(results, dict) and results, f"{name}: no results"
     missing = node_ids(g) - set(results)
@@ -112,7 +112,7 @@ def test_forward_metadata_structure_is_stable(name):
     """Pin the exact per-node-type metadata keys, so the describe/runner refactor
     stays behavior-preserving (the #8 'every node handled' check doesn't see fields)."""
     g = load_preset(name)
-    results = execute_graph(g)
+    results = inspect_graph(g)
     types = {n["id"]: n["type"] for n in g["graph"]["nodes"]}
     for nid, r in results.items():
         t = types[nid]
@@ -123,7 +123,7 @@ def test_forward_metadata_structure_is_stable(name):
 def test_mlp_forward_produces_correct_shapes():
     """Pin exact forward behavior on the baseline classifier."""
     g = load_preset("mlp-mnist")
-    results = execute_graph(g)
+    results = inspect_graph(g)
 
     errors = {nid: r["metadata"]["error"] for nid, r in results.items() if r["metadata"].get("error")}
     assert not errors, f"unexpected forward errors: {errors}"
@@ -145,7 +145,7 @@ def test_gan_preset_runs_its_subgraph_block():
     g = load_preset("gan-mnist")
     block_ids = [n["id"] for n in g["graph"]["nodes"] if n["type"] == "subgraph.block"]
     assert block_ids, "expected gan-mnist to contain a subgraph.block"
-    results = execute_graph(g)
+    results = inspect_graph(g)
     for bid in block_ids:
         assert bid in results, f"subgraph block {bid} not handled"
 

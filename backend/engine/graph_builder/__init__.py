@@ -8,7 +8,7 @@
 #   _state     — device selection + in-memory trained-model store (shared mutable state)
 #   stats      — tensor/parameter statistics for visualization metadata
 #   build      — topological sort, input routing, module/subgraph construction
-#   forward    — single forward pass (build_and_run_graph / execute_graph)
+#   forward    — standalone inspection pass (build_and_run_graph / inspect_graph)
 #   detail     — per-node inspector visualization (get_layer_detail)
 #   inference  — infer_graph / evaluate_test_set + tracked-sample helpers
 
@@ -32,7 +32,7 @@ from engine.graph_builder.build import (
     topological_sort, gather_inputs, SubGraphModule,
     build_subgraph_module, build_modules,
 )
-from engine.graph_builder.forward import build_and_run_graph, execute_graph
+from engine.graph_builder.forward import build_and_run_graph, inspect_graph
 from engine.graph_builder.detail import get_layer_detail
 from engine.graph_builder.inference import (
     infer_graph, evaluate_test_set,

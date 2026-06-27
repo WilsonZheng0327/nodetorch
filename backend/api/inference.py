@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter
 from viztracer import VizTracer
 
-from engine.graph_builder import execute_graph, infer_graph, evaluate_test_set
+from engine.graph_builder import inspect_graph, infer_graph, evaluate_test_set
 
 logger = logging.getLogger("nodetorch")
 
@@ -21,7 +21,7 @@ async def forward(graph_data: dict):
             include_files=["backend/"],
             max_stack_depth=40,
         ):
-            results = execute_graph(graph_data)
+            results = inspect_graph(graph_data)
         logger.info("Forward pass complete")
         return {"status": "ok", "results": results}
     except Exception as e:

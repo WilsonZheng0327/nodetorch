@@ -4,7 +4,7 @@ import threading
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from engine.graph_builder import execute_graph, train_graph
+from engine.graph_builder import inspect_graph, train_graph
 from api._ws import ws_reader
 
 logger = logging.getLogger("nodetorch")
@@ -48,7 +48,7 @@ async def websocket_endpoint(ws: WebSocket):
 
             if msg.get("type") == "forward":
                 try:
-                    results = execute_graph(msg["graph"])
+                    results = inspect_graph(msg["graph"])
                     await ws.send_text(json.dumps({
                         "type": "forward_result",
                         "status": "ok",
