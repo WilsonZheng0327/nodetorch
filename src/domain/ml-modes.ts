@@ -6,7 +6,7 @@ import { ExecutionEngine } from '../core/engine';
 // - id identifies the mode (used when calling engine.execute(graph, "shape", ...))
 // - executorKey is which key to look up in a node's executors map
 // They're the same today. They'd diverge if two modes share the same executor —
-// e.g., a "debug" mode with id: "debug" but executorKey: "forward" (same executor,
+// e.g., a "debug" mode with id: "debug" but executorKey: "shape" (same executor,
 // different propagation/caching settings).
 export function registerMLModes(engine: ExecutionEngine): void {
   engine.registerMode({
@@ -15,14 +15,6 @@ export function registerMLModes(engine: ExecutionEngine): void {
     propagation: 'eager',
     caching: true,
     executorKey: 'shape',
-  });
-
-  engine.registerMode({
-    id: 'forward',
-    label: 'Forward Pass',
-    propagation: 'manual',
-    caching: true,
-    executorKey: 'forward',
   });
 
   engine.registerMode({

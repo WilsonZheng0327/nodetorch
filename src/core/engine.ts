@@ -90,8 +90,8 @@ export class ExecutionEngine {
    *
    * Mode determines:
    * 1. Which executor to call on each node (mode.executorKey) — e.g., "shape" runs
-   *    shape math in TS, "forward" sends data to PyTorch. Same engine loop either way.
-   * 2. Whether to skip clean nodes (mode.caching) — shape/forward skip unchanged nodes,
+   *    shape math in TS. Same engine loop whatever the mode.
+   * 2. Whether to skip clean nodes (mode.caching) — shape skips unchanged nodes,
    *    train re-runs everything (each training step needs a fresh forward pass).
    */
   async execute(graph: Graph, modeId: string, lookupExecutor: ExecutorLookup): Promise<void> {

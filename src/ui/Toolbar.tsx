@@ -1,4 +1,4 @@
-// Toolbar — save/load graph, run forward pass, train.
+// Toolbar — save/load graph, step through, train/test/infer.
 
 import { useRef, useState, useEffect } from 'react';
 import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, ChevronDown, GraduationCap, FileCode } from 'lucide-react';

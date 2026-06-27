@@ -3,8 +3,9 @@ import asyncio
 import threading
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from viztracer import VizTracer
 
-from engine.graph_builder import inspect_graph, train_graph
+from engine.graph_builder import train_graph
 from api._ws import ws_reader
 
 logger = logging.getLogger("nodetorch")
@@ -14,13 +15,29 @@ router = APIRouter(tags=["training"])
 
 @router.post("/train")
 async def train(graph_data: dict):
-    logger.info("Training requested (REST)")
+    """Run a training pass under VizTracer for call-tree visualization.
+
+    The UI trains over the WebSocket (/ws); this REST endpoint exists purely
+    as a dev/visualization entry point. It runs train_graph wrapped in
+    VizTracer and writes train_trace.json (only backend/ frames, no torch
+    noise) to the server's working directory. Trigger it with curl, then view
+    the trace with `vizviewer train_trace.json`:
+
+        curl -X POST http://localhost:8000/train \\
+             -H 'Content-Type: application/json' -d @graph.json
+    """
+    logger.info("Training requested (REST) — tracing under VizTracer")
     try:
-        results = train_graph(graph_data)
+        with VizTracer(
+            output_file="train_trace.json",
+            include_files=["backend/"],
+            max_stack_depth=40,
+        ):
+            results = train_graph(graph_data)
         if "error" in results:
             logger.error(f"Training failed: {results['error']}")
             return {"status": "error", "error": results["error"]}
-        logger.info("Training complete")
+        logger.info("Training complete — wrote train_trace.json")
         return {"status": "ok", "results": results}
     except Exception as e:
         logger.error(f"Training failed: {e}")
@@ -46,23 +63,7 @@ async def websocket_endpoint(ws: WebSocket):
 
             logger.info(f"WebSocket message: type={msg.get('type')}")
 
-            if msg.get("type") == "forward":
-                try:
-                    results = inspect_graph(msg["graph"])
-                    await ws.send_text(json.dumps({
-                        "type": "forward_result",
-                        "status": "ok",
-                        "results": results,
-                    }))
-                except Exception as e:
-                    logger.error(f"WS forward failed: {e}")
-                    await ws.send_text(json.dumps({
-                        "type": "forward_result",
-                        "status": "error",
-                        "error": str(e),
-                    }))
-
-            elif msg.get("type") == "cancel":
+            if msg.get("type") == "cancel":
                 logger.info("Cancel requested")
                 if cancel_event:
                     cancel_event.set()

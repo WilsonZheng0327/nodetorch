@@ -14,7 +14,7 @@ export const API_BASE = RAW_BASE.replace(/\/$/, '');
 /** Base WebSocket URL of the backend (http→ws, https→wss). */
 export const WS_BASE = API_BASE.replace(/^http/, 'ws');
 
-/** Absolute REST URL for a path, e.g. apiUrl('/forward'). */
+/** Absolute REST URL for a path, e.g. apiUrl('/infer'). */
 export function apiUrl(path: string): string {
   return API_BASE + path;
 }

@@ -16,7 +16,7 @@ import {
   markDirty,
 } from '../core/graph';
 import type { DomainContext } from '../domain';
-import { validateForward, validateTraining } from '../core/validation';
+import { validateTraining } from '../core/validation';
 import { getNodePorts } from '../core/ports';
 import {
   type SerializedGraph,
@@ -615,75 +615,6 @@ export function useGraph(domain: DomainContext) {
   }, [getCurrentGraph, invalidateModel, runShape]);
 
   // --- Backend Communication ---
-
-  const runForward = useCallback(async () => {
-    const errors = validateForward(graphRef.current, domain.nodeRegistry);
-    if (errors.length > 0) {
-      setStatus({ type: 'error', message: errors.map((e) => e.message).join('\n') });
-      return;
-    }
-
-    setStatus({ type: 'running' });
-    const graphData = serializeGraph(graphRef.current);
-
-    let response: Response;
-    try {
-      response = await fetch(apiUrl('/forward'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(graphData),
-      });
-    } catch {
-      setStatus({ type: 'error', message: 'Cannot connect to backend — is the server running?' });
-      return;
-    }
-
-    let result: any;
-    try {
-      result = await response.json();
-    } catch {
-      setStatus({ type: 'error', message: `Backend error (HTTP ${response.status})` });
-      return;
-    }
-
-    if (result.status !== 'ok') {
-      setStatus({ type: 'error', message: friendlyError(result.error ?? result.detail ?? 'Forward pass failed') });
-      return;
-    }
-
-    // Check if any nodes reported errors
-    let hasErrors = false;
-    for (const [nodeId, nodeResult] of Object.entries(result.results) as [string, any][]) {
-      const node = graphRef.current.nodes.get(nodeId);
-      if (!node) continue;
-
-      if (nodeResult.metadata?.error) {
-        hasErrors = true;
-      }
-
-      const existingMeta = node.lastResult?.metadata ?? {};
-      node.lastResult = {
-        outputs: nodeResult.outputs ?? {},
-        metadata: {
-          ...existingMeta,
-          ...nodeResult.metadata,
-          forwardResults: nodeResult.outputs,
-        },
-      };
-    }
-
-    syncToRF();
-    setStatus(hasErrors
-      ? { type: 'error', message: 'Forward pass completed with errors — check nodes' }
-      : { type: 'success', message: 'Forward pass complete' },
-    );
-    if (!hasErrors) tutorialEvent('forward-run');
-
-    // Clear success status after a few seconds
-    if (!hasErrors) {
-      setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
-    }
-  }, [domain, syncToRF]);
 
   const runInfer = useCallback(async () => {
     if (!modelTrained) {
@@ -1391,7 +1322,6 @@ export function useGraph(domain: DomainContext) {
     saveGraph,
     loadGraph,
     clearGraph,
-    runForward,
     runInfer,
     runTest,
     testResult,

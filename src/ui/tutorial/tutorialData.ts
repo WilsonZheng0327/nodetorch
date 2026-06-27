@@ -134,10 +134,9 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
         autoDetect: 'edge-added',
       },
       {
-        id: 'run-shape',
-        text: 'Click Run to verify shapes',
-        hint: 'Click the green "Run" button in the toolbar. Every node should show output shapes without errors. If you see red, check your connections and property values.',
-        autoDetect: 'forward-run',
+        id: 'verify-shapes',
+        text: 'Verify every node shows valid shapes',
+        hint: 'Shapes are inferred automatically as you connect nodes — no need to run anything. Every node should display its output shape with no red errors. If you see red, check your connections and property values.',
       },
     ],
   },

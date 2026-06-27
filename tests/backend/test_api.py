@@ -17,7 +17,6 @@ EXPECTED_PATHS = {
     "/train",
     "/ws",
     # inference
-    "/forward",
     "/infer",
     "/evaluate-test",
     # generate
@@ -98,7 +97,7 @@ def test_route_count():
             http_endpoints += len(methods - {"HEAD", "OPTIONS"})
         else:
             ws_endpoints += 1
-    assert http_endpoints + ws_endpoints == 43
+    assert http_endpoints + ws_endpoints == 42
 
 
 def test_health():
