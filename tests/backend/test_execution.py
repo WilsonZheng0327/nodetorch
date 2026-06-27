@@ -183,6 +183,19 @@ def test_infer_graph_predicts_after_training(trained_mlp):
     assert out["prediction"] is not None
     assert "nodeResults" in out
 
+    # describe_inference output is now produced by the shared dispatch — pin its
+    # shape so a metadata regression in the inference presenter is caught.
+    pred = out["prediction"]
+    assert set(pred) == {"predictedClass", "confidence", "probabilities"}
+    assert 0 <= pred["predictedClass"] < 10 and len(pred["probabilities"]) == 10
+
+    data_meta = out["nodeResults"]["mnist"]["metadata"]
+    assert "outputShape" in data_meta and "actualLabel" in data_meta
+    assert "imagePixels" in data_meta  # MNIST is a 4D image → single-sample preview
+
+    # The classifier head carries the same prediction in its per-node metadata.
+    assert out["nodeResults"]["linear3"]["metadata"]["prediction"] == pred
+
 
 def test_evaluate_test_set_after_training(trained_mlp):
     g, _, _ = trained_mlp

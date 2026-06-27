@@ -18,7 +18,8 @@ from engine.graph_builder._state import (
     get_device, has_trained_model, get_trained_modules, ensure_trained_model, _last_run,
 )
 from engine.graph_builder.build import topological_sort, gather_inputs
-from engine.graph_builder.stats import tensor_info, _safe_float
+from engine.graph_builder.stats import _safe_float
+from engine.graph_builder.runners import RunContext, execute, describe_inference
 
 
 def evaluate_test_set(graph_data: dict) -> dict:
@@ -105,47 +106,24 @@ def evaluate_test_set(graph_data: dict) -> dict:
         for images, labels in test_loader:
             images, labels = images.to(dev), labels.to(dev)
 
-            batch_results: dict[str, dict] = {}
+            # Same per-node dispatch as inference, seeded with this test batch as
+            # the data node's output. Losses run (skip_losses=False) so we can read
+            # the test loss back out of ctx.results below.
             data_nid = data_node["id"]
-            batch_results[data_nid] = {"out": images, "labels": labels}
+            ctx = RunContext(
+                edges=edges, results={data_nid: {"out": images, "labels": labels}},
+                modules=trained_modules, use_trained=True,
+            )
+            for nid in order:
+                if nid != data_nid:
+                    execute(nodes[nid], ctx)
+            batch_results = ctx.results
 
             for nid in order:
-                if nid == data_nid:
-                    continue
-                n = nodes[nid]
-                ntype = n["type"]
-                if ntype in OPTIMIZER_NODES:
-                    continue
-                mod = trained_modules.get(nid)
-                if mod is None:
-                    continue
-
-                inputs = gather_inputs(nid, edges, batch_results)
-
-                if ntype in LOSS_NODES:
-                    if "predictions" in inputs and "labels" in inputs:
-                        loss = mod(inputs["predictions"], inputs["labels"])
-                        batch_results[nid] = {"out": loss}
-                        total_loss += loss.item()
-                    continue
-
-                if ntype == SUBGRAPH_TYPE:
-                    sg_out = mod(**inputs)
-                    first_key = next(iter(sg_out), None)
-                    if first_key:
-                        batch_results[nid] = {"out": sg_out[first_key]}
-                    continue
-
-                if ntype in MULTI_INPUT_NODES:
-                    batch_results[nid] = {"out": mod(**{k: v for k, v in inputs.items()})}
-                    continue
-
-                if "in" in inputs:
-                    raw = mod(inputs["in"])
-                    if isinstance(raw, dict):
-                        batch_results[nid] = raw
-                    else:
-                        batch_results[nid] = {"out": raw}
+                if nodes[nid]["type"] in LOSS_NODES:
+                    loss_out = batch_results.get(nid, {}).get("out")
+                    if isinstance(loss_out, torch.Tensor):
+                        total_loss += loss_out.item()
 
             # Accuracy + confusion data (classification only)
             if pred_node_id and pred_node_id in batch_results:
@@ -231,178 +209,29 @@ def infer_graph(graph_data: dict) -> dict:
     edges = graph["edges"]
     order = topological_sort(nodes, edges)
 
-    results: dict[str, dict[str, torch.Tensor]] = {}
+    # Same per-node dispatch as the inspection walk (execute), but reusing trained
+    # modules, loading a single sample (batch_override=1), and skipping losses.
+    # Only the presentation differs — describe_inference adds prediction/preview.
+    ctx = RunContext(
+        edges=edges, results={}, modules=trained_modules,
+        use_trained=True, batch_override=1, skip_losses=True,
+    )
     node_results: dict[str, dict] = {}
     prediction = None
 
     with torch.no_grad():
         for node_id in order:
             node = nodes[node_id]
-            node_type = node["type"]
-            props = node["properties"]
-
-            # Data nodes: load a single sample
-            loader = DATA_LOADERS.get(node_type)
-            if loader:
-                try:
-                    # Override batch size to 1 for inference
-                    infer_props = {**props, "batchSize": 1}
-                    tensors = loader(infer_props)
-                    tensors = {k: (v.to(get_device()) if isinstance(v, torch.Tensor) else v) for k, v in tensors.items()}
-                    results[node_id] = tensors
-                    outputs = {k: tensor_info(v) for k, v in tensors.items() if isinstance(v, torch.Tensor)}
-                    first_tensor = next(v for v in tensors.values() if isinstance(v, torch.Tensor))
-
-                    # Include the actual label for display (scalar labels only, not sequences)
-                    lbl_tensor = tensors.get("labels")
-                    label = int(lbl_tensor[0]) if lbl_tensor is not None and isinstance(lbl_tensor, torch.Tensor) and lbl_tensor.dim() == 1 else None
-
-                    meta: dict = {
-                        "outputShape": list(first_tensor.shape),
-                        "actualLabel": label,
-                    }
-
-                    # Image datasets: send raw pixel data for preview
-                    if "out" in tensors and isinstance(tensors["out"], torch.Tensor) and tensors["out"].dim() == 4:
-                        img = tensors["out"][0].detach().cpu()
-                        C = img.shape[0]
-                        denorm = DENORMALIZERS.get(node_type)
-                        if denorm:
-                            img = denorm(img)
-                        img = (img.clamp(0, 1) * 255).byte()
-                        if C == 1:
-                            meta["imagePixels"] = img[0].tolist()
-                            meta["imageChannels"] = 1
-                        else:
-                            meta["imagePixels"] = img.permute(1, 2, 0).tolist()
-                            meta["imageChannels"] = C
-
-                    # Text datasets: send raw sample text for preview
-                    if "_texts" in tensors:
-                        meta["sampleText"] = tensors["_texts"][0][:500]
-
-                    node_results[node_id] = {
-                        "outputs": outputs,
-                        "metadata": meta,
-                    }
-                except Exception as e:
-                    node_results[node_id] = {
-                        "outputs": {},
-                        "metadata": {"error": str(e)},
-                    }
-                continue
-
-            # Optimizer/loss: skip during inference
-            if node_type in OPTIMIZER_NODES or node_type in ALL_LOSS_NODES:
-                node_results[node_id] = {"outputs": {}, "metadata": {}}
-                continue
-
-            # Layer / structural nodes: use trained modules
-            module = trained_modules.get(node_id)
-            if not module:
-                node_results[node_id] = {
-                    "outputs": {},
-                    "metadata": {"error": "No trained module for this node"},
-                }
-                continue
-
-            inputs = gather_inputs(node_id, edges, results)
-
-            # Subgraph nodes
-            if node_type == SUBGRAPH_TYPE:
-                try:
-                    sg_outputs = module(**inputs)
-                    first_key = next(iter(sg_outputs), None)
-                    if first_key:
-                        results[node_id] = {"out": sg_outputs[first_key]}
-                        node_results[node_id] = {
-                            "outputs": {"out": tensor_info(sg_outputs[first_key])},
-                            "metadata": {"outputShape": list(sg_outputs[first_key].shape)},
-                        }
-                except Exception as e:
-                    node_results[node_id] = {"outputs": {}, "metadata": {"error": str(e)}}
-                continue
-
-            # Structural nodes pass all named inputs
-            if node_type in MULTI_INPUT_NODES:
-                try:
-                    output = module(**{k: v for k, v in inputs.items()})
-                    results[node_id] = {"out": output}
-                    node_results[node_id] = {
-                        "outputs": {"out": tensor_info(output)},
-                        "metadata": {"outputShape": list(output.shape)},
-                    }
-                except Exception as e:
-                    node_results[node_id] = {"outputs": {}, "metadata": {"error": str(e)}}
-                continue
-
-            if "in" not in inputs:
-                node_results[node_id] = {
-                    "outputs": {},
-                    "metadata": {"error": "No input connected"},
-                }
-                continue
-
-            try:
-                raw = module(inputs["in"])
-
-                # Handle multi-output (LSTM/GRU)
-                if isinstance(raw, dict):
-                    results[node_id] = raw
-                    output = next(iter(raw.values()))
-                else:
-                    results[node_id] = {"out": raw}
-                    output = raw
-
-                meta: dict = {
-                    "outputShape": list(output.shape),
-                    "paramCount": sum(p.numel() for p in module.parameters()),
-                }
-
-                is_final = any(
-                    e["source"]["nodeId"] == node_id
-                    and nodes.get(e["target"]["nodeId"], {}).get("type") in LOSS_NODES
-                    for e in edges
-                )
-                if is_final and output.dim() == 2:
-                    # Classification: show predicted class + probabilities
-                    probs = torch.softmax(output, dim=1)[0]
-                    predicted_class = int(probs.argmax())
-                    confidence = float(probs[predicted_class])
-                    prediction = {
-                        "predictedClass": predicted_class,
-                        "confidence": _safe_float(confidence),
-                        "probabilities": [_safe_float(float(p)) for p in probs],
-                    }
-                    meta["prediction"] = prediction
-                elif is_final and output.dim() == 4:
-                    # Reconstruction (autoencoder): show output as image
-                    img = output[0].detach().cpu()  # [C, H, W]
-                    img = (img.clamp(0, 1) * 255).byte()
-                    C = img.shape[0]
-                    if C == 1:
-                        meta["imagePixels"] = img[0].tolist()
-                        meta["imageChannels"] = 1
-                    else:
-                        meta["imagePixels"] = img.permute(1, 2, 0).tolist()
-                        meta["imageChannels"] = C
-                    meta["reconstruction"] = True
-
-                out_info = {k: tensor_info(v) for k, v in raw.items()} if isinstance(raw, dict) else {"out": tensor_info(output)}
-                node_results[node_id] = {
-                    "outputs": out_info,
-                    "metadata": meta,
-                }
-            except Exception as e:
-                node_results[node_id] = {
-                    "outputs": {},
-                    "metadata": {"error": str(e)},
-                }
+            result = describe_inference(node, execute(node, ctx), edges, nodes)
+            node_results[node_id] = result
+            pred = result["metadata"].get("prediction")
+            if pred is not None:
+                prediction = pred
 
     # Cache for layer detail queries
     _last_run.clear()
     _last_run["modules"] = trained_modules
-    _last_run["results"] = results
+    _last_run["results"] = ctx.results
     _last_run["nodes"] = nodes
     _last_run["edges"] = edges
 

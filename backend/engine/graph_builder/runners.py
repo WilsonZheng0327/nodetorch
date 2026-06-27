@@ -28,7 +28,7 @@ import torch
 
 from engine.graph_builder._state import get_device
 from engine.graph_builder.constants import (
-    LOSS_NODES, OPTIMIZER_NODES, MULTI_INPUT_NODES,
+    LOSS_NODES, OPTIMIZER_NODES, MULTI_INPUT_NODES, ALL_LOSS_NODES,
     GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE, DIFFUSION_EMBED_TYPE,
     SUBGRAPH_TYPE, SENTINEL_INPUT, SENTINEL_OUTPUT,
 )
@@ -37,7 +37,7 @@ from engine.graph_builder.stats import (
     tensor_info, _safe_float, module_weight_info, batchnorm_info, activation_info,
 )
 from engine.node_builders import NODE_BUILDERS, TorchModuleBuilder
-from dataprep.data_loaders import DATA_LOADERS
+from dataprep.data_loaders import DATA_LOADERS, DENORMALIZERS
 
 NodeResult = dict
 
@@ -88,11 +88,18 @@ class NodeExecutor(Protocol):
 
 @dataclass
 class RunContext:
-    """Everything an executor needs, plus the knobs that differ between walks."""
+    """Everything an executor needs, plus the knobs that differ between walks.
+
+    ``use_trained`` / ``batch_override`` / ``skip_losses`` are the only behavioral
+    differences between the build-fresh inspection walk and the trained inference
+    walks — the per-node dispatch itself is shared.
+    """
     edges: list
     results: dict                                  # node_id -> {port: tensor} (raw, for downstream)
     modules: dict = field(default_factory=dict)    # node_id -> nn.Module (fresh cache OR trained store)
     use_trained: bool = False                      # reuse ctx.modules instead of building
+    batch_override: int | None = None              # force a batchSize on data loaders (inference: 1)
+    skip_losses: bool = False                      # don't run loss nodes (inference / test display)
 
     def get_nn_module(self, node: dict, build) -> torch.nn.Module:
         """Get this node's nn.Module. In a build walk, construct a fresh one via
@@ -120,8 +127,11 @@ def _err(msg: str) -> Execution:
 # --- Executors (one per node-type class) — produce an Execution, store raw outputs ---
 
 def execute_data(node, ctx: RunContext) -> Execution:
+    props = node["properties"]
+    if ctx.batch_override is not None:
+        props = {**props, "batchSize": ctx.batch_override}
     loader = DATA_LOADERS[node["type"]]
-    tensors = loader(node["properties"])
+    tensors = loader(props)
     dev = get_device()
     tensors = {k: (v.to(dev) if isinstance(v, torch.Tensor) else v) for k, v in tensors.items()}
     ctx.results[node["id"]] = tensors
@@ -274,6 +284,8 @@ def execute(node: dict, ctx: RunContext) -> Execution:
     can't abort the whole walk. Guard conditions (missing input, unknown type) are
     returned explicitly by the executors as ``error`` Executions.
     """
+    if ctx.skip_losses and node["type"] in ALL_LOSS_NODES:
+        return Execution(kind="skip")
     executor = _EXECUTORS.get(node["type"], execute_layer)
     try:
         return executor(node, ctx)
@@ -371,3 +383,87 @@ def inspect_node(node: dict, ctx: RunContext) -> NodeResult:
     (execute + describe_inspection). This is one specific composition — the
     universal per-node step is ``execute``, not this."""
     return describe_inspection(node, execute(node, ctx))
+
+
+# --- Inference presentation: prediction / reconstruction / single-sample preview ---
+
+def _scalar_label(lbl) -> int | None:
+    """The sample's class label, for display — only scalar (1D) labels, not sequences."""
+    if isinstance(lbl, torch.Tensor) and lbl.dim() == 1:
+        return int(lbl[0])
+    return None
+
+
+def _add_image_preview(meta: dict, img: torch.Tensor, node_type: str) -> None:
+    """Attach displayable pixels for an image tensor [C, H, W]. Denormalizes when
+    the node has a registered denormalizer (data nodes); raw clamp otherwise
+    (reconstruction outputs, whose layer type isn't in DENORMALIZERS)."""
+    img = img.detach().cpu()
+    denorm = DENORMALIZERS.get(node_type)
+    if denorm:
+        img = denorm(img)
+    img = (img.clamp(0, 1) * 255).byte()
+    channels = img.shape[0]
+    if channels == 1:
+        meta["imagePixels"] = img[0].tolist()
+        meta["imageChannels"] = 1
+    else:
+        meta["imagePixels"] = img.permute(1, 2, 0).tolist()
+        meta["imageChannels"] = channels
+
+
+def describe_inference(node: dict, exe: Execution, edges: list, nodes: dict) -> NodeResult:
+    """Inference-walk presentation: single-sample run on trained modules.
+
+    Data nodes show the actual label + an image/text preview; the final layer
+    (the one feeding the loss) shows a class prediction (2D) or a reconstruction
+    image (4D). Losses/optimizers are skipped upstream (``skip_losses``), so they
+    arrive as ``kind="skip"`` and render empty.
+    """
+    if exe.kind == "error":
+        return {"outputs": {}, "metadata": {"error": exe.extra["msg"]}}
+    if exe.kind == "skip":
+        return {"outputs": {}, "metadata": {}}
+
+    outputs = _tensor_infos(exe.outputs)
+    node_type = node["type"]
+
+    if exe.kind == "data":
+        tensors = exe.outputs
+        meta: dict = {
+            "outputShape": list(exe.primary.shape),
+            "actualLabel": _scalar_label(tensors.get("labels")),
+        }
+        out = tensors.get("out")
+        if isinstance(out, torch.Tensor) and out.dim() == 4:
+            _add_image_preview(meta, out[0], node_type)
+        if "_texts" in tensors:
+            meta["sampleText"] = tensors["_texts"][0][:500]
+        return {"outputs": outputs, "metadata": meta}
+
+    if exe.kind in ("subgraph", "multi"):
+        return {"outputs": outputs, "metadata": {"outputShape": list(exe.primary.shape)}}
+
+    # layer (default): shape + params, plus prediction/reconstruction if it's the head
+    output = exe.primary
+    meta = {
+        "outputShape": list(output.shape),
+        "paramCount": sum(p.numel() for p in exe.module.parameters()),
+    }
+    is_final = any(
+        e["source"]["nodeId"] == node["id"]
+        and nodes.get(e["target"]["nodeId"], {}).get("type") in LOSS_NODES
+        for e in edges
+    )
+    if is_final and output.dim() == 2:
+        probs = torch.softmax(output, dim=1)[0]
+        predicted_class = int(probs.argmax())
+        meta["prediction"] = {
+            "predictedClass": predicted_class,
+            "confidence": _safe_float(float(probs[predicted_class])),
+            "probabilities": [_safe_float(float(p)) for p in probs],
+        }
+    elif is_final and output.dim() == 4:
+        _add_image_preview(meta, output[0], node_type)
+        meta["reconstruction"] = True
+    return {"outputs": outputs, "metadata": meta}
