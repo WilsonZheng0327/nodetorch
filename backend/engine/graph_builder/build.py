@@ -226,10 +226,11 @@ def build_modules(graph_data: dict) -> dict[str, nn.Module]:
     for downstream layers) but discards the outputs. Much lighter than
     build_and_run_graph for cases where you only need the module architecture.
     """
-    # Shares the per-node-type dispatch with the forward walk (runners.py); we
-    # just discard the display metadata and keep the built modules. Local import
-    # avoids an import cycle (runners imports from this module).
-    from engine.graph_builder.runners import RunContext, run_node
+    # Shares the per-node-type dispatch with the forward walk (runners.py). We
+    # only need the built modules, so we call execute() directly and skip the
+    # describe step entirely. Local import avoids an import cycle (runners imports
+    # from this module).
+    from engine.graph_builder.runners import RunContext, execute
 
     graph = graph_data["graph"]
     nodes = {n["id"]: n for n in graph["nodes"]}
@@ -239,5 +240,5 @@ def build_modules(graph_data: dict) -> dict[str, nn.Module]:
     ctx = RunContext(edges=edges, results={}, modules={}, use_trained=False)
     with torch.no_grad():
         for node_id in order:
-            run_node(nodes[node_id], ctx)
+            execute(nodes[node_id], ctx)
     return ctx.modules

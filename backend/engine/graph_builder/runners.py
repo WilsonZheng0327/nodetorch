@@ -1,24 +1,27 @@
-"""Per-node-type execution runners + the dispatch registry.
+"""Per-node-type execution registry, split into two phases.
 
-Each *runner* turns ONE node into raw outputs (stored on the context, for
-downstream nodes) plus a frontend ``node_result`` (outputs + display metadata).
-``run_node`` looks the runner up by node type — the single dispatch the graph
-walks (forward, build, infer, …) share instead of each re-implementing the
-per-type branching.
+A graph walk does the same thing for every node — dispatch on its type, gather
+inputs, get its module (build fresh or reuse trained), run it, store the raw
+output — and then *separately* formats display metadata for the frontend. Those
+two jobs have different audiences:
 
-The differences *between* walks live in the ``RunContext``, not in copied code:
-  - build a fresh module vs. reuse a trained one  → ``RunContext.get_nn_module``
-  - (later) inference batch size / preview metadata → context flags
+  - **execute** (this module's ``_EXECUTORS`` registry) is identical for ALL
+    walks (forward, build, inference, test, final). It produces an ``Execution``
+    and stores the raw tensors on ``ctx.results``. This is the single dispatch —
+    so node-type handling can't drift between walks.
+  - **describe** is per-walk formatting of an ``Execution`` into a
+    ``node_result``. The forward walk wants full metadata (weights, activations);
+    inference wants predictions; ``build_modules`` wants nothing. Only this half
+    differs, and it never re-runs a tensor — it just reads the ``Execution``.
 
-This module is the backend counterpart of the frontend's per-node ``executors``:
-node-type behavior behind a uniform ``run(node, ctx)`` interface, looked up by
-type. It mirrors, exactly, the handling that used to be inlined in
-``forward.build_and_run_graph``.
+So a walk is ``describe_X(node, execute(node, ctx))``; ``build_modules`` is just
+``execute(node, ctx)``. This is the backend counterpart of the frontend's
+per-node ``executors``, with the presentation factored out.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Protocol
+from typing import Protocol
 
 import torch
 
@@ -38,44 +41,62 @@ from dataprep.data_loaders import DATA_LOADERS
 NodeResult = dict
 
 
-class Runner(Protocol):
-    """Executes one node of a given type during a graph walk.
-
-    Each node-type class registers a runner in ``_RUNNERS``; ``run_node``
-    dispatches to it. A runner stores the node's raw output tensor(s) in
-    ``ctx.results`` (so downstream nodes can read them) and returns the
-    ``node_result`` — display outputs + metadata — for the frontend.
+@dataclass
+class Execution:
+    """The raw result of running one node — what every walk shares before
+    formatting. The output tensors are already on ``ctx.results``; a ``describe_*``
+    presenter turns this into a frontend ``node_result`` without re-running anything.
 
     Parameters
     ----------
-    node:
-        The serialized node dict: ``id``, ``type``, ``properties``, and (for a
-        ``subgraph.block``) ``subgraph``.
-    ctx:
-        The shared ``RunContext`` — graph edges, the ``results`` tensor bus,
-        the module store, and the per-walk flags (e.g. ``use_trained``).
+    kind:
+        Node category, picked by the executor: ``data``, ``layer``, ``loss``,
+        ``multi``, ``subgraph``, ``noise``, ``scheduler``, ``embed``, ``skip``,
+        or ``error``.
+    module:
+        The ``nn.Module`` that ran, if any (``None`` for data / skip / noise /
+        embed / errors). Used by presenters for param/weight stats.
+    outputs:
+        All named raw outputs, ``{port_id: tensor}``.
+    primary:
+        The main output tensor — used for output shape, activations, predictions
+        (``None`` for skip / error).
+    extra:
+        Type-specific scratch the presenter may need (e.g. ``{"msg": ...}`` for an
+        error).
+    """
+    kind: str
+    module: torch.nn.Module | None = None
+    outputs: dict = field(default_factory=dict)
+    primary: object = None
+    extra: dict = field(default_factory=dict)
 
-    Returns
-    -------
-    NodeResult
-        ``{"outputs": {...}, "metadata": {...}}`` for this node.
+
+class NodeExecutor(Protocol):
+    """Runs one node of a given type, returning an ``Execution``.
+
+    Registered per node-type class in ``_EXECUTORS`` and dispatched by ``execute``.
+    An executor gathers inputs, obtains the node's module (``ctx.get_nn_module``),
+    runs it, stores the raw output(s) on ``ctx.results``, and returns an
+    ``Execution`` describing what ran. It does NOT build display metadata — that's
+    the ``describe_*`` half.
     """
 
-    def __call__(self, node: dict, ctx: RunContext) -> NodeResult: ...
+    def __call__(self, node: dict, ctx: RunContext) -> Execution: ...
 
 
 @dataclass
 class RunContext:
-    """Everything a runner needs, plus the knobs that differ between walks."""
+    """Everything an executor needs, plus the knobs that differ between walks."""
     edges: list
     results: dict                                  # node_id -> {port: tensor} (raw, for downstream)
     modules: dict = field(default_factory=dict)    # node_id -> nn.Module (fresh cache OR trained store)
     use_trained: bool = False                      # reuse ctx.modules instead of building
 
-    def get_nn_module(self, node: dict, build: Callable[[], torch.nn.Module]) -> torch.nn.Module:
+    def get_nn_module(self, node: dict, build) -> torch.nn.Module:
         """Get this node's nn.Module. In a build walk, construct a fresh one via
-        `build` and cache it; in an inference walk (use_trained), reuse the stored
-        trained module instead (raising if it isn't there — it never builds).
+        ``build`` and cache it; in an inference walk (``use_trained``), reuse the
+        stored trained module instead (raising if it isn't there — it never builds).
 
         This single seam is the only place the forward (build-fresh) and inference
         (reuse-trained) walks differ in how a module is obtained.
@@ -91,12 +112,182 @@ class RunContext:
         return module
 
 
-def _error(msg: str) -> NodeResult:
-    return {"outputs": {}, "metadata": {"error": msg}}
+def _err(msg: str) -> Execution:
+    return Execution(kind="error", extra={"msg": msg})
+
+
+# --- Executors (one per node-type class) — produce an Execution, store raw outputs ---
+
+def execute_data(node, ctx: RunContext) -> Execution:
+    loader = DATA_LOADERS[node["type"]]
+    tensors = loader(node["properties"])
+    dev = get_device()
+    tensors = {k: (v.to(dev) if isinstance(v, torch.Tensor) else v) for k, v in tensors.items()}
+    ctx.results[node["id"]] = tensors
+    primary = next(v for v in tensors.values() if isinstance(v, torch.Tensor))
+    return Execution(kind="data", outputs=tensors, primary=primary)
+
+
+def execute_skip(node, ctx: RunContext) -> Execution:
+    # Optimizer nodes: no forward output; the training loop drives them.
+    return Execution(kind="skip")
+
+
+def execute_gan_noise(node, ctx: RunContext) -> Execution:
+    props = node["properties"]
+    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
+    if not builder:
+        return Execution(kind="skip")
+    # Build/register the module for its side effect (it lands in ctx.modules);
+    # the output is fabricated noise, not module(...), so we don't keep the handle.
+    ctx.get_nn_module(node, lambda: builder(props, input_shapes={}))
+    batch_size = props.get("batchSize", 64)
+    latent_dim = props.get("latentDim", 100)
+    noise = torch.randn(batch_size, latent_dim, device=get_device())
+    ctx.results[node["id"]] = {"out": noise}
+    return Execution(kind="noise", outputs={"out": noise}, primary=noise)
+
+
+def execute_diffusion_scheduler(node, ctx: RunContext) -> Execution:
+    props = node["properties"]
+    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
+    if not builder:
+        return Execution(kind="skip")
+    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
+    input_shapes = {k: list(v.shape) for k, v in inputs.items() if isinstance(v, torch.Tensor)}
+    ctx.get_nn_module(node, lambda: builder(props, input_shapes=input_shapes))
+    if "images" not in inputs:
+        return _err("No images input connected")
+    images = inputs["images"]
+    noisy_out = images.clone()
+    noise_dummy = torch.zeros_like(images)
+    t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
+    outputs = {"out": noisy_out, "noise": noise_dummy, "timestep": t_channel}
+    ctx.results[node["id"]] = outputs
+    return Execution(kind="scheduler", outputs=outputs, primary=noisy_out)
+
+
+def execute_diffusion_embed(node, ctx: RunContext) -> Execution:
+    props = node["properties"]
+    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
+    if not builder:
+        return Execution(kind="skip")
+    ctx.get_nn_module(node, lambda: builder(props, input_shapes={}))
+    embed_dim = props.get("embedDim", 128)
+    embed = torch.zeros(1, embed_dim, device=get_device())
+    ctx.results[node["id"]] = {"out": embed}
+    return Execution(kind="embed", outputs={"out": embed}, primary=embed)
+
+
+def execute_loss(node, ctx: RunContext) -> Execution:
+    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
+    if "predictions" not in inputs or "labels" not in inputs:
+        return _err("Connect both predictions and labels")
+    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
+    if not builder:
+        return _err(f"Unknown node type: {node['type']}")
+    input_shapes = {k: list(v.shape) for k, v in inputs.items()}
+    module = ctx.get_nn_module(node, lambda: builder(node["properties"], input_shapes=input_shapes))
+    loss = module(inputs["predictions"], inputs["labels"])
+    ctx.results[node["id"]] = {"out": loss}
+    return Execution(kind="loss", module=module, outputs={"out": loss}, primary=loss)
+
+
+def execute_multi_input(node, ctx: RunContext) -> Execution:
+    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
+    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
+    if not builder:
+        return _err(f"Unknown node type: {node['type']}")
+    input_shapes = {k: list(v.shape) for k, v in inputs.items()}
+    module = ctx.get_nn_module(node, lambda: builder(node["properties"], input_shapes=input_shapes))
+    output = module(**{k: v for k, v in inputs.items()})
+    ctx.results[node["id"]] = {"out": output}
+    return Execution(kind="multi", module=module, outputs={"out": output}, primary=output)
+
+
+def execute_subgraph(node, ctx: RunContext) -> Execution:
+    subgraph_data = node.get("subgraph")
+    if not subgraph_data:
+        return _err("Empty subgraph")
+    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
+    input_shapes = {k: list(v.shape) for k, v in inputs.items()}
+    sg_module = ctx.get_nn_module(node, lambda: build_subgraph_module(subgraph_data, input_shapes))
+
+    with torch.no_grad():
+        sg_outputs = sg_module(**inputs)
+
+    first_key = next(iter(sg_outputs), None)
+    if not first_key:
+        return _err("Subgraph produced no output")
+
+    primary = sg_outputs[first_key]
+    ctx.results[node["id"]] = {"out": primary}
+    return Execution(kind="subgraph", module=sg_module, outputs={"out": primary}, primary=primary)
+
+
+def execute_layer(node, ctx: RunContext) -> Execution:
+    """Default: a regular single-input layer (conv, linear, activation, …)."""
+    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
+    if not builder:
+        return _err(f"Unknown node type: {node['type']}")
+    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
+    if "in" not in inputs:
+        return _err("No input connected")
+    input_shapes = {k: list(v.shape) for k, v in inputs.items()}
+    module = ctx.get_nn_module(node, lambda: builder(node["properties"], input_shapes=input_shapes))
+    raw = module(inputs["in"])
+
+    if isinstance(raw, dict):  # multi-output nodes (LSTM/GRU return dicts)
+        ctx.results[node["id"]] = raw
+        return Execution(kind="layer", module=module, outputs=raw, primary=next(iter(raw.values())))
+    ctx.results[node["id"]] = {"out": raw}
+    return Execution(kind="layer", module=module, outputs={"out": raw}, primary=raw)
+
+
+# --- Dispatch registry (the single, shared per-type dispatch) ---
+
+_EXECUTORS: dict[str, NodeExecutor] = {}
+
+
+def _register(types, executor: NodeExecutor) -> None:
+    for t in types:
+        _EXECUTORS[t] = executor
+
+
+_register(DATA_LOADERS.keys(), execute_data)
+_register(OPTIMIZER_NODES, execute_skip)
+_register([GAN_NOISE_TYPE], execute_gan_noise)
+_register([DIFFUSION_SCHEDULER_TYPE], execute_diffusion_scheduler)
+_register([DIFFUSION_EMBED_TYPE], execute_diffusion_embed)
+_register(LOSS_NODES, execute_loss)
+_register(MULTI_INPUT_NODES, execute_multi_input)
+_register([SUBGRAPH_TYPE], execute_subgraph)
+
+
+def execute(node: dict, ctx: RunContext) -> Execution:
+    """Run one node through its type's executor (default: a regular layer).
+
+    Stores the node's raw output(s) on ``ctx.results`` and returns an
+    ``Execution``. Runtime errors become ``Execution(kind="error")`` — mirroring
+    the per-branch try/except the inlined dispatch used to have — so one bad node
+    can't abort the whole walk. Guard conditions (missing input, unknown type) are
+    returned explicitly by the executors as ``error`` Executions.
+    """
+    executor = _EXECUTORS.get(node["type"], execute_layer)
+    try:
+        return executor(node, ctx)
+    except Exception as e:  # noqa: BLE001 — a failing node must not abort the walk
+        return _err(str(e))
+
+
+# --- Presenters: format an Execution into a frontend node_result ---
+
+def _tensor_infos(outputs: dict) -> dict:
+    return {k: tensor_info(v) for k, v in outputs.items() if isinstance(v, torch.Tensor)}
 
 
 def _layer_meta(module: torch.nn.Module, tensor: torch.Tensor) -> dict:
-    """Display metadata for a built layer (shared by single- and multi-output layers)."""
+    """Full layer metadata: shape, params, weight/batchnorm stats, activations."""
     meta: dict = {
         "outputShape": list(tensor.shape),
         "paramCount": sum(p.numel() for p in module.parameters()),
@@ -111,204 +302,67 @@ def _layer_meta(module: torch.nn.Module, tensor: torch.Tensor) -> dict:
     return meta
 
 
-# --- Runners (one per node-type class) ---
-
-def run_data(node, ctx: RunContext) -> NodeResult:
-    loader = DATA_LOADERS[node["type"]]
-    tensors = loader(node["properties"])
-    dev = get_device()
-    tensors = {k: (v.to(dev) if isinstance(v, torch.Tensor) else v) for k, v in tensors.items()}
-    ctx.results[node["id"]] = tensors
-    outputs = {k: tensor_info(v) for k, v in tensors.items() if isinstance(v, torch.Tensor)}
-    first_tensor = next(v for v in tensors.values() if isinstance(v, torch.Tensor))
-    # Dataset nodes emit no "activations" histogram — they're raw input, not a layer output.
-    return {"outputs": outputs, "metadata": {"outputShape": list(first_tensor.shape)}}
-
-
-def run_skip(node, ctx: RunContext) -> NodeResult:
-    # Optimizer nodes: no forward output; the training loop drives them.
-    return {"outputs": {}, "metadata": {}}
-
-
-def run_gan_noise(node, ctx: RunContext) -> NodeResult:
-    props = node["properties"]
-    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
-    if not builder:
-        return {"outputs": {}, "metadata": {}}
-    # Build/register the module for its side effect (it lands in ctx.modules);
-    # the output is fabricated noise, not module(...), so we don't keep the handle.
-    ctx.get_nn_module(node, lambda: builder(props, input_shapes={}))
-    batch_size = props.get("batchSize", 64)
-    latent_dim = props.get("latentDim", 100)
-    noise = torch.randn(batch_size, latent_dim, device=get_device())
-    ctx.results[node["id"]] = {"out": noise}
-    return {"outputs": {"out": tensor_info(noise)}, "metadata": {"outputShape": [batch_size, latent_dim]}}
-
-
-def run_diffusion_scheduler(node, ctx: RunContext) -> NodeResult:
-    props = node["properties"]
-    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
-    if not builder:
-        return {"outputs": {}, "metadata": {}}
-    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
-    input_shapes = {k: list(v.shape) for k, v in inputs.items() if isinstance(v, torch.Tensor)}
-    ctx.get_nn_module(node, lambda: builder(props, input_shapes=input_shapes))
-    if "images" not in inputs:
-        return _error("No images input connected")
-    images = inputs["images"]
-    noisy_out = images.clone()
-    noise_dummy = torch.zeros_like(images)
-    t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
-    ctx.results[node["id"]] = {"out": noisy_out, "noise": noise_dummy, "timestep": t_channel}
-    return {
-        "outputs": {
-            "out": tensor_info(noisy_out),
-            "noise": tensor_info(noise_dummy),
-            "timestep": tensor_info(t_channel),
-        },
-        "metadata": {
-            "outputShape": list(noisy_out.shape),
-            "shapes": [
-                {"label": "Noisy", "value": list(noisy_out.shape)},
-                {"label": "Noise", "value": list(noise_dummy.shape)},
-                {"label": "Timestep", "value": list(t_channel.shape)},
-            ],
-        },
-    }
-
-
-def run_diffusion_embed(node, ctx: RunContext) -> NodeResult:
-    props = node["properties"]
-    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
-    if not builder:
-        return {"outputs": {}, "metadata": {}}
-    ctx.get_nn_module(node, lambda: builder(props, input_shapes={}))
-    embed_dim = props.get("embedDim", 128)
-    embed = torch.zeros(1, embed_dim, device=get_device())
-    ctx.results[node["id"]] = {"out": embed}
-    return {"outputs": {"out": tensor_info(embed)}, "metadata": {"outputShape": [1, embed_dim]}}
-
-
-def run_loss(node, ctx: RunContext) -> NodeResult:
-    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
-    if "predictions" not in inputs or "labels" not in inputs:
-        return _error("Connect both predictions and labels")
-    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
-    if not builder:
-        return _error(f"Unknown node type: {node['type']}")
-    input_shapes = {k: list(v.shape) for k, v in inputs.items()}
-    module = ctx.get_nn_module(node, lambda: builder(node["properties"], input_shapes=input_shapes))
-    loss = module(inputs["predictions"], inputs["labels"])
-    ctx.results[node["id"]] = {"out": loss}
-    return {
-        "outputs": {"out": tensor_info(loss)},
-        "metadata": {"outputShape": ["scalar"], "lossValue": _safe_float(float(loss.detach()))},
-    }
-
-
-def run_multi_input(node, ctx: RunContext) -> NodeResult:
-    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
-    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
-    if not builder:
-        return _error(f"Unknown node type: {node['type']}")
-    input_shapes = {k: list(v.shape) for k, v in inputs.items()}
-    module = ctx.get_nn_module(node, lambda: builder(node["properties"], input_shapes=input_shapes))
-    output = module(**{k: v for k, v in inputs.items()})
-    ctx.results[node["id"]] = {"out": output}
-    return {"outputs": {"out": tensor_info(output)}, "metadata": {"outputShape": list(output.shape)}}
-
-
-def run_subgraph(node, ctx: RunContext) -> NodeResult:
-    subgraph_data = node.get("subgraph")
-    if not subgraph_data:
-        return _error("Empty subgraph")
-    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
-    input_shapes = {k: list(v.shape) for k, v in inputs.items()}
-    sg_module = ctx.get_nn_module(node, lambda: build_subgraph_module(subgraph_data, input_shapes))
-
-    with torch.no_grad():
-        sg_outputs = sg_module(**inputs)
-
-    first_key = next(iter(sg_outputs), None)
-    if not first_key:
-        return _error("Subgraph produced no output")
-
-    ctx.results[node["id"]] = {"out": sg_outputs[first_key]}
-    meta: dict = {
-        "outputShape": list(sg_outputs[first_key].shape),
-        "paramCount": sum(p.numel() for p in sg_module.parameters()),
-        "activations": activation_info(sg_outputs[first_key]),
-    }
-    # Per-inner-node snapshots for visualization.
-    inner_snaps: dict = {}
+def _inner_snapshots(sg_module) -> dict:
+    """Per-inner-node activation snapshots for a subgraph block (for the viz)."""
+    snaps: dict = {}
     inner_results = getattr(sg_module, "_last_results", {})
     for inner_nid, inner_node in sg_module.inner_nodes.items():
         inner_type = inner_node["type"]
         if inner_type == SENTINEL_INPUT:
             t = inner_results.get(inner_nid, {}).get("in")
-            if t is not None and isinstance(t, torch.Tensor):
-                inner_snaps[inner_nid] = {"activations": activation_info(t)}
         elif inner_type == SENTINEL_OUTPUT:
             t = inner_results.get(inner_nid, {}).get("out")
-            if t is not None and isinstance(t, torch.Tensor):
-                inner_snaps[inner_nid] = {"activations": activation_info(t)}
-    if inner_snaps:
-        meta["innerSnapshots"] = inner_snaps
-    return {"outputs": {"out": tensor_info(sg_outputs[first_key])}, "metadata": meta}
+        else:
+            continue
+        if t is not None and isinstance(t, torch.Tensor):
+            snaps[inner_nid] = {"activations": activation_info(t)}
+    return snaps
 
 
-def run_layer(node, ctx: RunContext) -> NodeResult:
-    """Default: a regular single-input layer (conv, linear, activation, …)."""
-    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
-    if not builder:
-        return _error(f"Unknown node type: {node['type']}")
-    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
-    if "in" not in inputs:
-        return _error("No input connected")
-    input_shapes = {k: list(v.shape) for k, v in inputs.items()}
-    module = ctx.get_nn_module(node, lambda: builder(node["properties"], input_shapes=input_shapes))
-    raw_output = module(inputs["in"])
+def describe_forward(node: dict, exe: Execution) -> NodeResult:
+    """Forward-walk presentation: full display metadata for each node."""
+    if exe.kind == "error":
+        return {"outputs": {}, "metadata": {"error": exe.extra["msg"]}}
+    if exe.kind == "skip":
+        return {"outputs": {}, "metadata": {}}
 
-    if isinstance(raw_output, dict):  # multi-output nodes (LSTM/GRU return dicts)
-        ctx.results[node["id"]] = raw_output
-        first_tensor = next(iter(raw_output.values()))
-        return {
-            "outputs": {k: tensor_info(v) for k, v in raw_output.items()},
-            "metadata": _layer_meta(module, first_tensor),
+    outputs = _tensor_infos(exe.outputs)
+
+    if exe.kind in ("data", "noise", "embed", "multi"):
+        return {"outputs": outputs, "metadata": {"outputShape": list(exe.primary.shape)}}
+
+    if exe.kind == "scheduler":
+        o = exe.outputs
+        return {"outputs": outputs, "metadata": {
+            "outputShape": list(exe.primary.shape),
+            "shapes": [
+                {"label": "Noisy", "value": list(o["out"].shape)},
+                {"label": "Noise", "value": list(o["noise"].shape)},
+                {"label": "Timestep", "value": list(o["timestep"].shape)},
+            ],
+        }}
+
+    if exe.kind == "loss":
+        return {"outputs": outputs, "metadata": {
+            "outputShape": ["scalar"],
+            "lossValue": _safe_float(float(exe.primary.detach())),
+        }}
+
+    if exe.kind == "subgraph":
+        meta: dict = {
+            "outputShape": list(exe.primary.shape),
+            "paramCount": sum(p.numel() for p in exe.module.parameters()),
+            "activations": activation_info(exe.primary),
         }
-    ctx.results[node["id"]] = {"out": raw_output}
-    return {"outputs": {"out": tensor_info(raw_output)}, "metadata": _layer_meta(module, raw_output)}
+        snaps = _inner_snapshots(exe.module)
+        if snaps:
+            meta["innerSnapshots"] = snaps
+        return {"outputs": outputs, "metadata": meta}
 
-
-# --- Dispatch registry ---
-
-_RUNNERS: dict[str, Runner] = {}
-
-
-def _register(types, runner: Runner) -> None:
-    for t in types:
-        _RUNNERS[t] = runner
-
-
-_register(DATA_LOADERS.keys(), run_data)
-_register(OPTIMIZER_NODES, run_skip)
-_register([GAN_NOISE_TYPE], run_gan_noise)
-_register([DIFFUSION_SCHEDULER_TYPE], run_diffusion_scheduler)
-_register([DIFFUSION_EMBED_TYPE], run_diffusion_embed)
-_register(LOSS_NODES, run_loss)
-_register(MULTI_INPUT_NODES, run_multi_input)
-_register([SUBGRAPH_TYPE], run_subgraph)
+    # layer (default)
+    return {"outputs": outputs, "metadata": _layer_meta(exe.module, exe.primary)}
 
 
 def run_node(node: dict, ctx: RunContext) -> NodeResult:
-    """Run one node through its type's runner (default: a regular layer).
-
-    Runtime errors become an ``{"error": …}`` result, mirroring the per-branch
-    try/except the inlined dispatch used to have. Guard conditions (missing input,
-    unknown type) are returned explicitly by the runners themselves.
-    """
-    runner = _RUNNERS.get(node["type"], run_layer)
-    try:
-        return runner(node, ctx)
-    except Exception as e:  # noqa: BLE001 — a failing node must not abort the whole walk
-        return {"outputs": {}, "metadata": {"error": str(e)}}
+    """Execute a node and format it for the forward walk (execute + describe_forward)."""
+    return describe_forward(node, execute(node, ctx))
