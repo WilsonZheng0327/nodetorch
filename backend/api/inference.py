@@ -1,5 +1,6 @@
 import logging
 from fastapi import APIRouter
+from viztracer import VizTracer
 
 from engine.graph_builder import execute_graph, infer_graph, evaluate_test_set
 
@@ -12,7 +13,15 @@ router = APIRouter(tags=["inference"])
 async def forward(graph_data: dict):
     logger.info("Forward pass requested")
     try:
-        results = execute_graph(graph_data)
+        # DEV: VizTracer captures the full call tree of this forward pass.
+        # Writes forward_trace.json on block exit; view with `vizviewer forward_trace.json`.
+        # include_files keeps only our code (skips torch/numpy internals). Remove when done.
+        with VizTracer(
+            output_file="forward_trace.json",
+            include_files=["backend/"],
+            max_stack_depth=40,
+        ):
+            results = execute_graph(graph_data)
         logger.info("Forward pass complete")
         return {"status": "ok", "results": results}
     except Exception as e:

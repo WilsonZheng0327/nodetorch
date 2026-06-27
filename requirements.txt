@@ -11,3 +11,6 @@ python-multipart
 openai
 anthropic
 httpx
+
+# Dev: execution tracing / call-graph profiling (viztracer -o trace.json; vizviewer trace.json)
+viztracer
