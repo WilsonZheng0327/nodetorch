@@ -73,6 +73,53 @@ def test_forward_walk_handles_every_node(name):
         assert "outputs" in r and "metadata" in r, f"{name}: malformed result for {nid}"
 
 
+# The exact metadata keys the forward walk emits per node type. In forward mode
+# these are uniform across presets (no position-dependent fields), so we pin them
+# by type — this is the structural snapshot that guards the describe/runner
+# refactor: if a metadata field is dropped or added, the matching node fails here.
+FORWARD_META_KEYS = {
+    "data.mnist": ["outputShape"],
+    "data.fashion_mnist": ["outputShape"],
+    "ml.layers.flatten": ["activations", "outputShape", "paramCount"],
+    "ml.layers.linear": ["activations", "outputShape", "paramCount", "weights"],
+    "ml.layers.conv2d": ["activations", "outputShape", "paramCount", "weights"],
+    "ml.layers.conv_transpose2d": ["activations", "outputShape", "paramCount", "weights"],
+    "ml.layers.batchnorm2d": ["activations", "batchnorm", "outputShape", "paramCount", "weights"],
+    "ml.activations.relu": ["activations", "outputShape", "paramCount"],
+    "ml.activations.sigmoid": ["activations", "outputShape", "paramCount"],
+    "ml.layers.avgpool2d": ["activations", "outputShape", "paramCount"],
+    "ml.layers.maxpool2d": ["activations", "outputShape", "paramCount"],
+    "ml.layers.dropout": ["activations", "outputShape", "paramCount"],
+    "ml.structural.reshape": ["activations", "outputShape", "paramCount"],
+    "ml.structural.concat": ["outputShape"],
+    "ml.structural.add": ["outputShape"],
+    "ml.structural.reparameterize": ["outputShape"],
+    "ml.loss.cross_entropy": ["lossValue", "outputShape"],
+    "ml.loss.mse": ["lossValue", "outputShape"],
+    "ml.loss.gan": ["outputShape"],
+    "ml.loss.vae": ["outputShape"],
+    "ml.gan.noise_input": ["outputShape"],
+    "subgraph.block": ["activations", "innerSnapshots", "outputShape", "paramCount"],
+    "ml.diffusion.noise_scheduler": ["outputShape", "shapes"],
+    "ml.optimizers.adam": [],
+    "ml.optimizers.sgd": [],
+    "ml.optimizers.adamw": [],
+}
+
+
+@pytest.mark.parametrize("name", FAST_PRESETS)
+def test_forward_metadata_structure_is_stable(name):
+    """Pin the exact per-node-type metadata keys, so the describe/runner refactor
+    stays behavior-preserving (the #8 'every node handled' check doesn't see fields)."""
+    g = load_preset(name)
+    results = execute_graph(g)
+    types = {n["id"]: n["type"] for n in g["graph"]["nodes"]}
+    for nid, r in results.items():
+        t = types[nid]
+        if t in FORWARD_META_KEYS:
+            assert sorted(r["metadata"].keys()) == FORWARD_META_KEYS[t], f"{name}/{t}"
+
+
 def test_mlp_forward_produces_correct_shapes():
     """Pin exact forward behavior on the baseline classifier."""
     g = load_preset("mlp-mnist")
