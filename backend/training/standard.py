@@ -14,9 +14,9 @@ from engine.graph_builder import (
     get_device,
     _safe_float,
     ALL_LOSS_NODES,
-    _pick_tracked_samples,
-    _probe_tracked_samples,
-    _collect_misclassifications,
+    pick_tracked_samples,
+    probe_tracked_samples,
+    collect_misclassifications,
 )
 from dataprep.data_loaders import CLASS_NAMES
 from engine.forward_utils import run_forward_pass
@@ -120,7 +120,7 @@ def standard_train(ctx: TrainingContext) -> TrainingResult:
                             predicted = preds.argmax(dim=1)
                             confusion_preds.extend(predicted.cpu().tolist())
                             confusion_labels.extend(labels.cpu().tolist())
-                            _collect_misclassifications(
+                            collect_misclassifications(
                                 images, predicted, labels, preds,
                                 ctx.dataset_type, misclass_samples, misclass_counts,
                             )
@@ -158,7 +158,7 @@ def standard_train(ctx: TrainingContext) -> TrainingResult:
             scheduler.step()
 
         # Tracked samples
-        tracked_probes = _probe_tracked_samples(
+        tracked_probes = probe_tracked_samples(
             ctx.tracked_samples, ctx.modules, ctx.nodes, ctx.edges, ctx.order, ctx.dataset_type,
         )
 

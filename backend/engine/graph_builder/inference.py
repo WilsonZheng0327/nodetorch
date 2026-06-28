@@ -2,7 +2,7 @@
 
 ``infer_graph`` runs a single sample through the stored trained modules;
 ``evaluate_test_set`` scores the trained model on the held-out split. The
-``_pick_tracked_samples`` / ``_probe_tracked_samples`` / ``_collect_misclassifications``
+``pick_tracked_samples`` / ``probe_tracked_samples`` / ``collect_misclassifications``
 helpers support the training dashboard and are imported by ``training/``.
 """
 
@@ -241,7 +241,7 @@ def infer_graph(graph_data: dict) -> dict:
     }
 
 
-def _pick_tracked_samples(dataset, dataset_type: str, n: int = 4) -> list[dict]:
+def pick_tracked_samples(dataset, dataset_type: str, n: int = 4) -> list[dict]:
     """Pick N fixed samples from the dataset to track across epochs.
 
     Returns a list of dicts, each with:
@@ -291,7 +291,7 @@ def _pick_tracked_samples(dataset, dataset_type: str, n: int = 4) -> list[dict]:
     return samples
 
 
-def _probe_tracked_samples(
+def probe_tracked_samples(
     tracked: list[dict],
     modules: dict,
     nodes: dict,
@@ -436,7 +436,7 @@ def _probe_tracked_samples(
     return results
 
 
-def _collect_misclassifications(
+def collect_misclassifications(
     images: torch.Tensor,
     predicted: torch.Tensor,
     labels: torch.Tensor,

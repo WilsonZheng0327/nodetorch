@@ -36,7 +36,7 @@ from engine.graph_builder.forward import build_and_run_graph, inspect_graph
 from engine.graph_builder.detail import get_layer_detail
 from engine.graph_builder.inference import (
     infer_graph, evaluate_test_set,
-    _pick_tracked_samples, _probe_tracked_samples, _collect_misclassifications,
+    pick_tracked_samples, probe_tracked_samples, collect_misclassifications,
 )
 
 

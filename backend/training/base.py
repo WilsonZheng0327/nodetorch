@@ -36,9 +36,9 @@ from engine.graph_builder import (
     batchnorm_info,
     activation_info,
     tensor_info,
-    _pick_tracked_samples,
-    _probe_tracked_samples,
-    _collect_misclassifications,
+    pick_tracked_samples,
+    probe_tracked_samples,
+    collect_misclassifications,
 )
 from dataprep.data_loaders import DATA_LOADERS, TRAIN_DATASETS, CLASS_NAMES, get_raw_texts, BPETextDataset, BPELMDataset
 from dataprep.bpe import get_bpe_tokenizer
@@ -201,7 +201,7 @@ def build_training_context(
         return train_dataset  # error dict
 
     # Pick tracked samples
-    tracked_samples = _pick_tracked_samples(train_dataset, dataset_type, n=4)
+    tracked_samples = pick_tracked_samples(train_dataset, dataset_type, n=4)
 
     return TrainingContext(
         graph_data=graph_data,
