@@ -407,9 +407,15 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
 function SystemInfoPanel({ info }: { info: SystemInfo | null }) {
   const [currentDevice, setCurrentDevice] = useState<string>('cpu');
 
-  useEffect(() => {
-    if (info?.currentDevice) setCurrentDevice(info.currentDevice);
-  }, [info]);
+  // Sync from the backend-reported device when it changes, via React's
+  // adjust-state-during-render pattern (same as LeftRail) rather than an effect —
+  // avoids a post-paint re-render. The selector can then override locally; a
+  // later info refresh re-syncs only if the reported device actually differs.
+  const [lastReported, setLastReported] = useState<string | undefined>(undefined);
+  if (info?.currentDevice && info.currentDevice !== lastReported) {
+    setLastReported(info.currentDevice);
+    setCurrentDevice(info.currentDevice);
+  }
 
   if (!info) {
     return <div className="dashboard-chart-placeholder">Connecting to backend...</div>;

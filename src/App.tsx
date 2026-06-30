@@ -84,11 +84,6 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
 
-  // Only the Train button opens the dashboard automatically.
-  const isTraining = graph.trainingActive;
-  useEffect(() => {
-    if (isTraining) setDashboardOpen(true);
-  }, [isTraining]);
   const selectedNode = selectedNodeIds.length === 1
     ? graph.currentGraph.nodes.get(selectedNodeIds[0]) ?? null
     : null;
@@ -367,7 +362,7 @@ export default function App() {
         {graph.connectionError && (
           <div className="connection-error-toast">{graph.connectionError}</div>
         )}
-        <Toolbar onSave={graph.saveGraph} onLoad={(json: string) => { graph.loadGraph(json); setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200); }} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }} onSimulateBackprop={graph.simulateBackprop} onSaveModel={graph.saveModel} onLoadModel={graph.loadModel} onSaveWeights={graph.saveWeights} onLoadWeights={graph.loadWeights} onExportPython={graph.exportPython} onInfer={graph.runInfer} onTest={graph.runTest} onTrain={graph.runTrain} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <Toolbar onSave={graph.saveGraph} onLoad={(json: string) => { graph.loadGraph(json); setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200); }} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }} onSimulateBackprop={graph.simulateBackprop} onSaveModel={graph.saveModel} onLoadModel={graph.loadModel} onSaveWeights={graph.saveWeights} onLoadWeights={graph.loadWeights} onExportPython={graph.exportPython} onInfer={graph.runInfer} onTest={graph.runTest} onTrain={() => { setDashboardOpen(true); return graph.runTrain(); }} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
         <LeftRail
           savedBlocks={graph.savedBlocks}
@@ -383,7 +378,7 @@ export default function App() {
             per-epoch data; they should be unified into one shared type. */}
         <TrainingDashboard
           progress={graph.trainingProgress as EpochData[]}
-          isTraining={isTraining}
+          isTraining={graph.trainingActive}
           batchProgress={graph.batchProgress}
           selectedEpoch={graph.selectedEpoch}
           onSelectEpoch={graph.setSelectedEpoch}

@@ -48,9 +48,11 @@ function isFirstVisit(): boolean {
 
 export function TutorialPanel() {
   const [state, setState] = useState<TutorialState>(loadState);
-  const firstVisit = useRef(isFirstVisit());
-  const [dismissed, setDismissed] = useState(() => firstVisit.current ? false : isDismissed());
-  const [collapsed, setCollapsed] = useState(() => !firstVisit.current);
+  // Computed once via a lazy initializer (stable across renders, safe to read
+  // during render — unlike a ref, whose .current the React Compiler forbids here).
+  const [firstVisit] = useState(isFirstVisit);
+  const [dismissed, setDismissed] = useState(() => firstVisit ? false : isDismissed());
+  const [collapsed, setCollapsed] = useState(() => !firstVisit);
   const [expandedGoal, setExpandedGoal] = useState<string | null>(() => {
     const s = loadState();
     for (const goal of TUTORIAL_GOALS) {
