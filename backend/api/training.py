@@ -14,24 +14,35 @@ router = APIRouter(tags=["training"])
 
 
 @router.post("/train")
-async def train(graph_data: dict):
+async def train(graph_data: dict, scope: str = "all"):
     """Run a training pass under VizTracer for call-tree visualization.
 
     The UI trains over the WebSocket (/ws); this REST endpoint exists purely
     as a dev/visualization entry point. It runs train_graph wrapped in
-    VizTracer and writes train_trace.json (only backend/ frames, no torch
-    noise) to the server's working directory. Trigger it with curl, then view
-    the trace with `vizviewer train_trace.json`:
+    VizTracer and writes train_trace.json to the server's working directory.
+    View it with `vizviewer train_trace.json`.
 
-        curl -X POST http://localhost:8000/train \\
+    The ``scope`` query param controls how much is traced:
+      * ``all`` (default) — trace everything, including torch / DataLoader /
+        dataset internals. Use this to see what fills the "gaps" where backend/
+        code isn't running (dataset load, first-batch build, CUDA/cuDNN init).
+        Bigger, noisier trace.
+      * ``backend`` — only backend/ frames (just our code, no torch noise).
+        Smaller trace; library time shows up as empty gaps.
+
+        curl -X POST 'http://localhost:8000/train?scope=all' \\
              -H 'Content-Type: application/json' -d @graph.json
     """
-    logger.info("Training requested (REST) — tracing under VizTracer")
+    # scope=backend restricts to our code; anything else traces everything.
+    # Library frames are deep, so allow a deeper stack when not filtering.
+    include_files = ["backend/"] if scope == "backend" else None
+    max_depth = 40 if scope == "backend" else 80
+    logger.info(f"Training requested (REST) — tracing under VizTracer (scope={scope})")
     try:
         with VizTracer(
             output_file="train_trace.json",
-            include_files=["backend/"],
-            max_stack_depth=40,
+            include_files=include_files,
+            max_stack_depth=max_depth,
         ):
             results = train_graph(graph_data)
         if "error" in results:

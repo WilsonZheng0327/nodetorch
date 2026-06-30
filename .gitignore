@@ -28,8 +28,8 @@ __pycache__/
 *.pyc
 .venv/
 
-# VizTracer dev traces
-*_trace.json
+# VizTracer dev traces (incl. renamed baselines like train_trace_before.json)
+*_trace*.json
 
 # Unified storage (repo-root storage/). Everything here is ephemeral and
 # gitignored EXCEPT block-templates/, which ships shipped block presets.

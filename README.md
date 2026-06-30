@@ -21,11 +21,11 @@ Build neural networks by dragging nodes onto a canvas and connecting them. Shape
 - **Real PyTorch training** — train on GPU/CPU with live loss/accuracy charts, per-class accuracy, gradient flow, confusion matrix
 - **Forward step-through** — walk through each layer's transformation one step at a time, see feature maps, activations, stats, and plain-English insights
 - **Backward step-through** — visualize gradients flowing backward, see gradient kernels, spatial heatmaps, per-neuron bars, vanishing/exploding gradient detection
-- **Inference** — run trained models on new samples, see predictions (classification) or reconstructions (autoencoders)
+- **Inference & test** — run trained models on new samples (predictions or reconstructions), or evaluate on a held-out test set with per-class accuracy and a confusion matrix
 - **Loss landscape** — 2D visualization of the loss surface around trained weights
 - **Node visualization** — per-node weight/gradient/activation histograms with health indicators
 - **Text generation** — train language models (character-level or BPE subword), then generate text interactively with temperature and top-K sampling
-- **Save/load** — export graphs as JSON, save/load trained weights to disk
+- **Save/load** — export graphs as JSON, weights as `.pt`, or a self-contained model bundle (graph + weights) as `.ntmodel`
 - **Export to Python** — generate a standalone, runnable PyTorch training script from any graph
 - **Model presets** — one-click load of 17 pre-built architectures
 - **Guided tutorials** — built-in tutorial panel with 8 tracks (UI basics + paradigm-specific walkthroughs for CNNs, VAEs, GANs, diffusion, and language models)
@@ -45,7 +45,7 @@ Build neural networks by dragging nodes onto a canvas and connecting them. Shape
 
 ## Available Nodes
 
-**Layers**: Conv2d, Conv1d, ConvTranspose2d, Linear, Embedding, PositionalEncoding, LSTM, GRU, RNN, MultiHeadAttention, Attention, Flatten, Upsample, Pretrained ResNet-18
+**Layers**: Conv2d, Conv1d, ConvTranspose2d, Linear, Embedding, PositionalEncoding, LSTM, GRU, RNN, MultiHeadAttention, Attention, Flatten, Dropout, Dropout2d, Upsample, Pretrained ResNet-18
 
 **Preprocessing**: Tokenizer (character / word / BPE)
 
@@ -135,10 +135,10 @@ Frontend opens at http://localhost:5173.
 2. **Connect nodes** — drag from an output port to an input port
 3. **Edit properties** — click a node, edit in the inspector (right panel)
 4. **Shape inference** — happens automatically as you connect and edit
-5. **Train** — click Train, watch live metrics in the dashboard (F to toggle)
+5. **Train / Test / Infer** — click Train and watch live metrics in the dashboard (F to toggle), then Test on the held-out set or Infer on a new sample
 6. **Inspect** — click a node to see detailed visualizations, confusion matrix, loss landscape
 7. **Step through** — click Step Through to walk through the forward pass layer by layer
-8. **Save/Load** — toolbar icons to export/import graphs and trained weights
+8. **Save/Load** — toolbar icons to export/import graphs, weights, and self-contained model bundles
 9. **Presets** — click the book icon to load a pre-built model
 
 ## Keyboard Shortcuts
