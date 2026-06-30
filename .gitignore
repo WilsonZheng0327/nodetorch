@@ -41,6 +41,5 @@ test_diffusion.py
 # Generated export scripts
 /*.py
 !/backend/**/*.py
-CONTRIBUTING.md
 
 .claude

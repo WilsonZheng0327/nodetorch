@@ -24,6 +24,18 @@ class TestRegistry:
     def test_detect_empty(self):
         assert detect_training_mode({}) == "standard"
 
+    def test_detect_gan(self):
+        # Either the noise input or the GAN loss node triggers the GAN paradigm.
+        assert detect_training_mode({"n": {"type": "ml.gan.noise_input"}}) == "gan"
+        assert detect_training_mode({"n": {"type": "ml.loss.gan"}}) == "gan"
+
+    def test_detect_diffusion(self):
+        assert detect_training_mode({"n": {"type": "ml.diffusion.noise_scheduler"}}) == "diffusion"
+
+    def test_detect_autoregressive(self):
+        # A language-model dataset node selects the autoregressive loop.
+        assert detect_training_mode({"n": {"type": "data.tiny_shakespeare"}}) == "autoregressive"
+
 
 class TestBuildOptimizer:
     def test_adam(self):

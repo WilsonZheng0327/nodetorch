@@ -257,7 +257,7 @@ def _mnist_subset():
 
 
 def _train_one_epoch(name: str):
-    """Train a preset for a single batched epoch, leaving its result in hand."""
+    """Train a preset for a single batched epoch. Returns (graph, result, epochs)."""
     g = load_preset(name)
     for n in g["graph"]["nodes"]:
         if n["type"].startswith("ml.optimizers"):
@@ -265,7 +265,9 @@ def _train_one_epoch(name: str):
         if n["type"].startswith("data."):
             n["properties"]["batchSize"] = 512
     _model_store.clear()
-    return g, train_graph(g)
+    epochs: list[dict] = []
+    result = train_graph(g, on_epoch=epochs.append)
+    return g, result, epochs
 
 
 def _assert_lite_walk(name: str, g: dict, result: dict):
@@ -291,16 +293,57 @@ def trained_diffusion(_mnist_subset):
     return _train_one_epoch("diffusion-mnist")
 
 
+@pytest.fixture(scope="module")
+def _shakespeare_subset():
+    """Shrink TinyShakespeare to a single batch of short sequences so the
+    autoregressive loop trains in seconds. Restores the real loader afterward."""
+    import torch.utils.data as tud
+    import dataprep.data_loaders as dl
+
+    original = dl.TRAIN_DATASETS["data.tiny_shakespeare"]
+    # vocab is built from the FULL corpus, so a sequence subset keeps every char id in range
+    sub = tud.Subset(dl.train_dataset_tiny_shakespeare(seqLen=64), range(128))
+    dl.TRAIN_DATASETS["data.tiny_shakespeare"] = lambda: sub
+    yield
+    dl.TRAIN_DATASETS["data.tiny_shakespeare"] = original
+
+
+@pytest.fixture(scope="module")
+def trained_charlm(_shakespeare_subset):
+    return _train_one_epoch("char-lm-shakespeare")
+
+
 def test_gan_train_one_epoch_final_forward(trained_gan):
     """GAN final forward: noise_input + two subgraph blocks + gan loss."""
-    g, result = trained_gan
+    g, result, _ = trained_gan
     _assert_lite_walk("gan-mnist", g, result)
 
 
 def test_diffusion_train_one_epoch_final_forward(trained_diffusion):
     """Diffusion final forward: noise_scheduler + concat/add + conv stack."""
-    g, result = trained_diffusion
+    g, result, _ = trained_diffusion
     _assert_lite_walk("diffusion-mnist", g, result)
+
+
+def test_autoregressive_train_one_epoch(trained_charlm):
+    """Autoregressive (char-LM) 1-epoch smoke: embedding → lstm → linear → CE.
+    Exercises the LM dataset path, 3D-logit reshape, perplexity, and the
+    autoregressive run_final_forward walk — none covered by the image paradigms."""
+    g, result, epochs = trained_charlm
+    assert "error" not in result, result.get("error")
+
+    # Every node handled by the final-forward walk (incl. the LSTM dict-output layer).
+    nr = result["nodeResults"]
+    types = {n["id"]: n["type"] for n in g["graph"]["nodes"]}
+    assert set(nr) == set(types), f"missing {sorted(set(types) - set(nr))}"
+
+    # Autoregressive-specific epoch metrics: finite loss, a real perplexity, and
+    # a generated-text sample (the paradigm's signature outputs).
+    assert epochs, "no epoch was reported"
+    e = epochs[-1]
+    assert math.isfinite(e["loss"])
+    assert e["perplexity"] > 0 and math.isfinite(e["perplexity"])
+    assert "generatedText" in e
 
 
 # --- Coverage note ---
