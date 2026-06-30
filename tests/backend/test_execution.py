@@ -205,6 +205,104 @@ def test_evaluate_test_set_after_training(trained_mlp):
     assert out["testSamples"] > 0
 
 
+def test_tracked_samples_probed_during_training(trained_mlp):
+    """probe_tracked_samples runs the fixed tracked set through the live model
+    each epoch — pin its per-sample output (the dispatch we're unifying)."""
+    _, _, epochs = trained_mlp
+    probes = epochs[-1]["trackedSamples"]
+    assert probes, "no tracked samples were probed"
+    p = probes[0]
+    assert {"idx", "label", "probabilities", "predictedClass", "confidence", "loss"} <= set(p)
+    assert len(p["probabilities"]) == 10
+    assert 0 <= p["predictedClass"] < 10
+
+
+# --- GAN / diffusion final-forward walk (run_final_forward) ---
+#
+# These paradigms exercise run_final_forward branches the standard path never
+# hits: GAN noise_input + subgraph blocks, diffusion noise_scheduler + concat/add.
+# The walk produces *lite* metadata — deliberately lighter than the inspection
+# walk's FORWARD_META_KEYS above: no weights, no batchnorm, no subgraph inner
+# snapshots. This map pins that, so migrating run_final_forward onto the shared
+# execute() dispatch stays behavior-preserving.
+LITE_META_KEYS = {
+    "data.mnist": ["outputShape"],
+    "ml.gan.noise_input": ["outputShape"],
+    "subgraph.block": ["outputShape"],
+    "ml.loss.gan": ["outputShape"],
+    "ml.diffusion.noise_scheduler": ["outputShape"],
+    "ml.structural.concat": ["outputShape"],
+    "ml.structural.add": ["outputShape"],
+    "ml.layers.conv2d": ["activations", "outputShape", "paramCount"],
+    "ml.layers.batchnorm2d": ["activations", "outputShape", "paramCount"],
+    "ml.activations.relu": ["activations", "outputShape", "paramCount"],
+    "ml.loss.mse": ["lossValue", "outputShape"],
+    # optimizers don't run; save_training_results overwrites them with final stats.
+    "ml.optimizers.adam": ["finalAccuracy", "finalLoss"],
+}
+
+
+@pytest.fixture(scope="module")
+def _mnist_subset():
+    """Shrink the MNIST training set to a single batch so the heavier GAN /
+    diffusion loops train in seconds. Restores the real loader afterward."""
+    import torch.utils.data as tud
+    import dataprep.data_loaders as dl
+
+    original = dl.TRAIN_DATASETS["data.mnist"]
+    full = original()
+    dl.TRAIN_DATASETS["data.mnist"] = lambda: tud.Subset(full, range(512))
+    yield
+    dl.TRAIN_DATASETS["data.mnist"] = original
+
+
+def _train_one_epoch(name: str):
+    """Train a preset for a single batched epoch, leaving its result in hand."""
+    g = load_preset(name)
+    for n in g["graph"]["nodes"]:
+        if n["type"].startswith("ml.optimizers"):
+            n["properties"]["epochs"] = 1
+        if n["type"].startswith("data."):
+            n["properties"]["batchSize"] = 512
+    _model_store.clear()
+    return g, train_graph(g)
+
+
+def _assert_lite_walk(name: str, g: dict, result: dict):
+    assert "error" not in result, result.get("error")
+    nr = result["nodeResults"]
+    types = {n["id"]: n["type"] for n in g["graph"]["nodes"]}
+    # run_final_forward must emit a result for EVERY node — the regression check
+    # for a dropped/unhandled node type, same spirit as the forward walk above.
+    assert set(nr) == set(types), f"{name}: missing {sorted(set(types) - set(nr))}"
+    for nid, r in nr.items():
+        t = types[nid]
+        if t in LITE_META_KEYS:
+            assert sorted(r["metadata"].keys()) == LITE_META_KEYS[t], f"{name}/{t}"
+
+
+@pytest.fixture(scope="module")
+def trained_gan(_mnist_subset):
+    return _train_one_epoch("gan-mnist")
+
+
+@pytest.fixture(scope="module")
+def trained_diffusion(_mnist_subset):
+    return _train_one_epoch("diffusion-mnist")
+
+
+def test_gan_train_one_epoch_final_forward(trained_gan):
+    """GAN final forward: noise_input + two subgraph blocks + gan loss."""
+    g, result = trained_gan
+    _assert_lite_walk("gan-mnist", g, result)
+
+
+def test_diffusion_train_one_epoch_final_forward(trained_diffusion):
+    """Diffusion final forward: noise_scheduler + concat/add + conv stack."""
+    g, result = trained_diffusion
+    _assert_lite_walk("diffusion-mnist", g, result)
+
+
 # --- Coverage note ---
 
 def test_fast_presets_all_exist():

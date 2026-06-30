@@ -18,7 +18,6 @@ import torch.utils.data
 from engine.graph_builder import (
     build_and_run_graph,
     topological_sort,
-    gather_inputs,
     get_device,
     _safe_float,
     _model_store,
@@ -26,8 +25,6 @@ from engine.graph_builder import (
     _last_run,
     ALL_LOSS_NODES,
     OPTIMIZER_NODES,
-    LOSS_NODES,
-    SUBGRAPH_TYPE,
     SENTINEL_INPUT,
     SENTINEL_OUTPUT,
     SubGraphModule,
@@ -35,7 +32,6 @@ from engine.graph_builder import (
     gradient_info,
     batchnorm_info,
     activation_info,
-    tensor_info,
     pick_tracked_samples,
     probe_tracked_samples,
     collect_misclassifications,
@@ -63,7 +59,6 @@ class TrainingContext:
 
     # Built modules
     modules: dict[str, nn.Module]
-    initial_node_results: dict      # from build_and_run_graph (for final forward fallback)
 
     # Key nodes
     data_node: dict
@@ -83,7 +78,6 @@ class TrainingContext:
     train_loader: torch.utils.data.DataLoader
     val_loader: torch.utils.data.DataLoader | None
     train_dataset: torch.utils.data.Dataset
-    data_loader_fn: callable        # for final forward pass
 
     # Tracked samples (picked before training starts)
     tracked_samples: list[dict]
@@ -162,10 +156,9 @@ def build_training_context(
         return {"error": "No data node in graph"}
 
     batch_size = data_node["properties"].get("batchSize", 1)
-    data_loader_fn = DATA_LOADERS[data_node["type"]]
 
     # Build modules
-    modules, results, node_results, nodes, edges = build_and_run_graph(graph_data)
+    modules, _, _, nodes, edges = build_and_run_graph(graph_data)
 
     # Collect all trainable parameters
     all_params = list(p for m in modules.values() for p in m.parameters())
@@ -209,7 +202,6 @@ def build_training_context(
         edges=edges,
         order=topological_sort(nodes, edges),
         modules=modules,
-        initial_node_results=node_results,
         data_node=data_node,
         data_node_id=data_node["id"],
         loss_node_ids=loss_node_ids,
@@ -223,7 +215,6 @@ def build_training_context(
         train_loader=train_loader,
         val_loader=val_loader,
         train_dataset=train_dataset,
-        data_loader_fn=data_loader_fn,
         tracked_samples=tracked_samples,
         on_epoch=on_epoch,
         on_batch=on_batch,
@@ -546,124 +537,24 @@ def build_epoch_result(epoch, ctx, avg_loss, accuracy, val_loss, val_accuracy,
 
 
 def run_final_forward(ctx, modules):
-    """Post-training forward pass to get display metadata for each node."""
-    from engine.graph_builder import MULTI_INPUT_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE
+    """Post-training forward pass to get display metadata for each node.
 
-    final_results: dict = {}
+    Reuses the shared per-node dispatch (``execute``) over the trained modules —
+    the same walk as inference, but on a full batch with losses kept — and formats
+    each result with the lightweight ``describe_lite`` presenter. Returns
+    ``(final_results, node_results)``: the raw output tensors (cached on
+    ``_last_run`` for layer-detail queries) and the per-node display metadata.
+    """
+    from engine.graph_builder.runners import RunContext, execute, describe_lite
+
+    rctx = RunContext(edges=ctx.edges, results={}, modules=modules, use_trained=True)
     node_results: dict = {}
-
     with torch.no_grad():
         for node_id in ctx.order:
-            node = ctx.nodes[node_id]
-            node_type = node["type"]
-
-            if DATA_LOADERS.get(node_type):
-                tensors = ctx.data_loader_fn(node["properties"])
-                final_results[node_id] = tensors
-                outputs = {k: tensor_info(v) for k, v in tensors.items() if isinstance(v, torch.Tensor)}
-                first_tensor = next(v for v in tensors.values() if isinstance(v, torch.Tensor))
-                node_results[node_id] = {
-                    "outputs": outputs,
-                    "metadata": {"outputShape": list(first_tensor.shape)},
-                }
-                continue
-
-            # GAN noise input: produce dummy noise
-            if node_type == GAN_NOISE_TYPE:
-                props = node.get("properties", {})
-                batch_size = props.get("batchSize", 64)
-                latent_dim = props.get("latentDim", 100)
-                dev = get_device()
-                dummy_noise = torch.randn(batch_size, latent_dim, device=dev)
-                final_results[node_id] = {"out": dummy_noise}
-                node_results[node_id] = {
-                    "outputs": {"out": tensor_info(dummy_noise)},
-                    "metadata": {"outputShape": [batch_size, latent_dim]},
-                }
-                continue
-
-            # Diffusion noise scheduler: 3 outputs (noisy, noise, timestep)
-            if node_type == DIFFUSION_SCHEDULER_TYPE:
-                inputs = gather_inputs(node_id, ctx.edges, final_results)
-                if "images" in inputs:
-                    images = inputs["images"]
-                    noisy_out = images.clone()
-                    noise_dummy = torch.zeros_like(images)
-                    t_channel = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3], device=images.device)
-                    final_results[node_id] = {"out": noisy_out, "noise": noise_dummy, "timestep": t_channel}
-                    node_results[node_id] = {
-                        "outputs": {"out": tensor_info(noisy_out), "noise": tensor_info(noise_dummy), "timestep": tensor_info(t_channel)},
-                        "metadata": {"outputShape": list(noisy_out.shape)},
-                    }
-                continue
-
-            if node_type in OPTIMIZER_NODES:
-                node_results[node_id] = {"outputs": {}, "metadata": {}}
-                continue
-
-            mod = modules.get(node_id)
-            if mod is None:
-                continue
-
-            inputs = gather_inputs(node_id, ctx.edges, final_results)
-
-            if node_type in LOSS_NODES:
-                if "predictions" in inputs and "labels" in inputs:
-                    loss = mod(inputs["predictions"], inputs["labels"])
-                    final_results[node_id] = {"out": loss}
-                    node_results[node_id] = {
-                        "outputs": {"out": tensor_info(loss)},
-                        "metadata": {"outputShape": ["scalar"], "lossValue": _safe_float(float(loss.detach()))},
-                    }
-                continue
-
-            if node_type in MULTI_INPUT_NODES:
-                try:
-                    output = mod(**{k: v for k, v in inputs.items()})
-                    final_results[node_id] = {"out": output}
-                    node_results[node_id] = {
-                        "outputs": {"out": tensor_info(output)},
-                        "metadata": {"outputShape": list(output.shape) if hasattr(output, 'shape') else ["scalar"]},
-                    }
-                except Exception:
-                    pass
-                continue
-
-            if node_type == SUBGRAPH_TYPE:
-                try:
-                    sg_outputs = mod(**inputs)
-                    first_key = next(iter(sg_outputs), None)
-                    if first_key:
-                        final_results[node_id] = {"out": sg_outputs[first_key]}
-                        node_results[node_id] = {
-                            "outputs": {"out": tensor_info(sg_outputs[first_key])},
-                            "metadata": {"outputShape": list(sg_outputs[first_key].shape)},
-                        }
-                except Exception:
-                    pass
-                continue
-
-            if "in" in inputs:
-                try:
-                    raw = mod(inputs["in"])
-                    output = raw if not isinstance(raw, dict) else next(iter(raw.values()))
-                    if isinstance(raw, dict):
-                        final_results[node_id] = raw
-                    else:
-                        final_results[node_id] = {"out": raw}
-                    meta: dict = {
-                        "outputShape": list(output.shape),
-                        "paramCount": sum(p.numel() for p in mod.parameters()),
-                    }
-                    ai = activation_info(output) if isinstance(output, torch.Tensor) else None
-                    if ai:
-                        meta["activations"] = ai
-                    out_info = {k: tensor_info(v) for k, v in raw.items()} if isinstance(raw, dict) else {"out": tensor_info(output)}
-                    node_results[node_id] = {"outputs": out_info, "metadata": meta}
-                except Exception:
-                    pass
-
-    return final_results, node_results
+            result = describe_lite(ctx.nodes[node_id], execute(ctx.nodes[node_id], rctx))
+            if result is not None:
+                node_results[node_id] = result
+    return rctx.results, node_results
 
 
 def save_training_results(ctx: TrainingContext, result: TrainingResult) -> dict:

@@ -385,6 +385,43 @@ def inspect_node(node: dict, ctx: RunContext) -> NodeResult:
     return describe_inspection(node, execute(node, ctx))
 
 
+def describe_lite(node: dict, exe: Execution) -> NodeResult | None:
+    """Post-training final-pass presentation: the *minimal* per-node metadata the
+    dashboard needs after a run — output shape, param count, loss value, and layer
+    activations. Deliberately lighter than ``describe_inspection``: no weight or
+    batchnorm stats, no scheduler ``shapes`` rows, no subgraph inner snapshots
+    (the epoch ``nodeSnapshots`` already carry those during training).
+
+    Returns ``None`` for a node that errored or didn't run, so the caller leaves
+    that node's existing metadata untouched — mirroring the old per-branch
+    ``except: pass`` / ``continue`` skips in ``run_final_forward``."""
+    if exe.kind == "error":
+        return None
+    if exe.kind == "skip":
+        return {"outputs": {}, "metadata": {}}
+
+    outputs = _tensor_infos(exe.outputs)
+
+    if exe.kind == "loss":
+        return {"outputs": outputs, "metadata": {
+            "outputShape": ["scalar"],
+            "lossValue": _safe_float(float(exe.primary.detach())),
+        }}
+
+    if exe.kind == "layer":
+        meta: dict = {
+            "outputShape": list(exe.primary.shape),
+            "paramCount": sum(p.numel() for p in exe.module.parameters()),
+        }
+        ai = activation_info(exe.primary) if isinstance(exe.primary, torch.Tensor) else None
+        if ai:
+            meta["activations"] = ai
+        return {"outputs": outputs, "metadata": meta}
+
+    # data / noise / embed / scheduler / multi / subgraph → bare output shape
+    return {"outputs": outputs, "metadata": {"outputShape": list(exe.primary.shape)}}
+
+
 # --- Inference presentation: prediction / reconstruction / single-sample preview ---
 
 def _scalar_label(lbl) -> int | None:

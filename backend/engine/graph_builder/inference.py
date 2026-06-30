@@ -11,13 +11,12 @@ import torch.nn as nn
 
 from dataprep.data_loaders import DATA_LOADERS, DENORMALIZERS
 from engine.graph_builder.constants import (
-    LOSS_NODES, OPTIMIZER_NODES, MULTI_INPUT_NODES, ALL_LOSS_NODES,
-    GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE, SUBGRAPH_TYPE,
+    LOSS_NODES, ALL_LOSS_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE,
 )
 from engine.graph_builder._state import (
     get_device, has_trained_model, get_trained_modules, ensure_trained_model, _last_run,
 )
-from engine.graph_builder.build import topological_sort, gather_inputs
+from engine.graph_builder.build import topological_sort
 from engine.graph_builder.stats import _safe_float
 from engine.graph_builder.runners import RunContext, execute, describe_inference
 
@@ -334,104 +333,67 @@ def probe_tracked_samples(
                 pred_nid = edge["source"]["nodeId"]
                 break
 
+    # Probe in eval mode (deterministic batchnorm/dropout), restoring train after.
+    for mod in modules.values():
+        if isinstance(mod, nn.Module):
+            mod.eval()
+
     results = []
-    for s in tracked:
-        inp = s["input"].unsqueeze(0).to(dev)  # add batch dim
-        label_tensor = torch.tensor([s["label"]], dtype=torch.long).to(dev) if s["label"] is not None else None
+    with torch.no_grad():
+        for s in tracked:
+            inp = s["input"].unsqueeze(0).to(dev)  # add batch dim
+            label_tensor = torch.tensor([s["label"]], dtype=torch.long).to(dev) if s["label"] is not None else None
 
-        # Forward pass through the graph
-        batch_results: dict[str, dict] = {}
-        batch_results[data_nid] = {"out": inp, "labels": label_tensor}
-
-        with torch.no_grad():
+            # Same shared per-node dispatch as inference/test, seeded with this one
+            # sample as the data node's output (losses kept, so per-sample loss is
+            # readable below). use_trained reuses the live training modules.
+            ctx = RunContext(
+                edges=edges, results={data_nid: {"out": inp, "labels": label_tensor}},
+                modules=modules, use_trained=True,
+            )
             for nid in order:
-                if nid == data_nid:
-                    continue
-                n = nodes[nid]
-                ntype = n["type"]
-                if ntype in OPTIMIZER_NODES:
-                    continue
-                mod = modules.get(nid)
-                if mod is None:
-                    continue
-                mod.eval()
+                if nid != data_nid:
+                    execute(nodes[nid], ctx)
+            batch_results = ctx.results
 
-                inputs = gather_inputs(nid, edges, batch_results)
+            # Build probe result
+            probe: dict = {
+                "idx": s["idx"],
+                "label": s["label"],
+            }
 
-                if ntype in LOSS_NODES:
-                    if "predictions" in inputs and "labels" in inputs:
-                        try:
-                            loss_val = mod(inputs["predictions"], inputs["labels"])
-                            batch_results[nid] = {"out": loss_val}
-                        except Exception:
-                            pass
-                    continue
+            # Only send image/text on first call (frontend caches it)
+            if "imagePixels" in s:
+                probe["imagePixels"] = s["imagePixels"]
+                probe["imageChannels"] = s.get("imageChannels", 1)
 
-                if ntype == SUBGRAPH_TYPE:
-                    try:
-                        sg_out = mod(**inputs)
-                        first_key = next(iter(sg_out), None)
-                        if first_key:
-                            batch_results[nid] = {"out": sg_out[first_key]}
-                    except Exception:
-                        pass
-                    continue
+            # Extract prediction from the final layer
+            if pred_nid and pred_nid in batch_results:
+                pred_out = batch_results[pred_nid].get("out")
+                if isinstance(pred_out, torch.Tensor):
+                    if pred_out.dim() == 2:
+                        # Classification: softmax probabilities
+                        probs = torch.softmax(pred_out, dim=1)[0]
+                        probe["probabilities"] = [_safe_float(float(p)) for p in probs.tolist()]
+                        pred_class = int(probs.argmax())
+                        probe["predictedClass"] = pred_class
+                        probe["confidence"] = _safe_float(float(probs[pred_class]))
+                    else:
+                        # Non-classification (autoencoder etc): just report output norm
+                        probe["outputNorm"] = _safe_float(float(pred_out.detach().float().norm()))
 
-                if ntype in MULTI_INPUT_NODES:
-                    try:
-                        batch_results[nid] = {"out": mod(**{k: v for k, v in inputs.items()})}
-                    except Exception:
-                        pass
-                    continue
+            # Per-sample loss
+            if loss_nid and loss_nid in batch_results:
+                loss_out = batch_results[loss_nid].get("out")
+                if isinstance(loss_out, torch.Tensor):
+                    probe["loss"] = _safe_float(float(loss_out.item()))
 
-                if "in" in inputs:
-                    try:
-                        raw = mod(inputs["in"])
-                        if isinstance(raw, dict):
-                            batch_results[nid] = raw
-                        else:
-                            batch_results[nid] = {"out": raw}
-                    except Exception:
-                        pass
+            results.append(probe)
 
-        # Set modules back to train mode
-        for mod in modules.values():
-            if isinstance(mod, nn.Module):
-                mod.train()
-
-        # Build probe result
-        probe: dict = {
-            "idx": s["idx"],
-            "label": s["label"],
-        }
-
-        # Only send image/text on first call (frontend caches it)
-        if "imagePixels" in s:
-            probe["imagePixels"] = s["imagePixels"]
-            probe["imageChannels"] = s.get("imageChannels", 1)
-
-        # Extract prediction from the final layer
-        if pred_nid and pred_nid in batch_results:
-            pred_out = batch_results[pred_nid].get("out")
-            if pred_out is not None and isinstance(pred_out, torch.Tensor):
-                if pred_out.dim() == 2:
-                    # Classification: softmax probabilities
-                    probs = torch.softmax(pred_out, dim=1)[0]
-                    probe["probabilities"] = [_safe_float(float(p)) for p in probs.tolist()]
-                    pred_class = int(probs.argmax())
-                    probe["predictedClass"] = pred_class
-                    probe["confidence"] = _safe_float(float(probs[pred_class]))
-                else:
-                    # Non-classification (autoencoder etc): just report output norm
-                    probe["outputNorm"] = _safe_float(float(pred_out.detach().float().norm()))
-
-        # Per-sample loss
-        if loss_nid and loss_nid in batch_results:
-            loss_out = batch_results[loss_nid].get("out")
-            if loss_out is not None and isinstance(loss_out, torch.Tensor):
-                probe["loss"] = _safe_float(float(loss_out.item()))
-
-        results.append(probe)
+    # Restore train mode for the subsequent epochs.
+    for mod in modules.values():
+        if isinstance(mod, nn.Module):
+            mod.train()
 
     return results
 
