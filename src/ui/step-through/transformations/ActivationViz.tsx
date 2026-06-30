@@ -5,7 +5,8 @@
 
 import { useRef, useEffect } from 'react';
 import type { ActivationTransformation, HistogramData } from '../types';
-import { FeatureMapsGrid, fmtAxis } from './shared';
+import { FeatureMapsGrid } from './shared';
+import { fmtAxis } from './format';
 
 function getCurve(fn: string, slope?: number): (x: number) => number {
   switch (fn) {

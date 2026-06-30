@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from 'react';
 import type { FeatureMaps, HistogramData } from '../types';
+import { fmtAxis } from './format';
 
 /** Render a grid of feature map channels as grayscale canvases. */
 export function FeatureMapsGrid({ data, label }: { data: FeatureMaps; label?: string }) {
@@ -60,17 +61,6 @@ export function Arrow({ label }: { label?: string }) {
       {label && <span className="tfm-arrow-label">{label}</span>}
     </div>
   );
-}
-
-/** Adaptive axis formatting. */
-export function fmtAxis(v: number): string {
-  const abs = Math.abs(v);
-  if (abs === 0) return '0';
-  if (abs >= 1000) return v.toFixed(0);
-  if (abs >= 100) return v.toFixed(0);
-  if (abs >= 1) return v.toFixed(1);
-  if (abs >= 0.01) return v.toFixed(2);
-  return v.toExponential(1);
 }
 
 /** Bar chart with Y-axis labels and gridlines.

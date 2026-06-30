@@ -5,7 +5,8 @@ import './App.css';
 import { useMemo, useEffect, useCallback, useState, useRef, type DragEvent } from 'react';
 import { initDomain } from './domain';
 import { useGraph } from './ui/useGraph';
-import { EngineNode, DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './ui/EngineNode';
+import { EngineNode } from './ui/EngineNode';
+import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './ui/contexts';
 import { LeftRail } from './ui/sidebar/LeftRail';
 import { ChatRail } from './ui/chat/ChatRail';
 import { Toolbar } from './ui/Toolbar';
@@ -13,7 +14,8 @@ import { TrainingDashboard, type ModelLayerInfo, type EpochData } from './ui/das
 import { StepThroughPanel } from './ui/step-through/StepThroughPanel';
 import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
-import { TutorialPanel, tutorialEvent } from './ui/tutorial/TutorialPanel';
+import { TutorialPanel } from './ui/tutorial/TutorialPanel';
+import { tutorialEvent } from './ui/tutorial/tutorialEvent';
 import { apiUrl } from './api/base';
 
 const categoryColors: Record<string, string> = {
@@ -322,7 +324,7 @@ export default function App() {
           onEdgesChange={graph.onEdgesChange}
           onConnect={graph.connect}
           isValidConnection={graph.isValidConnection}
-          onEdgeClick={(_e, _edge) => {/* no-op: right-click only */}}
+          onEdgeClick={() => {/* no-op: right-click only */}}
           onEdgeContextMenu={onEdgeContextMenu}
           onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDoubleClick}

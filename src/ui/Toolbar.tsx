@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, ChevronDown, GraduationCap, FileCode } from 'lucide-react';
-import { tutorialEvent } from './tutorial/TutorialPanel';
+import { tutorialEvent } from './tutorial/tutorialEvent';
 import './Toolbar.css';
 import { apiUrl } from '../api/base';
 

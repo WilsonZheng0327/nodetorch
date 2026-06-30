@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { Blocks, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { NodePalette } from '../NodePalette';
 import { PropertyInspector } from '../inspector/PropertyInspector';
-import { tutorialEvent } from '../tutorial/TutorialPanel';
+import { tutorialEvent } from '../tutorial/tutorialEvent';
 import type { NodeInstance } from '../../core/graph';
 
 type Tab = 'nodes' | 'inspector';

@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 
+import type { Executor } from '../../../src/core/engine';
 import { conv2dNode } from '../../../src/domain/nodes/layers/conv2d';
 import { conv1dNode } from '../../../src/domain/nodes/layers/conv1d';
 import { linearNode } from '../../../src/domain/nodes/layers/linear';
@@ -50,7 +51,7 @@ import { ganLossNode } from '../../../src/domain/nodes/loss/gan-loss';
 // ---------------------------------------------------------------------------
 
 /** Shorthand to grab the shape executor from a node definition. */
-function shapeExecutor(node: { executors: Record<string, { execute: Function }> }) {
+function shapeExecutor(node: { executors: Record<string, Executor> }) {
   return node.executors.shape;
 }
 

@@ -3,7 +3,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import * as RF from '@xyflow/react';
-import { tutorialEvent } from './tutorial/TutorialPanel';
+import { tutorialEvent } from './tutorial/tutorialEvent';
 import {
   type Graph,
   createGraph,
@@ -794,7 +794,7 @@ export function useGraph(domain: DomainContext) {
         setBackpropAnim(null);
         setStatus((s) => s.type === 'success' ? { type: 'idle' } : s);
       }, totalDuration);
-    } catch (e) {
+    } catch {
       setStatus({ type: 'error', message: 'Cannot connect to backend' });
     }
   }, []);

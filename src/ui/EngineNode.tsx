@@ -4,30 +4,11 @@
 
 import * as RF from '@xyflow/react';
 import type { NodeInstance } from '../core/graph';
-import type { DomainContext } from '../domain';
 import { getNodePorts } from '../core/ports';
-import { createContext, useContext, useRef, useEffect, type CSSProperties } from 'react';
+import { useContext, useRef, useEffect, type CSSProperties } from 'react';
 import { VizPanel, type VizSnapshot } from './VizPanel';
+import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './contexts';
 import './EngineNode.css';
-
-// The domain context is provided at the top of the React tree
-// so every node component can look up definitions.
-export const DomainCtx = createContext<DomainContext | null>(null);
-
-// Callback context for actions that nodes can trigger
-export const GraphActionsCtx = createContext<{
-  removeNode: (nodeId: string) => void;
-} | null>(null);
-
-// Visualization context for live training snapshots and pinned panels
-export const VizCtx = createContext<{
-  pinnedVizNodes: Set<string>;
-  toggleVizPin: (nodeId: string) => void;
-  liveSnapshots: Record<string, VizSnapshot>;
-} | null>(null);
-
-// Backprop animation context — map of nodeId to { delayMs, intensity }
-export const BackpropCtx = createContext<Record<string, { delayMs: number; intensity: number }> | null>(null);
 
 export type EngineNodeData = {
   instance: NodeInstance;

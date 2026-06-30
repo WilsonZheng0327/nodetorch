@@ -6,12 +6,13 @@
 
 import { describe, it, expect } from 'vitest';
 
+import type { Executor } from '../../../src/core/engine';
 import { tokenizerCharNode } from '../../../src/domain/nodes/preprocessing/tokenizer-char';
 import { tokenizerWordNode } from '../../../src/domain/nodes/preprocessing/tokenizer-word';
 import { tokenizerBpeNode } from '../../../src/domain/nodes/preprocessing/tokenizer-bpe';
 
 /** Shorthand to grab the shape executor. */
-function shapeExecutor(node: { executors: Record<string, { execute: Function }> }) {
+function shapeExecutor(node: { executors: Record<string, Executor> }) {
   return node.executors.shape;
 }
 

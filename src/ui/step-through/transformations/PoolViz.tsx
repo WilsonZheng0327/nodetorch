@@ -82,7 +82,6 @@ function PoolStepThrough({ rawInput, rawOutput, inH, inW, outH, outW, poolH, poo
   const windowValues: { val: number; r: number; c: number }[] = [];
   let maxVal = -Infinity;
   let maxIdx = 0;
-  let sum = 0;
   for (let pr = 0; pr < poolH; pr++) {
     for (let pc = 0; pc < poolW; pc++) {
       const ir = inR + pr;
@@ -90,7 +89,6 @@ function PoolStepThrough({ rawInput, rawOutput, inH, inW, outH, outW, poolH, poo
       const val = (ir >= 0 && ir < inH && ic >= 0 && ic < inW) ? rawInput[ir][ic] : 0;
       const idx = windowValues.length;
       windowValues.push({ val, r: ir, c: ic });
-      sum += val;
       if (val > maxVal) { maxVal = val; maxIdx = idx; }
     }
   }

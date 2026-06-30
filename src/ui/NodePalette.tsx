@@ -7,7 +7,7 @@ import './NodePalette.css';
 import { useContext, useState, type DragEvent } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { NodeDefinition } from '../core/nodedef';
-import { DomainCtx } from './EngineNode';
+import { DomainCtx } from './contexts';
 
 // Tree structure for nested categories
 interface CategoryNode {

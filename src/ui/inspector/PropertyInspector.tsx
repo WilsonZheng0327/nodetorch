@@ -6,10 +6,10 @@ import './PropertyInspector.css';
 import { useContext, useRef, useEffect, useState } from 'react';
 import type { NodeInstance } from '../../core/graph';
 import type { PropertyDefinition } from '../../core/nodedef';
-import { DomainCtx } from '../EngineNode';
+import { DomainCtx } from '../contexts';
 import { DatasetDetail } from './DatasetDetail';
 import { LayerDetail } from './LayerDetail';
-import { tutorialEvent } from '../tutorial/TutorialPanel';
+import { tutorialEvent } from '../tutorial/tutorialEvent';
 
 interface Props {
   node: NodeInstance | null;

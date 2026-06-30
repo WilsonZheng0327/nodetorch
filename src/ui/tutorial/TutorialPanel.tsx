@@ -272,8 +272,3 @@ function GoalSection({ goal, completed, expanded, onToggleExpand, onToggleTask }
     </div>
   );
 }
-
-/** Dispatch a tutorial auto-detect event. Call this from other components. */
-export function tutorialEvent(key: string) {
-  window.dispatchEvent(new CustomEvent('nodetorch-tutorial', { detail: key }));
-}

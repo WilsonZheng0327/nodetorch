@@ -8,7 +8,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState, type Poi
 import { Sparkles, ChevronRight, ChevronLeft, ArrowUp, Square, Settings, Wrench } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { DomainCtx } from '../EngineNode';
+import { DomainCtx } from '../contexts';
 import { buildNodeCatalog } from '../../domain/catalog';
 import { useAgentChat } from './useAgentChat';
 import { executeGraphTool, type GraphToolApi } from './graphTools';
