@@ -66,10 +66,12 @@ def standard_train(ctx: TrainingContext) -> TrainingResult:
 
         epoch_start = time.time()
         total_loss = 0.0
-        correct = 0
+        correct = 0  # becomes a device tensor once batches accumulate
         total = 0
-        per_class_correct: dict[int, int] = {}
-        per_class_total: dict[int, int] = {}
+        # On-device per-class count vectors (length = num classes), or None until
+        # the first classification batch. Synced to lists once at epoch end.
+        per_class_correct: torch.Tensor | None = None
+        per_class_total: torch.Tensor | None = None
         confusion_preds: list[int] = []
         confusion_labels: list[int] = []
         misclass_samples: list[dict] = []
@@ -103,13 +105,15 @@ def standard_train(ctx: TrainingContext) -> TrainingResult:
                 optimizer.step()
                 total_loss += loss_tensor.item()
 
-                # Accuracy (classification only)
+                # Accuracy (classification only). compute_batch_accuracy keeps
+                # its counts on-device; accumulate as tensors here and sync once
+                # at epoch end rather than per batch.
                 c, t, pcc, pct = compute_batch_accuracy(batch_results, loss_node_id, ctx.edges, labels)
-                correct += c
-                total += t
-                for cls in pct:
-                    per_class_total[cls] = per_class_total.get(cls, 0) + pct[cls]
-                    per_class_correct[cls] = per_class_correct.get(cls, 0) + pcc.get(cls, 0)
+                if c is not None:
+                    correct = correct + c
+                    total += t
+                    per_class_correct = pcc if per_class_correct is None else per_class_correct + pcc
+                    per_class_total = pct if per_class_total is None else per_class_total + pct
 
                 # Confusion matrix + misclassifications
                 for edge in ctx.edges:
@@ -131,6 +135,8 @@ def standard_train(ctx: TrainingContext) -> TrainingResult:
         # Epoch metrics
         epoch_time = time.time() - epoch_start
         avg_loss = total_loss / len(ctx.train_loader)
+        # Single GPU->CPU sync per epoch for the accuracy count.
+        correct = int(correct.item()) if torch.is_tensor(correct) else correct
         accuracy = correct / total if total > 0 else 0.0
 
         # Validation
@@ -162,12 +168,16 @@ def standard_train(ctx: TrainingContext) -> TrainingResult:
             ctx.tracked_samples, ctx.modules, ctx.nodes, ctx.edges, ctx.order, ctx.dataset_type,
         )
 
-        # Per-class accuracy
-        per_class_accuracy = sorted([
-            {"cls": cls, "accuracy": _safe_float(
-                per_class_correct.get(cls, 0) / per_class_total[cls]) if per_class_total.get(cls, 0) > 0 else 0.0}
-            for cls in per_class_total.keys()
-        ], key=lambda x: x["accuracy"]) if per_class_total else []
+        # Per-class accuracy — one .tolist() sync, then plain Python arithmetic.
+        if per_class_total is not None:
+            pct_list = per_class_total.tolist()
+            pcc_list = per_class_correct.tolist()
+            per_class_accuracy = sorted([
+                {"cls": cls, "accuracy": _safe_float(pcc_list[cls] / pct_list[cls])}
+                for cls in range(len(pct_list)) if pct_list[cls] > 0
+            ], key=lambda x: x["accuracy"])
+        else:
+            per_class_accuracy = []
 
         # Build and send epoch result
         epoch_result = build_epoch_result(

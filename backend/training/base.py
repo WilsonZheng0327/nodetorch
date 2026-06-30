@@ -358,31 +358,38 @@ def init_weight_norms(modules: dict[str, nn.Module]) -> dict[str, float]:
 
 
 def compute_batch_accuracy(batch_results, loss_node_id, edges, labels):
-    """Compute classification accuracy for a batch. Returns (correct, total, per_class_correct, per_class_total).
+    """Compute classification accuracy for a batch.
 
-    Returns (0, 0, {}, {}) if not a classification task.
+    Returns ``(correct, total, per_class_correct, per_class_total)`` where
+    ``correct`` is a scalar device tensor and ``per_class_correct`` /
+    ``per_class_total`` are 1-D device tensors indexed by class id (length =
+    number of output classes). ``total`` is a plain int (the host already knows
+    the batch size, so reading it needs no sync).
+
+    Everything stays on-device and avoids ``.item()`` so the caller can
+    accumulate across batches and synchronize once at epoch end — the previous
+    per-class Python loop forced ~2*num_classes GPU->CPU syncs per batch, which
+    dominated the batch time. Returns ``(None, 0, None, None)`` if this isn't a
+    classification task.
     """
-    correct = 0
-    total = 0
-    per_class_correct: dict[int, int] = {}
-    per_class_total: dict[int, int] = {}
-
     for edge in edges:
         if edge["target"]["nodeId"] == loss_node_id and edge["target"]["portId"] == "predictions":
             pred_node_id = edge["source"]["nodeId"]
             preds = batch_results.get(pred_node_id, {}).get("out")
             if preds is not None and preds.dim() == 2:
+                num_classes = preds.size(1)
                 predicted = preds.argmax(dim=1)
-                correct = int((predicted == labels).sum().item())
+                hits = predicted == labels
+                correct = hits.sum()  # scalar device tensor, summed at epoch end
                 total = int(labels.size(0))
-                for cls in labels.unique().tolist():
-                    cls = int(cls)
-                    mask = labels == cls
-                    per_class_total[cls] = mask.sum().item()
-                    per_class_correct[cls] = int((predicted[mask] == cls).sum().item())
+                # bincount is a single vectorized kernel — replaces the per-class
+                # masking loop, and the result indexes directly by class id.
+                per_class_total = torch.bincount(labels, minlength=num_classes)
+                per_class_correct = torch.bincount(labels[hits], minlength=num_classes)
+                return correct, total, per_class_correct, per_class_total
             break
 
-    return correct, total, per_class_correct, per_class_total
+    return None, 0, None, None
 
 
 def run_validation_pass(ctx: TrainingContext, modules, loss_node_id):
@@ -408,11 +415,14 @@ def run_validation_pass(ctx: TrainingContext, modules, loss_node_id):
             if v_loss is not None:
                 val_total_loss += float(v_loss.item())
                 c, t, _, _ = compute_batch_accuracy(batch_results, loss_node_id, ctx.edges, labels)
-                val_correct += c
-                val_total += t
+                if c is not None:
+                    val_correct = val_correct + c  # on-device accumulation
+                    val_total += t
 
     n_batches = len(ctx.val_loader)
     val_loss = val_total_loss / n_batches if n_batches > 0 else None
+    # Single GPU->CPU sync for the whole validation set, not one per batch.
+    val_correct = int(val_correct.item()) if torch.is_tensor(val_correct) else val_correct
     val_accuracy = val_correct / val_total if val_total > 0 else None
     return val_loss, val_accuracy
 
