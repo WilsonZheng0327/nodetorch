@@ -46,14 +46,17 @@ export function LeftRail({
   const [tab, setTab] = useState<Tab>('nodes');
 
   // Auto-switch tab on selection change: a node selected → Inspector,
-  // selection cleared → Nodes. Manual tab clicks override until the next change.
-  // Adjusting state during render (guarded by a changed value) is React's
-  // recommended pattern for deriving state from props without an effect.
+  // selection cleared → Nodes. Selecting a node also expands the rail if it's
+  // collapsed, so its details are visible without manually opening the panel.
+  // Manual tab clicks override until the next change. Adjusting state during
+  // render (guarded by a changed value) is React's recommended pattern for
+  // deriving state from props without an effect.
   const [prevNodeId, setPrevNodeId] = useState<string | null>(null);
   const nodeId = node?.id ?? null;
   if (nodeId !== prevNodeId) {
     setPrevNodeId(nodeId);
     setTab(nodeId ? 'inspector' : 'nodes');
+    if (nodeId) setCollapsed(false);
   }
 
   // The rail starts collapsed, so the palette isn't visible on mount. If
