@@ -346,6 +346,29 @@ def test_autoregressive_train_one_epoch(trained_charlm):
     assert "generatedText" in e
 
 
+def test_training_saves_run_record(_mnist_subset, monkeypatch, tmp_path):
+    """Training must persist a run-history record. Guards the build_run_record
+    call-site signature — it drifted silently once (caller vs. keyword-only
+    params) and the surrounding except: pass stopped runs saving for months."""
+    import persistence.runs_store as rs
+    monkeypatch.setattr(rs, "RUNS_DIR", tmp_path)
+
+    _, result, _ = _train_one_epoch("mlp-mnist")
+    assert "error" not in result, result.get("error")
+
+    runs = rs.list_runs()
+    assert len(runs) == 1, "training did not save a run record"
+    run = runs[0]
+    assert run["optimizer"] == "adam"      # short name, as build_run_record stores it
+    assert run["epochs"] == 1
+    assert run["totalParams"] > 0
+    assert run["learningRate"] is not None
+    assert run["duration"] is not None
+    # The full record carries per-epoch history for charting.
+    full = rs.load_run(run["id"])
+    assert full and len(full["epochHistory"]) >= 1
+
+
 # --- Coverage note ---
 
 def test_fast_presets_all_exist():

@@ -590,19 +590,22 @@ def save_training_results(ctx: TrainingContext, result: TrainingResult) -> dict:
     if result.misclassifications:
         _last_run["misclassifications"] = result.misclassifications
 
-    # Save run to disk
+    # Save run to disk. Best-effort, but log on failure — a silent `except: pass`
+    # here once hid a build_run_record signature drift that stopped runs saving.
     try:
         from persistence.runs_store import build_run_record, save_run
+        opt_node = ctx.optimizer_nodes[0]
         record = build_run_record(
             graph_data=ctx.graph_data,
             epoch_results=result.epoch_results,
-            training_time=sum(e.get("time", 0) for e in result.epoch_results),
+            optimizer_props={**opt_node.get("properties", {}), "__type__": opt_node["type"].split(".")[-1]},
             data_node=ctx.data_node,
-            optimizer_node=ctx.optimizer_nodes[0],
+            duration_seconds=sum(e.get("time", 0) for e in result.epoch_results),
+            module_param_count=sum(p.numel() for m in result.modules.values() for p in m.parameters()),
         )
         save_run(record)
-    except Exception:
-        pass
+    except Exception as e:
+        logging.getLogger("nodetorch").warning(f"Run history save failed: {e}")
 
     # Set optimizer metadata
     for nid, n in ctx.nodes.items():
