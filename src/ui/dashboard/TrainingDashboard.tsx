@@ -1,6 +1,6 @@
 // Training dashboard — always-visible panel with training progress, charts, and system info.
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, Fragment } from 'react';
 import './TrainingDashboard.css';
 import { apiUrl } from '../../api/base';
 
@@ -271,7 +271,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
         </div>
       )}
 
-      {/* Tab selector */}
+      {/* Tab selector — dividers after Samples, Model, and Runs */}
       <div className="dashboard-tabs">
         {(['loss', 'accuracy', 'gradients', 'perclass', 'samples', 'test', 'epochs'] as const)
           .filter((tab) => {
@@ -279,23 +279,26 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
             return true;
           })
           .map((tab) => (
-          <button
-            key={tab}
-            className={`dashboard-tab ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {{ loss: 'Loss', accuracy: isAutoregressive ? 'Perplexity' : 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', samples: isAutoregressive ? 'Generated' : 'Samples', test: 'Test', epochs: 'Epochs' }[tab]}
-          </button>
+          <Fragment key={tab}>
+            <button
+              className={`dashboard-tab ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {{ loss: 'Loss', accuracy: isAutoregressive ? 'Perplexity' : 'Accuracy', gradients: 'Gradients', perclass: 'Per-Class', samples: isAutoregressive ? 'Generated' : 'Samples', test: 'Test', epochs: 'Epochs' }[tab]}
+            </button>
+            {tab === 'samples' && <span className="dashboard-tab-divider" />}
+          </Fragment>
         ))}
-        <span className="dashboard-tab-divider" />
         {(['summary', 'runs', 'system'] as const).map((tab) => (
-          <button
-            key={tab}
-            className={`dashboard-tab ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {{ summary: 'Model', runs: 'Runs', system: 'System' }[tab]}
-          </button>
+          <Fragment key={tab}>
+            <button
+              className={`dashboard-tab ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {{ summary: 'Model', runs: 'Runs', system: 'System' }[tab]}
+            </button>
+            {tab === 'summary' && <span className="dashboard-tab-divider" />}
+          </Fragment>
         ))}
       </div>
 
@@ -337,7 +340,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
             onClearCompare={() => setCompareRun(null)}
           />
         ) : activeTab === 'samples' ? (
-          isAutoregressive ? <GeneratedTextView progress={progress} /> : <TrackedSamplesView progress={progress} />
+          isAutoregressive ? <GeneratedTextView progress={progress} /> : <TrackedSamplesView progress={progress} selectedEpoch={selectedEpoch} />
         ) : activeTab === 'test' ? (
           <TestResultView result={testResult} />
         ) : activeTab === 'epochs' ? (
@@ -759,12 +762,20 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
       }
     }
 
-    // Selected epoch marker (vertical line + larger dot)
-    if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < data.length) {
-      const sx = pad.left + (plotW * selectedIndex) / Math.max(data.length - 1, 1);
-      const sy = pad.top + plotH - (plotH * (data[selectedIndex] - min)) / range;
+    // Epoch marker: a dotted vertical line + dot at the epoch in view. When
+    // scrubbing history it's blue at the selected epoch; when viewing the latest
+    // epoch (selectedIndex == null) it's orange at the final point to signal
+    // "current / latest".
+    const isCurrentEpoch = selectedIndex == null;
+    const markerIndex = isCurrentEpoch
+      ? data.length - 1
+      : (selectedIndex >= 0 && selectedIndex < data.length ? selectedIndex : -1);
+    if (markerIndex >= 0) {
+      const markerColor = isCurrentEpoch ? '#fe640b' : '#89b4fa';
+      const sx = pad.left + (plotW * markerIndex) / Math.max(data.length - 1, 1);
+      const sy = pad.top + plotH - (plotH * (data[markerIndex] - min)) / range;
       // Vertical line
-      ctx.strokeStyle = '#89b4fa';
+      ctx.strokeStyle = markerColor;
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -773,7 +784,7 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
       ctx.stroke();
       ctx.setLineDash([]);
       // Highlight dot
-      ctx.fillStyle = '#89b4fa';
+      ctx.fillStyle = markerColor;
       ctx.beginPath();
       ctx.arc(sx, sy, 5, 0, Math.PI * 2);
       ctx.fill();
@@ -781,7 +792,7 @@ function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valDa
       ctx.fillStyle = '#cdd6f4';
       ctx.font = '11px JetBrains Mono, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(formatValue(data[selectedIndex]), sx, sy - 10);
+      ctx.fillText(formatValue(data[markerIndex]), sx, sy - 10);
     }
   }, [rawData, labels, color, formatValue, selectedIndex, valData, valColor, compareData, compareColor, compareLabel, size]);
 
@@ -1032,7 +1043,7 @@ function GeneratedTextView({ progress }: { progress: EpochData[] }) {
 }
 
 
-function TrackedSamplesView({ progress }: { progress: EpochData[] }) {
+function TrackedSamplesView({ progress, selectedEpoch }: { progress: EpochData[]; selectedEpoch: number | null }) {
   // For GAN/diffusion, show generated samples instead of tracked samples
   const isGenerative = progress.some(ep => ep.generatedSamples?.length);
   if (isGenerative) {
@@ -1055,17 +1066,19 @@ function TrackedSamplesView({ progress }: { progress: EpochData[] }) {
           sample={sample}
           probes={progress.map(ep => ep.trackedSamples?.[sIdx])}
           epochs={progress.map(ep => ep.epoch)}
+          selectedEpoch={selectedEpoch}
         />
       ))}
     </div>
   );
 }
 
-function TrackedSampleRow({ sample, probes, epochs }: {
+function TrackedSampleRow({ sample, probes, epochs, selectedEpoch }: {
   sampleIdx: number;
   sample: TrackedSampleProbe;
   probes: (TrackedSampleProbe | undefined)[];
   epochs: number[];
+  selectedEpoch: number | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -1099,9 +1112,19 @@ function TrackedSampleRow({ sample, probes, epochs }: {
     ctx.putImageData(data, 0, 0);
   }, [sample.imagePixels]);
 
-  // Get latest prediction
-  const latestProbe = probes[probes.length - 1];
-  const isClassification = latestProbe?.probabilities != null;
+  // The epoch in view: the slider selection (1-based) or the latest.
+  const selIdx = selectedEpoch != null
+    ? Math.min(Math.max(selectedEpoch - 1, 0), probes.length - 1)
+    : probes.length - 1;
+  const probe = probes[selIdx];
+  const epochNum = epochs[selIdx];
+  // Classification vs reconstruction is a fixed property of the model.
+  const isClassification = (probes[probes.length - 1] ?? probe)?.probabilities != null;
+
+  const correct = probe?.predictedClass === sample.label;
+  const conf = (probe?.confidence ?? 0) * 100;
+  const maxLoss = Math.max(...probes.filter(Boolean).map(p => p!.loss ?? 0), 0.01);
+  const lossPct = ((probe?.loss ?? 0) / maxLoss) * 100;
 
   return (
     <div className="tracked-sample-row">
@@ -1115,56 +1138,33 @@ function TrackedSampleRow({ sample, probes, epochs }: {
         <div className="tracked-sample-label">Label: {sample.label ?? '?'}</div>
       </div>
 
-      {/* Prediction timeline */}
+      {/* Selected-epoch prediction — one horizontal bar that scrubs with the slider */}
       <div className="tracked-sample-timeline">
         {isClassification ? (
           <>
             <div className="tracked-sample-timeline-header">
-              <span>Confidence over epochs</span>
+              <span>Confidence (epoch {epochNum})</span>
               <span className="tracked-sample-latest">
-                {latestProbe?.predictedClass != null && (
-                  <>Predicted: {latestProbe.predictedClass} ({((latestProbe.confidence ?? 0) * 100).toFixed(1)}%)</>
-                )}
+                {probe?.predictedClass != null
+                  ? <>Predicted: {probe.predictedClass} ({conf.toFixed(1)}%)</>
+                  : 'no data'}
               </span>
             </div>
-            <div className="tracked-sample-bars">
-              {probes.map((p, i) => {
-                if (!p) return null;
-                const correct = p.predictedClass === sample.label;
-                const conf = (p.confidence ?? 0) * 100;
-                return (
-                  <div key={i} className="tracked-sample-bar-col" title={`Epoch ${epochs[i]}: class ${p.predictedClass} (${conf.toFixed(1)}%)`}>
-                    <div className="tracked-sample-bar-track">
-                      <div
-                        className={`tracked-sample-bar-fill ${correct ? 'tracked-sample-bar-correct' : 'tracked-sample-bar-wrong'}`}
-                        style={{ height: `${conf}%` }}
-                      />
-                    </div>
-                    <span className="tracked-sample-bar-epoch">{epochs[i]}</span>
-                  </div>
-                );
-              })}
+            <div className="tracked-sample-hbar-track" title={`Epoch ${epochNum}: class ${probe?.predictedClass ?? '?'} (${conf.toFixed(1)}%)`}>
+              <div
+                className={`tracked-sample-hbar-fill ${correct ? 'tracked-sample-bar-correct' : 'tracked-sample-bar-wrong'}`}
+                style={{ width: `${conf}%` }}
+              />
             </div>
           </>
         ) : (
           <>
             <div className="tracked-sample-timeline-header">
-              <span>Loss over epochs</span>
+              <span>Loss (epoch {epochNum})</span>
+              <span className="tracked-sample-latest">{probe?.loss != null ? probe.loss.toFixed(4) : 'no data'}</span>
             </div>
-            <div className="tracked-sample-bars">
-              {probes.map((p, i) => {
-                if (!p || p.loss == null) return null;
-                const maxLoss = Math.max(...probes.filter(Boolean).map(pp => pp!.loss ?? 0), 0.01);
-                const pct = (p.loss / maxLoss) * 100;
-                return (
-                  <div key={i} className="tracked-sample-bar-col" title={`Epoch ${epochs[i]}: loss ${p.loss.toFixed(4)}`}>
-                    <div className="tracked-sample-bar-track">
-                      <div className="tracked-sample-bar-fill tracked-sample-bar-loss" style={{ height: `${pct}%` }} />
-                    </div>
-                    <span className="tracked-sample-bar-epoch">{epochs[i]}</span>
-                  </div>
-                );
-              })}
+            <div className="tracked-sample-hbar-track" title={`Epoch ${epochNum}: loss ${(probe?.loss ?? 0).toFixed(4)}`}>
+              <div className="tracked-sample-hbar-fill tracked-sample-bar-loss" style={{ width: `${lossPct}%` }} />
             </div>
           </>
         )}
