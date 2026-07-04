@@ -1,7 +1,7 @@
 // Toolbar — save/load graph, step through, train/test/infer.
 
 import { useRef, useState, useEffect } from 'react';
-import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, ChevronDown, GraduationCap, FileCode } from 'lucide-react';
+import { Download, Upload, BookOpen, Trash2, LayoutGrid, Eye, EyeOff, Footprints, Undo2, ChevronDown, GraduationCap, FileCode, HelpCircle } from 'lucide-react';
 import { tutorialEvent } from './tutorial/tutorialEvent';
 import './Toolbar.css';
 import { apiUrl } from '../api/base';
@@ -24,12 +24,13 @@ interface Props {
   onSaveWeights: () => Promise<void>;          // weights only (.pt)
   onLoadWeights: (file: File) => Promise<void>; // weights onto the current graph
   onExportPython: () => Promise<void>;
+  onShowShortcuts: () => void;
   status: { type: 'idle' | 'running' | 'success' | 'error'; message?: string };
   modelTrained: boolean;
   modelStale: boolean;
 }
 
-export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, onSaveModel, onLoadModel, onSaveWeights, onLoadWeights, onExportPython, status, modelTrained, modelStale }: Props) {
+export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, onClear, onOrganize, onShowAllViz, onHideAllViz, onStepThrough, onSimulateBackprop, onSaveModel, onLoadModel, onSaveWeights, onLoadWeights, onExportPython, onShowShortcuts, status, modelTrained, modelStale }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);       // graph (.json)
   const modelInputRef = useRef<HTMLInputElement>(null);      // model bundle (.ntmodel)
   const weightsInputRef = useRef<HTMLInputElement>(null);    // weights (.pt)
@@ -256,9 +257,15 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
         <button className="toolbar-btn toolbar-btn-icon" onClick={() => handleAction(onExportPython)} disabled={busy} title="Export as standalone Python file">
           <FileCode size={15} />
         </button>
-        <div className="toolbar-separator" />
         <button className="toolbar-btn toolbar-btn-icon" onClick={() => window.dispatchEvent(new Event('nodetorch-tutorial-reopen'))} title="Open tutorial">
           <GraduationCap size={15} />
+        </button>
+        <button
+          className="toolbar-btn toolbar-btn-icon toolbar-btn-help"
+          onClick={onShowShortcuts}
+          title={'Keyboard shortcuts\n\n1   Node palette\n2   Training dashboard\n3   AI assistant\nW/A/S/D   Pan camera\nCtrl+Z   Undo\n\nClick for the full list'}
+        >
+          <HelpCircle size={15} />
         </button>
         <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileChange} />
         <input ref={modelInputRef} type="file" accept=".ntmodel" style={{ display: 'none' }} onChange={handleModelFile} />

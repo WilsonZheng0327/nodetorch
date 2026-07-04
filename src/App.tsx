@@ -165,15 +165,8 @@ export default function App() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-      // Shortcuts help
-      if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
-        e.preventDefault();
-        setShortcutsOpen((v) => !v);
-        return;
-      }
-
-      // F toggles the training dashboard
-      if (e.key === 'f' || e.key === 'F') {
+      // 2 toggles the training dashboard (palette=1 in LeftRail, agent=3 in ChatRail)
+      if (e.key === '2') {
         e.preventDefault();
         setDashboardOpen((v) => !v);
         return;
@@ -362,7 +355,7 @@ export default function App() {
         {graph.connectionError && (
           <div className="connection-error-toast">{graph.connectionError}</div>
         )}
-        <Toolbar onSave={graph.saveGraph} onLoad={(json: string) => { graph.loadGraph(json); setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200); }} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }} onSimulateBackprop={graph.simulateBackprop} onSaveModel={graph.saveModel} onLoadModel={graph.loadModel} onSaveWeights={graph.saveWeights} onLoadWeights={graph.loadWeights} onExportPython={graph.exportPython} onInfer={graph.runInfer} onTest={graph.runTest} onTrain={() => { setDashboardOpen(true); return graph.runTrain(); }} onCancel={graph.cancelTrain} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <Toolbar onSave={graph.saveGraph} onLoad={(json: string) => { graph.loadGraph(json); setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200); }} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }} onSimulateBackprop={graph.simulateBackprop} onSaveModel={graph.saveModel} onLoadModel={graph.loadModel} onSaveWeights={graph.saveWeights} onLoadWeights={graph.loadWeights} onExportPython={graph.exportPython} onInfer={graph.runInfer} onTest={graph.runTest} onTrain={() => { setDashboardOpen(true); return graph.runTrain(); }} onCancel={graph.cancelTrain} onShowShortcuts={() => setShortcutsOpen(true)} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
         <LeftRail
           savedBlocks={graph.savedBlocks}

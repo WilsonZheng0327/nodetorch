@@ -1,4 +1,4 @@
-// Keyboard shortcuts help modal — opened by pressing "?".
+// Keyboard shortcuts help modal — opened by the "?" button in the toolbar.
 
 import { useEffect } from 'react';
 import './ShortcutsHelp.css';
@@ -17,13 +17,13 @@ const SHORTCUTS: { category: string; items: Shortcut[] }[] = [
   {
     category: 'Canvas',
     items: [
-      { keys: 'Tab', description: 'Toggle node palette' },
-      { keys: 'E', description: 'Toggle AI assistant' },
+      { keys: '1', description: 'Toggle node palette' },
+      { keys: '2', description: 'Toggle training dashboard' },
+      { keys: '3', description: 'Toggle AI assistant' },
       { keys: 'W / A / S / D', description: 'Pan camera (also arrow keys)' },
       { keys: 'Shift + Arrow / WASD', description: 'Pan camera fast' },
       { keys: 'Scroll', description: 'Zoom in / out' },
       { keys: 'Drag blank area', description: 'Pan camera' },
-      { keys: '?', description: 'Show this help' },
     ],
   },
   {

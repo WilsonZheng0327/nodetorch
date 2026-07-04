@@ -75,12 +75,13 @@ export function LeftRail({
     tutorialEvent('palette-opened');
   }
 
-  // Tab key toggles the rail (preserves the old palette shortcut).
+  // "1" toggles the rail (node palette).
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (e.key === 'Tab') {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === '1') {
         e.preventDefault();
         setCollapsed((c) => {
           if (c && tab === 'nodes') tutorialEvent('palette-opened');
@@ -97,7 +98,7 @@ export function LeftRail({
       <button
         className="left-rail-handle"
         onClick={() => { setCollapsed(false); if (tab === 'nodes') tutorialEvent('palette-opened'); }}
-        title="Expand panel (Tab)"
+        title="Expand panel (1)"
       >
         <Blocks size={15} />
         <ChevronRight size={16} />
@@ -125,7 +126,7 @@ export function LeftRail({
         <button
           className="left-rail-collapse"
           onClick={() => setCollapsed(true)}
-          title="Collapse panel (Tab)"
+          title="Collapse panel (1)"
         >
           <ChevronLeft size={16} />
         </button>

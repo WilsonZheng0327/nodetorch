@@ -38,12 +38,12 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
       {
         id: 'keyboard-shortcuts',
         text: 'Open the keyboard shortcuts help',
-        hint: 'Press "?" on your keyboard (or Shift+/) to open the shortcuts panel. NodeTorch has shortcuts for undo, copy/paste, select-all, organize, and more.',
+        hint: 'Click the "?" button at the right end of the top toolbar to open the shortcuts panel. NodeTorch has shortcuts for the node palette (1), dashboard (2), assistant (3), undo, copy/paste, and more.',
       },
       {
         id: 'toggle-dashboard',
         text: 'Toggle the training dashboard',
-        hint: 'Press "F" or click the "Dashboard" button at the bottom. The dashboard shows training progress, model summary, hardware info, and compare runs — even before you train.',
+        hint: 'Press "2" or click the "Dashboard" button at the bottom. The dashboard shows training progress, model summary, hardware info, and compare runs — even before you train.',
       },
       {
         id: 'inspector-learn',

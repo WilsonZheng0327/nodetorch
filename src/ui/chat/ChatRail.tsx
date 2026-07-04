@@ -72,14 +72,14 @@ export function ChatRail({ getGraphJson, graph }: Props) {
     localStorage.setItem('chat-rail-width', String(width));
   }, [width]);
 
-  // "E" toggles the assistant on/off (ignored while typing in a field).
+  // "3" toggles the assistant on/off (ignored while typing in a field).
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if ((e.target as HTMLElement)?.isContentEditable) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'e' || e.key === 'E') {
+      if (e.key === '3') {
         e.preventDefault();
         setCollapsed((c) => !c);
       }
@@ -130,7 +130,7 @@ export function ChatRail({ getGraphJson, graph }: Props) {
 
   if (collapsed) {
     return (
-      <button className="chat-rail-handle" onClick={() => setCollapsed(false)} title="Open AI assistant (E)">
+      <button className="chat-rail-handle" onClick={() => setCollapsed(false)} title="Open AI assistant (3)">
         <ChevronLeft size={16} />
         <Sparkles size={15} />
       </button>
@@ -157,7 +157,7 @@ export function ChatRail({ getGraphJson, graph }: Props) {
           <button className="chat-rail-icon-btn" onClick={() => setSettingsOpen(true)} title="Provider settings">
             <Settings size={15} />
           </button>
-          <button className="chat-rail-collapse" onClick={() => setCollapsed(true)} title="Collapse assistant (E)">
+          <button className="chat-rail-collapse" onClick={() => setCollapsed(true)} title="Collapse assistant (3)">
             <ChevronRight size={16} />
           </button>
         </div>
