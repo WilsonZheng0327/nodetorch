@@ -77,6 +77,9 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Always reserve the scrollbar gutter so content doesn't shift when it
+     appears/disappears (e.g. switching palette tabs or filtering). */
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--border, #45475a) transparent;
 }
