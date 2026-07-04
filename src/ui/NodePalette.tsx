@@ -5,7 +5,7 @@
 import './NodePalette.css';
 
 import { useContext, useState, type DragEvent } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import type { NodeDefinition } from '../core/nodedef';
 import { DomainCtx } from './contexts';
 
@@ -16,15 +16,18 @@ interface CategoryNode {
   children: Map<string, CategoryNode>;
 }
 
+// Path used for the collapsible Saved Blocks section (not part of the node tree).
+const SAVED_PATH = '__saved_blocks__';
+
 // Explicit ordering for top-level categories. Anything not listed falls after
 // these, alphabetically. Keeps "Custom Block" at the end regardless of name.
 const TOP_LEVEL_ORDER = ['Data', 'ML', 'Custom Block'];
 
 // One-line explanation shown under each top-level ("big") category header.
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  Data: 'Datasets that feed the model — image and text sources to train and test on.',
-  ML: 'The network itself — layers, activations, losses, and optimizers.',
-  'Custom Block': 'Reusable sub-graphs you build once and drop into any model.',
+  Data: 'Image and text datasets for training and testing.',
+  ML: 'Layers, activations, losses, and optimizers.',
+  'Custom Block': 'Reusable sub-graphs built from existing nodes. Double-click to edit within the subgraph.',
 };
 
 function buildCategoryTree(defs: NodeDefinition[]): Map<string, CategoryNode> {
@@ -80,35 +83,58 @@ function sortTree(level: Map<string, CategoryNode>) {
   for (const [k, v] of sorted) level.set(k, v);
 }
 
+// Every category path in the tree (parent → "parent/child"), for expand/collapse-all.
+function collectPaths(level: Map<string, CategoryNode>, prefix = ''): string[] {
+  const out: string[] = [];
+  for (const node of level.values()) {
+    const path = prefix ? `${prefix}/${node.name}` : node.name;
+    out.push(path);
+    if (node.children.size > 0) out.push(...collectPaths(node.children, path));
+  }
+  return out;
+}
+
 function onDragStart(event: DragEvent, nodeType: string) {
   event.dataTransfer.setData('application/nodetorch-type', nodeType);
   event.dataTransfer.effectAllowed = 'move';
 }
 
+// Whether a folder is open: user override wins, else roots (depth 0) start open.
+type IsOpen = (path: string, depth: number) => boolean;
+type Toggle = (path: string, depth: number) => void;
+
 // Recursive category renderer
-function CategoryGroup({ node, depth }: { node: CategoryNode; depth: number }) {
-  const [expanded, setExpanded] = useState(depth === 0);
+function CategoryGroup({ node, depth, path, isOpen, toggle }: {
+  node: CategoryNode;
+  depth: number;
+  path: string;
+  isOpen: IsOpen;
+  toggle: Toggle;
+}) {
+  const expanded = isOpen(path, depth);
   const hasContent = node.items.length > 0 || node.children.size > 0;
 
   if (!hasContent) return null;
 
+  const isRoot = depth === 0;
+  const desc = isRoot ? CATEGORY_DESCRIPTIONS[node.name] : undefined;
+
   return (
-    <>
+    <div className={isRoot ? 'palette-root' : undefined}>
       {/* Category header — same indentation as sibling items */}
       <button
-        className={`palette-folder ${depth === 0 ? 'palette-folder-root' : ''}`}
-        onClick={() => setExpanded(!expanded)}
+        className={`palette-folder ${isRoot ? 'palette-folder-root' : ''}`}
+        data-depth={depth}
+        onClick={() => toggle(path, depth)}
       >
         <span className="palette-folder-icon">{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
-        {node.name}
+        <span className="palette-folder-name">{node.name}</span>
       </button>
 
-      {depth === 0 && CATEGORY_DESCRIPTIONS[node.name] && (
-        <div className="palette-folder-desc">{CATEGORY_DESCRIPTIONS[node.name]}</div>
-      )}
+      {desc && <div className="palette-folder-desc">{desc}</div>}
 
       {expanded && (
-        <div className="palette-folder-content">
+        <div className="palette-folder-content" data-depth={depth}>
           {/* Items at this level */}
           {node.items.map((def) => (
             <div
@@ -125,11 +151,18 @@ function CategoryGroup({ node, depth }: { node: CategoryNode; depth: number }) {
 
           {/* Subcategories */}
           {Array.from(node.children.values()).map((child) => (
-            <CategoryGroup key={child.name} node={child} depth={depth + 1} />
+            <CategoryGroup
+              key={child.name}
+              node={child}
+              depth={depth + 1}
+              path={`${path}/${child.name}`}
+              isOpen={isOpen}
+              toggle={toggle}
+            />
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -148,6 +181,8 @@ interface PaletteProps {
 export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
   const domain = useContext(DomainCtx);
   const [search, setSearch] = useState('');
+  // Per-path open overrides. Absent → default (roots open, sub-folders closed).
+  const [openState, setOpenState] = useState<Map<string, boolean>>(new Map());
 
   if (!domain) return null;
 
@@ -162,6 +197,28 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
     : allDefs;
   const tree = buildCategoryTree(filteredDefs);
 
+  const visibleBlocks = savedBlocks.filter((b) => !query || b.name.toLowerCase().includes(query));
+  const showSaved = visibleBlocks.length > 0;
+
+  // While searching, force everything open so matches aren't hidden in closed folders.
+  const isOpen: IsOpen = (path, depth) =>
+    query ? true : openState.has(path) ? openState.get(path)! : depth === 0;
+  const toggle: Toggle = (path, depth) =>
+    setOpenState((prev) => {
+      const next = new Map(prev);
+      const cur = prev.has(path) ? prev.get(path)! : depth === 0;
+      next.set(path, !cur);
+      return next;
+    });
+
+  const setAll = (open: boolean) => {
+    const paths = collectPaths(tree);
+    if (savedBlocks.length > 0) paths.push(SAVED_PATH);
+    setOpenState(new Map(paths.map((p) => [p, open])));
+  };
+
+  const savedOpen = isOpen(SAVED_PATH, 0);
+
   return (
     <div className="palette-content">
       <input
@@ -171,24 +228,33 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
+      <div className="palette-bulk">
+        <button className="palette-bulk-btn" onClick={() => setAll(true)}>
+          <ChevronsUpDown size={12} /> Expand all
+        </button>
+        <button className="palette-bulk-btn" onClick={() => setAll(false)}>
+          <ChevronsDownUp size={12} /> Collapse all
+        </button>
+      </div>
+
       {Array.from(tree.values()).map((node) => (
-        <CategoryGroup key={node.name} node={node} depth={0} />
+        <CategoryGroup key={node.name} node={node} depth={0} path={node.name} isOpen={isOpen} toggle={toggle} />
       ))}
 
-      {/* Saved blocks */}
-      {savedBlocks.length > 0 && (!query || savedBlocks.some((b) => b.name.toLowerCase().includes(query))) && (
-        <>
+      {/* Saved blocks — collapsible, same chrome as a top-level category */}
+      {showSaved && (
+        <div className="palette-root">
           <div className="palette-divider" />
-          <div className="palette-folder palette-folder-root">
-            Saved Blocks
-          </div>
+          <button className="palette-folder palette-folder-root" data-depth={0} onClick={() => toggle(SAVED_PATH, 0)}>
+            <span className="palette-folder-icon">{savedOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
+            <span className="palette-folder-name">Saved Blocks</span>
+          </button>
           <div className="palette-folder-desc">
-            Custom blocks you've saved plus shipped presets — drag any onto the canvas.
+            Saved custom blocks and shipped presets. Drag any onto the canvas.
           </div>
-          <div className="palette-folder-content">
-            {savedBlocks
-              .filter((b) => !query || b.name.toLowerCase().includes(query))
-              .map((block) => (
+          {savedOpen && (
+            <div className="palette-folder-content" data-depth={0}>
+              {visibleBlocks.map((block) => (
                 <div key={block.filename} className="palette-item palette-saved-block">
                   <div
                     className="palette-saved-block-drag"
@@ -210,11 +276,12 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
                   </button>}
                 </div>
               ))}
-          </div>
-        </>
+            </div>
+          )}
+        </div>
       )}
 
-      {filteredDefs.length === 0 && savedBlocks.length === 0 && (
+      {filteredDefs.length === 0 && !showSaved && (
         <div className="palette-empty">No matching nodes</div>
       )}
     </div>

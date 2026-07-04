@@ -28,6 +28,37 @@
   border-color: #89b4fa;
 }
 
+/* Expand-all / collapse-all row under the search box */
+.palette-bulk {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+
+.palette-bulk-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 6px;
+  background: #262636;
+  border: 1px solid #313244;
+  border-radius: 5px;
+  color: #9399b2;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.palette-bulk-btn:hover {
+  background: #2c2c40;
+  border-color: #45475a;
+  color: #cdd6f4;
+}
+
 .palette-empty {
   padding: 16px;
   text-align: center;
@@ -35,8 +66,17 @@
   font-size: 13px;
 }
 
-/* Category folders */
+/* ============================================================================
+   Hierarchy (Design 1 — tree rails). Levels read from a hard size/weight step
+   plus indentation guide-lines. Big categories carry a blue accent bar down
+   the whole name + description block.
+   ========================================================================== */
 
+.palette-root {
+  margin-bottom: 2px;
+}
+
+/* Category folders (sub-groups, depth >= 1) */
 .palette-folder {
   display: flex;
   align-items: center;
@@ -46,10 +86,10 @@
   background: none;
   border: none;
   border-radius: 5px;
-  color: #a6adc8;
+  color: #bac2de;
   font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 700;
   cursor: pointer;
   text-align: left;
   margin-bottom: 1px;
@@ -61,32 +101,49 @@
   color: #cdd6f4;
 }
 
-.palette-folder-root {
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #6c7086;
-  padding: 10px 8px 4px;
-  margin-top: 2px;
+.palette-folder:not(.palette-folder-root) .palette-folder-icon {
+  color: #89b4fa;
 }
 
-.palette-folder-root:first-child {
-  margin-top: 0;
-  padding-top: 6px;
+/* Big top-level categories — blue accent bar over name + description */
+.palette-folder-root {
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #cdd6f4;
+  padding: 9px 8px 5px 10px;
+  margin-top: 10px;
+  margin-bottom: 0;
+  border-left: 3px solid #89b4fa;
+  border-radius: 0;
+}
+
+.palette-root:first-child .palette-folder-root {
+  margin-top: 2px;
 }
 
 .palette-folder-root:hover {
   background: none;
-  color: #a6adc8;
+  color: #cdd6f4;
 }
 
-/* One-line explanation under a top-level category / the Saved Blocks header */
+.palette-folder-root .palette-folder-icon {
+  color: #89b4fa;
+}
+
+.palette-folder-name {
+  flex: 1;
+  min-width: 0;
+}
+
+/* One-line explanation under a big category — continues the blue accent bar */
 .palette-folder-desc {
-  padding: 0 10px 8px;
+  padding: 0 10px 8px 10px;
   font-size: 11px;
   line-height: 1.45;
   color: #7f849c;
+  border-left: 3px solid #89b4fa;
 }
 
 /* Divider above the Saved Blocks section */
@@ -100,11 +157,22 @@
   font-size: 10px;
   width: 12px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
   color: #585b70;
 }
 
 .palette-folder-content {
   padding-left: 12px;
+}
+
+/* Tree guide-lines on nested content */
+.palette-folder-content[data-depth="1"],
+.palette-folder-content[data-depth="2"],
+.palette-folder-content[data-depth="3"] {
+  border-left: 1px solid #313244;
+  margin-left: 9px;
+  padding-left: 9px;
 }
 
 /* Node items */
@@ -127,19 +195,22 @@
 }
 
 .palette-item:hover {
-  background: #313244;
+  background: #2a2b3c;
   border-color: #45475a;
 }
 
+/* Name (bright, bold) vs description (dim, lighter) — strong separation */
 .palette-item-name {
-  font-weight: 600;
-  font-size: 12px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #eff1f5;
 }
 
 .palette-item-desc {
   font-size: 11px;
-  color: #585b70;
-  margin-top: 1px;
+  font-weight: 400;
+  color: #6c7086;
+  margin-top: 2px;
   line-height: 1.3;
 }
 
