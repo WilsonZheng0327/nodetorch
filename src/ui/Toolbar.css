@@ -59,18 +59,20 @@
   border-color: #2563eb;
 }
 
-.toolbar-btn-disabled-hint {
-  opacity: 0.4;
+/* Unavailable — untrained or stale. Grey out over the button's normal color.
+   Compound selector so grey wins over .toolbar-btn-test / -infer. */
+.toolbar-btn.toolbar-btn-disabled-hint,
+.toolbar-btn.toolbar-btn-stale {
+  background: #45475a;
+  border-color: #45475a;
+  color: #a6adc8;
+  opacity: 1;
 }
 
-.toolbar-btn-stale {
-  background: #92400e;
-  border-color: #92400e;
-}
-
-.toolbar-btn-stale:hover:not(:disabled) {
-  background: #78350f;
-  border-color: #78350f;
+.toolbar-btn.toolbar-btn-disabled-hint:hover:not(:disabled),
+.toolbar-btn.toolbar-btn-stale:hover:not(:disabled) {
+  background: #51536a;
+  border-color: #51536a;
 }
 
 .toolbar-btn-train {

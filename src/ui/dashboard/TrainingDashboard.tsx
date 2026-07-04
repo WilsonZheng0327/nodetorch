@@ -24,11 +24,14 @@ interface Props {
   totalSnapshotEpochs: number;
   modelSummary?: ModelLayerInfo[];
   testResult?: TestResult | null;
+  isTesting?: boolean;
+  // Increment to focus the Test tab and open the dashboard (e.g. on Test press).
+  focusTestSignal?: number;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
-export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs, modelSummary, testResult, open: openProp, onOpenChange }: Props) {
+export function TrainingDashboard({ progress, isTraining, batchProgress, selectedEpoch, onSelectEpoch, totalSnapshotEpochs, modelSummary, testResult, isTesting, focusTestSignal, open: openProp, onOpenChange }: Props) {
   const [activeTab, setActiveTab] = useState<'loss' | 'accuracy' | 'gradients' | 'perclass' | 'samples' | 'test' | 'epochs' | 'summary' | 'runs' | 'system'>('loss');
   const [savedRuns, setSavedRuns] = useState<SavedRun[] | null>(null);
   const [runsLoading, setRunsLoading] = useState(false);
@@ -55,6 +58,14 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
   useEffect(() => {
     if (isTraining) setOpen(true);
   }, [isTraining]);
+
+  // Focus the Test tab and open the dashboard when Test is pressed
+  useEffect(() => {
+    if (focusTestSignal) {
+      setActiveTab('test');
+      setOpen(true);
+    }
+  }, [focusTestSignal]);
 
   // Fetch runs when tab becomes runs, and after training completes
   const fetchRuns = () => {
@@ -108,14 +119,26 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
     : latest;
 
   if (!open) {
+    // Miniview priority: in-progress training (purple) → latest test result
+    // (green) → finished training (green) → idle.
+    let toggleClass = '';
+    let toggleLabel = 'Dashboard';
+    if (isTraining && latest) {
+      toggleClass = 'dashboard-toggle-training';
+      toggleLabel = `Training — Epoch ${latest.epoch}, Loss ${latest.loss?.toFixed(4)}, Acc ${(latest.accuracy * 100).toFixed(1)}%`;
+    } else if (!isTraining && testResult) {
+      toggleClass = 'dashboard-toggle-done';
+      toggleLabel = `Test — Acc ${(testResult.testAccuracy * 100).toFixed(1)}%, Loss ${testResult.testLoss.toFixed(4)}`;
+    } else if (finished && latest) {
+      toggleClass = 'dashboard-toggle-done';
+      toggleLabel = `Done — Epoch ${latest.epoch}, Loss ${latest.loss?.toFixed(4)}, Acc ${(latest.accuracy * 100).toFixed(1)}%`;
+    }
     return (
       <button
-        className={`dashboard-toggle ${finished ? 'dashboard-toggle-done' : ''}`}
+        className={`dashboard-toggle ${toggleClass}`}
         onClick={() => setOpen(true)}
       >
-        {latest
-          ? `${finished ? 'Done' : 'Training'} — Epoch ${latest.epoch}, Loss ${latest.loss?.toFixed(4)}, Acc ${(latest.accuracy * 100).toFixed(1)}%`
-          : 'Dashboard'}
+        {toggleLabel}
       </button>
     );
   }
@@ -270,7 +293,7 @@ export function TrainingDashboard({ progress, isTraining, batchProgress, selecte
         ) : activeTab === 'samples' ? (
           isAutoregressive ? <GeneratedTextView progress={progress} /> : <TrackedSamplesView progress={progress} selectedEpoch={selectedEpoch} />
         ) : activeTab === 'test' ? (
-          <TestResultView result={testResult} />
+          <TestResultView result={testResult} isTesting={isTesting} />
         ) : activeTab === 'epochs' ? (
           <div className="dashboard-table-wrap">
             {progress.length > 0 ? (

@@ -688,13 +688,20 @@ export function useGraph(domain: DomainContext) {
     testLoss: number; testAccuracy: number; testSamples: number;
     perClassAccuracy: { cls: number; name: string; accuracy: number; count: number }[];
   } | null>(null);
+  // True while a test evaluation is in flight — drives the dashboard's Test tab.
+  const [testing, setTesting] = useState(false);
 
   const runTest = useCallback(async () => {
     if (!modelTrained) {
       setStatus({ type: 'error', message: 'No trained model — train first' });
       return;
     }
-    setStatus({ type: 'running', message: 'Evaluating on test set...' });
+    if (modelStale) {
+      setStatus({ type: 'error', message: 'Model outdated — graph changed since last training. Retrain first.' });
+      return;
+    }
+    // No toolbar status for test — results are shown in the dashboard test tab.
+    setTesting(true);
     try {
       const res = await fetch(apiUrl('/evaluate-test'), {
         method: 'POST',
@@ -707,14 +714,12 @@ export function useGraph(domain: DomainContext) {
         return;
       }
       setTestResult(data.result);
-      const acc = (data.result.testAccuracy * 100).toFixed(1);
-      const loss = data.result.testLoss.toFixed(4);
-      setStatus({ type: 'success', message: `Test set: ${acc}% accuracy, ${loss} loss (${data.result.testSamples} samples)` });
-      setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 8000);
     } catch {
       setStatus({ type: 'error', message: 'Cannot connect to backend' });
+    } finally {
+      setTesting(false);
     }
-  }, [modelTrained, saveGraph]);
+  }, [modelTrained, modelStale, saveGraph]);
 
   const [trainingProgress, setTrainingProgress] = useState<EpochRecord[]>([]);
 
@@ -952,13 +957,16 @@ export function useGraph(domain: DomainContext) {
       return;
     }
 
-    setStatus({ type: 'running', message: 'Training...' });
+    // No toolbar message during training — the dashboard is the single source
+    // for progress/results. Keep type 'running' so a dropped WS is still detected.
+    setStatus({ type: 'running' });
     setTrainingActive(true);
     tutorialEvent('training-started');
     setTrainingProgress([]);
     setSnapshotHistory([]);
     setSelectedEpoch(null);
     setBatchProgress(null);
+    setTestResult(null);  // retraining invalidates any previous test result
     const graphData = serializeGraph(graphRef.current);
 
     return new Promise<void>((resolve) => {
@@ -1025,12 +1033,7 @@ export function useGraph(domain: DomainContext) {
           if (msg.nodeSnapshots) {
             setSnapshotHistory((prev) => [...prev, msg.nodeSnapshots]);
           }
-          const progressStr = msg.totalEpochs ? ` [${msg.epoch}/${msg.totalEpochs}]` : '';
-          const timeStr = msg.time != null ? ` (${msg.time}s)` : '';
-          setStatus({
-            type: 'running',
-            message: `Epoch${progressStr} — loss: ${msg.loss?.toFixed(4)}, acc: ${(msg.accuracy * 100)?.toFixed(1)}%${timeStr}`,
-          });
+          // Per-epoch progress is shown in the dashboard, not the toolbar.
         }
 
         if (msg.type === 'train_result') {
@@ -1038,9 +1041,9 @@ export function useGraph(domain: DomainContext) {
             applyResults(msg.results);
             setModelTrained(true);
             setModelStale(false);
-            const message = msg.cancelled ? 'Training cancelled' : 'Training complete';
-            setStatus({ type: 'success', message });
-            setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 5000);
+            // Final result lives in the dashboard; clear the toolbar status
+            // (also moves type off 'running' so onclose won't flag a lost WS).
+            setStatus({ type: 'idle' });
           } else {
             setStatus({ type: 'error', message: friendlyError(msg.error ?? 'Training failed') });
           }
@@ -1325,6 +1328,7 @@ export function useGraph(domain: DomainContext) {
     runInfer,
     runTest,
     testResult,
+    testing,
     runTrain,
     cancelTrain,
     saveModel,

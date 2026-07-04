@@ -83,6 +83,8 @@ export default function App() {
   const [stepThroughOpen, setStepThroughOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
+  // Bumped on Test press to focus the dashboard's Test tab.
+  const [testFocus, setTestFocus] = useState(0);
 
   const selectedNode = selectedNodeIds.length === 1
     ? graph.currentGraph.nodes.get(selectedNodeIds[0]) ?? null
@@ -355,7 +357,29 @@ export default function App() {
         {graph.connectionError && (
           <div className="connection-error-toast">{graph.connectionError}</div>
         )}
-        <Toolbar onSave={graph.saveGraph} onLoad={(json: string) => { graph.loadGraph(json); setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200); }} onClear={graph.clearGraph} onOrganize={graph.organizeGraph} onShowAllViz={graph.showAllViz} onHideAllViz={graph.hideAllViz} onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }} onSimulateBackprop={graph.simulateBackprop} onSaveModel={graph.saveModel} onLoadModel={graph.loadModel} onSaveWeights={graph.saveWeights} onLoadWeights={graph.loadWeights} onExportPython={graph.exportPython} onInfer={graph.runInfer} onTest={graph.runTest} onTrain={() => { setDashboardOpen(true); return graph.runTrain(); }} onCancel={graph.cancelTrain} onShowShortcuts={() => setShortcutsOpen(true)} status={graph.status} modelTrained={graph.modelTrained} modelStale={graph.modelStale} />
+        <Toolbar
+          onSave={graph.saveGraph}
+          onLoad={(json: string) => { graph.loadGraph(json); setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200); }}
+          onClear={graph.clearGraph}
+          onOrganize={graph.organizeGraph}
+          onShowAllViz={graph.showAllViz}
+          onHideAllViz={graph.hideAllViz}
+          onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }}
+          onSimulateBackprop={graph.simulateBackprop}
+          onSaveModel={graph.saveModel}
+          onLoadModel={graph.loadModel}
+          onSaveWeights={graph.saveWeights}
+          onLoadWeights={graph.loadWeights}
+          onExportPython={graph.exportPython}
+          onInfer={graph.runInfer}
+          onTest={() => { if (graph.modelTrained && !graph.modelStale) { setDashboardOpen(true); setTestFocus((n) => n + 1); } return graph.runTest(); }}
+          onTrain={() => { setDashboardOpen(true); return graph.runTrain(); }}
+          onCancel={graph.cancelTrain}
+          onShowShortcuts={() => setShortcutsOpen(true)}
+          status={graph.status}
+          modelTrained={graph.modelTrained}
+          modelStale={graph.modelStale}
+        />
         <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
         <LeftRail
           savedBlocks={graph.savedBlocks}
@@ -378,6 +402,8 @@ export default function App() {
           totalSnapshotEpochs={graph.snapshotHistory.length}
           modelSummary={modelSummary}
           testResult={graph.testResult}
+          isTesting={graph.testing}
+          focusTestSignal={testFocus}
           open={dashboardOpen}
           onOpenChange={setDashboardOpen}
         />

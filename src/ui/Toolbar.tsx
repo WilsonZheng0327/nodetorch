@@ -180,12 +180,12 @@ export function Toolbar({ onSave, onLoad, onInfer, onTrain, onTest, onCancel, on
           </button>
         )}
         <button
-          className={`toolbar-btn toolbar-btn-test ${!modelTrained ? 'toolbar-btn-disabled-hint' : ''}`}
+          className={`toolbar-btn toolbar-btn-test ${!modelTrained ? 'toolbar-btn-disabled-hint' : ''} ${modelStale ? 'toolbar-btn-stale' : ''}`}
           onClick={() => handleAction(onTest)}
           disabled={busy || !modelTrained}
-          title={!modelTrained ? 'Train a model first' : 'Evaluate on the held-out test set'}
+          title={!modelTrained ? 'Train a model first' : modelStale ? 'Model outdated — retrain' : 'Evaluate on the held-out test set'}
         >
-          Test
+          Test{modelStale ? ' !' : ''}
         </button>
         <button
           className={`toolbar-btn toolbar-btn-infer ${!modelTrained ? 'toolbar-btn-disabled-hint' : ''} ${modelStale ? 'toolbar-btn-stale' : ''}`}

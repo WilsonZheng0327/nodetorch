@@ -32,6 +32,16 @@
   border-color: #10b981;
 }
 
+/* Intermediate (in-progress) training results — purple */
+.dashboard-toggle-training {
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #a855f7;
+}
+
+.dashboard-toggle-training:hover {
+  border-color: #a855f7;
+}
+
 /* Main dashboard panel — bottom of screen, wide */
 .dashboard {
   position: absolute;

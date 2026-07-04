@@ -220,7 +220,10 @@ export function RunsPanel({
 
 // --- Test Result View ---
 
-export function TestResultView({ result }: { result?: TestResult | null }) {
+export function TestResultView({ result, isTesting }: { result?: TestResult | null; isTesting?: boolean }) {
+  if (isTesting && !result) {
+    return <div className="dashboard-chart-placeholder">Evaluating on the held-out test set…</div>;
+  }
   if (!result) {
     return <div className="dashboard-chart-placeholder">No test results yet — click "Test" after training to evaluate on the held-out test set</div>;
   }
