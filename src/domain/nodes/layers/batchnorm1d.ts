@@ -6,13 +6,28 @@ export const batchNorm1dNode: NodeDefinition = {
   displayName: 'BatchNorm1d',
   description: 'Batch normalization for 2D/3D input (linear layers)',
   category: ['ML', 'Layers', 'Normalization'],
-  learnMore: 'The 1D version of BatchNorm \u2014 normalizes features in fully connected layers. Place after Linear and before the activation function.',
+  learnMore:
+    'The 1D version of BatchNorm \u2014 normalizes features in fully connected layers. Place after Linear and before the activation function.',
 
   getProperties: () => [],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

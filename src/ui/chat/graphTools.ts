@@ -19,10 +19,19 @@ export interface GraphToolApi {
   modelTrained: boolean;
   modelStale: boolean;
   updateProperty: (nodeId: string, key: string, value: unknown) => Promise<void>;
-  addNode: (type: string, position: { x: number; y: number }, requestedId?: string) => Promise<string | undefined>;
+  addNode: (
+    type: string,
+    position: { x: number; y: number },
+    requestedId?: string,
+  ) => Promise<string | undefined>;
   connect: (connection: RF.Connection) => Promise<void>;
   removeNode: (nodeId: string) => Promise<void>;
-  removeEdge: (sourceId: string, sourcePort: string, targetId: string, targetPort: string) => Promise<boolean>;
+  removeEdge: (
+    sourceId: string,
+    sourcePort: string,
+    targetId: string,
+    targetPort: string,
+  ) => Promise<boolean>;
   clearGraph: () => void;
   organizeGraph: () => void;
   addBlockFromTemplate: (filename: string, position: { x: number; y: number }) => Promise<void>;
@@ -58,20 +67,26 @@ function summarizeGraph(g: Graph): string {
   }
   if (g.edges.length) {
     lines.push(`Edges (${g.edges.length}):`);
-    for (const e of g.edges) lines.push(`- ${e.source.nodeId}.${e.source.portId} -> ${e.target.nodeId}.${e.target.portId}`);
+    for (const e of g.edges)
+      lines.push(
+        `- ${e.source.nodeId}.${e.source.portId} -> ${e.target.nodeId}.${e.target.portId}`,
+      );
   }
   return lines.join('\n');
 }
 
 function describeNode(n: NodeInstance): string {
   const md = n.lastResult?.metadata as Record<string, unknown> | undefined;
-  const props = Object.entries(n.properties).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
+  const props = Object.entries(n.properties)
+    .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+    .join(', ');
   const parts = [`${n.id} (${n.type})`, `props: ${props || '(none)'}`];
   if (md?.outputShape) parts.push(`outputShape: [${(md.outputShape as unknown[]).join(', ')}]`);
   if (md?.paramCount != null) parts.push(`params: ${md.paramCount}`);
   // Final training metrics land on the optimizer node after a run (see useGraph).
   if (typeof md?.finalLoss === 'number') parts.push(`finalLoss: ${md.finalLoss.toFixed(4)}`);
-  if (typeof md?.finalAccuracy === 'number') parts.push(`finalAccuracy: ${(md.finalAccuracy * 100).toFixed(1)}%`);
+  if (typeof md?.finalAccuracy === 'number')
+    parts.push(`finalAccuracy: ${(md.finalAccuracy * 100).toFixed(1)}%`);
   if (md?.error) parts.push(`ERROR: ${md.error}`);
   return parts.join('\n');
 }
@@ -125,7 +140,12 @@ function getTrainingResults(graph: GraphToolApi): string {
   return `Training results — ${epochs.length} epoch(s):\n${lines.join('\n')}${stale}`;
 }
 
-export async function executeGraphTool(graph: GraphToolApi, domain: Domain, name: string, args: Args): Promise<string> {
+export async function executeGraphTool(
+  graph: GraphToolApi,
+  domain: Domain,
+  name: string,
+  args: Args,
+): Promise<string> {
   try {
     switch (name) {
       case 'set_node_property':
@@ -205,7 +225,12 @@ async function connect(graph: GraphToolApi, args: Args) {
   const g = graph.getCurrentGraph();
   if (!g.nodes.has(sourceId)) return `error: no node "${sourceId}"`;
   if (!g.nodes.has(targetId)) return `error: no node "${targetId}"`;
-  const connection: RF.Connection = { source: sourceId, sourceHandle: sourcePort, target: targetId, targetHandle: targetPort };
+  const connection: RF.Connection = {
+    source: sourceId,
+    sourceHandle: sourcePort,
+    target: targetId,
+    targetHandle: targetPort,
+  };
   if (!graph.isValidConnection(connection)) {
     return `error: invalid connection ${sourceId}.${sourcePort} -> ${targetId}.${targetPort} (check port ids and type compatibility)`;
   }
@@ -274,9 +299,10 @@ function validate(graph: GraphToolApi, domain: Domain, args: Args) {
   const g = graph.getCurrentGraph();
 
   // Structural checks (ports connected, required nodes present, reachability).
-  const structural = mode === 'training'
-    ? validateTraining(g, domain.nodeRegistry)
-    : validateForward(g, domain.nodeRegistry);
+  const structural =
+    mode === 'training'
+      ? validateTraining(g, domain.nodeRegistry)
+      : validateForward(g, domain.nodeRegistry);
   const lines = structural.map((e) => `- ${e.nodeId ? e.nodeId + ': ' : ''}${e.message}`);
 
   // Shape checks. validateForward/Training never run the shape math, so a node

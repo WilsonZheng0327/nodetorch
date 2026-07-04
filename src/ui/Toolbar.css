@@ -44,7 +44,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1px;  /* small space when a button pairs an icon with a dropdown chevron */
+  gap: 1px; /* small space when a button pairs an icon with a dropdown chevron */
 }
 
 .toolbar-btn-infer {
@@ -156,7 +156,7 @@
   background: #1e1e2e;
   border: 1px solid #45475a;
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 50;
   min-width: 240px;
   padding: 4px;

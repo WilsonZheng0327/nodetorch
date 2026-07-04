@@ -16,14 +16,22 @@ function makeGraph(): Graph {
   const g = createGraph('main', 'Main');
   addNode(g, createNode('a', 'ml.layers.conv2d', { x: 0, y: 0 }, { outChannels: 32 }));
   addNode(g, createNode('b', 'ml.activations.relu', { x: 200, y: 0 }, {}));
-  addEdge(g, { id: 'e1', source: { nodeId: 'a', portId: 'out' }, target: { nodeId: 'b', portId: 'in' } });
+  addEdge(g, {
+    id: 'e1',
+    source: { nodeId: 'a', portId: 'out' },
+    target: { nodeId: 'b', portId: 'in' },
+  });
 
   // A composite node whose subgraph has its own nodes + edge.
   const block = createNode('blk', 'subgraph.block', { x: 400, y: 0 }, { blockName: 'My Block' });
   const inner = createGraph('inner', 'Inner');
   addNode(inner, createNode('i1', 'subgraph.input', { x: 0, y: 0 }, {}));
   addNode(inner, createNode('i2', 'ml.layers.linear', { x: 100, y: 0 }, { outFeatures: 10 }));
-  addEdge(inner, { id: 'ie1', source: { nodeId: 'i1', portId: 'out' }, target: { nodeId: 'i2', portId: 'in' } });
+  addEdge(inner, {
+    id: 'ie1',
+    source: { nodeId: 'i1', portId: 'out' },
+    target: { nodeId: 'i2', portId: 'in' },
+  });
   block.subgraph = inner;
   addNode(g, block);
   return g;
@@ -73,8 +81,12 @@ describe('validateSerializedGraph', () => {
 
   it('rejects non-objects and a wrong version', () => {
     expect(validateSerializedGraph(null)).toHaveLength(1);
-    expect(validateSerializedGraph({ version: '0.9', graph: { id: 'm', name: 'm', nodes: [], edges: [] } }))
-      .toEqual([expect.stringMatching(/version/i)]);
+    expect(
+      validateSerializedGraph({
+        version: '0.9',
+        graph: { id: 'm', name: 'm', nodes: [], edges: [] },
+      }),
+    ).toEqual([expect.stringMatching(/version/i)]);
   });
 
   it('flags missing nodes list', () => {
@@ -85,9 +97,16 @@ describe('validateSerializedGraph', () => {
     const data = {
       version: '1.0',
       graph: {
-        id: 'm', name: 'm',
+        id: 'm',
+        name: 'm',
         nodes: [{ id: 'a', type: 'ml.activations.relu', position: { x: 0, y: 0 }, properties: {} }],
-        edges: [{ id: 'e', source: { nodeId: 'a', portId: 'out' }, target: { nodeId: 'ghost', portId: 'in' } }],
+        edges: [
+          {
+            id: 'e',
+            source: { nodeId: 'a', portId: 'out' },
+            target: { nodeId: 'ghost', portId: 'in' },
+          },
+        ],
       },
     };
     expect(validateSerializedGraph(data)).toEqual([expect.stringMatching(/missing node "ghost"/)]);
@@ -97,28 +116,46 @@ describe('validateSerializedGraph', () => {
     const data = {
       version: '1.0',
       graph: {
-        id: 'm', name: 'm',
-        nodes: [{ id: 'x', type: 'ml.layers.quantum_flux', position: { x: 0, y: 0 }, properties: {} }],
+        id: 'm',
+        name: 'm',
+        nodes: [
+          { id: 'x', type: 'ml.layers.quantum_flux', position: { x: 0, y: 0 }, properties: {} },
+        ],
         edges: [],
       },
     };
-    expect(validateSerializedGraph(data, known)).toEqual([expect.stringMatching(/unknown node type/i)]);
+    expect(validateSerializedGraph(data, known)).toEqual([
+      expect.stringMatching(/unknown node type/i),
+    ]);
   });
 
   it('flags duplicate node ids and recurses into subgraphs', () => {
     const data = {
       version: '1.0',
       graph: {
-        id: 'm', name: 'm',
+        id: 'm',
+        name: 'm',
         nodes: [
           { id: 'dup', type: 'ml.activations.relu', position: { x: 0, y: 0 }, properties: {} },
           { id: 'dup', type: 'ml.activations.relu', position: { x: 0, y: 0 }, properties: {} },
           {
-            id: 'blk', type: 'subgraph.block', position: { x: 0, y: 0 }, properties: {},
+            id: 'blk',
+            type: 'subgraph.block',
+            position: { x: 0, y: 0 },
+            properties: {},
             subgraph: {
-              id: 'i', name: 'i',
-              nodes: [{ id: 'q', type: 'ml.activations.relu', position: { x: 0, y: 0 }, properties: {} }],
-              edges: [{ id: 'e', source: { nodeId: 'q', portId: 'out' }, target: { nodeId: 'missing', portId: 'in' } }],
+              id: 'i',
+              name: 'i',
+              nodes: [
+                { id: 'q', type: 'ml.activations.relu', position: { x: 0, y: 0 }, properties: {} },
+              ],
+              edges: [
+                {
+                  id: 'e',
+                  source: { nodeId: 'q', portId: 'out' },
+                  target: { nodeId: 'missing', portId: 'in' },
+                },
+              ],
             },
           },
         ],

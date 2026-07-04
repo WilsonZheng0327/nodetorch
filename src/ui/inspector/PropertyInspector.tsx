@@ -19,7 +19,13 @@ interface Props {
   graphJson?: string;
 }
 
-export function PropertyInspector({ node, selectedCount, onPropertyChange, onSaveBlock, graphJson }: Props) {
+export function PropertyInspector({
+  node,
+  selectedCount,
+  onPropertyChange,
+  onSaveBlock,
+  graphJson,
+}: Props) {
   const domain = useContext(DomainCtx);
   const [datasetDetailType, setDatasetDetailType] = useState<string | null>(null);
   const [layerDetailNode, setLayerDetailNode] = useState<{ id: string; type: string } | null>(null);
@@ -55,162 +61,186 @@ export function PropertyInspector({ node, selectedCount, onPropertyChange, onSav
 
   return (
     <>
-    {datasetDetailType && (
-      <DatasetDetail
-        datasetType={datasetDetailType}
-        augOptions={node.properties as any}
-        onClose={() => setDatasetDetailType(null)}
-      />
-    )}
-    {layerDetailNode && graphJson && (
-      <LayerDetail
-        nodeId={layerDetailNode.id}
-        nodeType={layerDetailNode.type}
-        graphJson={graphJson}
-        onClose={() => setLayerDetailNode(null)}
-      />
-    )}
-    <div className="inspector">
-      <div className="inspector-header">{def.displayName}</div>
-      <div className="inspector-desc">{def.description}</div>
-
-      {def.learnMore && (
-        <div className="inspector-learn-more">{def.learnMore}</div>
+      {datasetDetailType && (
+        <DatasetDetail
+          datasetType={datasetDetailType}
+          augOptions={node.properties as any}
+          onClose={() => setDatasetDetailType(null)}
+        />
       )}
-
-      {properties.length > 0 && (
-        <div className="inspector-section">
-          <div className="inspector-section-title">Properties</div>
-          {properties.map((prop) => {
-            if (prop.visible && !prop.visible(node.properties)) return null;
-
-            return (
-              <PropertyWidget
-                key={prop.id}
-                definition={prop}
-                value={node.properties[prop.id]}
-                onChange={(value) => onPropertyChange(node.id, prop.id, value)}
-              />
-            );
-          })}
-        </div>
+      {layerDetailNode && graphJson && (
+        <LayerDetail
+          nodeId={layerDetailNode.id}
+          nodeType={layerDetailNode.type}
+          graphJson={graphJson}
+          onClose={() => setLayerDetailNode(null)}
+        />
       )}
+      <div className="inspector">
+        <div className="inspector-header">{def.displayName}</div>
+        <div className="inspector-desc">{def.description}</div>
 
-      {metadata && (
-        <div className="inspector-section">
-          <div className="inspector-section-title">Info</div>
-          {metadata.outputShape && (
-            <div className="inspector-info">
-              <span>Output Shape</span>
-              <span>[{metadata.outputShape.join(', ')}]</span>
-            </div>
-          )}
-          {metadata.paramCount != null && (
-            <div className="inspector-info">
-              <span>Parameters</span>
-              <span>{metadata.paramCount.toLocaleString()}</span>
-            </div>
-          )}
-          {metadata.paramBreakdown && (
-            <div className="inspector-info-breakdown">
-              {metadata.paramBreakdown}
-            </div>
-          )}
-          {metadata.error && (
-            <div className="inspector-info inspector-info-error">
-              <span>{metadata.error}</span>
-            </div>
-          )}
-          {metadata.prediction && (
-            <>
+        {def.learnMore && <div className="inspector-learn-more">{def.learnMore}</div>}
+
+        {properties.length > 0 && (
+          <div className="inspector-section">
+            <div className="inspector-section-title">Properties</div>
+            {properties.map((prop) => {
+              if (prop.visible && !prop.visible(node.properties)) return null;
+
+              return (
+                <PropertyWidget
+                  key={prop.id}
+                  definition={prop}
+                  value={node.properties[prop.id]}
+                  onChange={(value) => onPropertyChange(node.id, prop.id, value)}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {metadata && (
+          <div className="inspector-section">
+            <div className="inspector-section-title">Info</div>
+            {metadata.outputShape && (
               <div className="inspector-info">
-                <span>Predicted</span>
-                <span>{metadata.prediction.predictedClass} ({(metadata.prediction.confidence * 100).toFixed(1)}%)</span>
+                <span>Output Shape</span>
+                <span>[{metadata.outputShape.join(', ')}]</span>
               </div>
-              {metadata.prediction.probabilities && (
-                <ProbabilityBars probs={metadata.prediction.probabilities} predicted={metadata.prediction.predictedClass} />
-              )}
-            </>
-          )}
-        </div>
-      )}
-      {metadata?.weights && (
-        <div className="inspector-section">
-          <div className="inspector-section-title">Weights</div>
-          <div className="inspector-info">
-            <span>Mean</span><span>{metadata.weights.mean?.toFixed(4)}</span>
+            )}
+            {metadata.paramCount != null && (
+              <div className="inspector-info">
+                <span>Parameters</span>
+                <span>{metadata.paramCount.toLocaleString()}</span>
+              </div>
+            )}
+            {metadata.paramBreakdown && (
+              <div className="inspector-info-breakdown">{metadata.paramBreakdown}</div>
+            )}
+            {metadata.error && (
+              <div className="inspector-info inspector-info-error">
+                <span>{metadata.error}</span>
+              </div>
+            )}
+            {metadata.prediction && (
+              <>
+                <div className="inspector-info">
+                  <span>Predicted</span>
+                  <span>
+                    {metadata.prediction.predictedClass} (
+                    {(metadata.prediction.confidence * 100).toFixed(1)}%)
+                  </span>
+                </div>
+                {metadata.prediction.probabilities && (
+                  <ProbabilityBars
+                    probs={metadata.prediction.probabilities}
+                    predicted={metadata.prediction.predictedClass}
+                  />
+                )}
+              </>
+            )}
           </div>
-          <div className="inspector-info">
-            <span>Std</span><span>{metadata.weights.std?.toFixed(4)}</span>
-          </div>
-          <div className="inspector-info">
-            <span>Range</span><span>{metadata.weights.min?.toFixed(4)} to {metadata.weights.max?.toFixed(4)}</span>
-          </div>
-          {metadata.weights.histBins && (
-            <Histogram bins={metadata.weights.histBins} counts={metadata.weights.histCounts} color="#89b4fa" label="Weight distribution" />
-          )}
-        </div>
-      )}
-      {metadata?.activations && (
-        <div className="inspector-section">
-          <div className="inspector-section-title">Activations</div>
-          <div className="inspector-info">
-            <span>Mean</span><span>{metadata.activations.mean?.toFixed(4)}</span>
-          </div>
-          <div className="inspector-info">
-            <span>Std</span><span>{metadata.activations.std?.toFixed(4)}</span>
-          </div>
-          <div className="inspector-info">
-            <span>Sparsity</span><span>{metadata.activations.sparsity != null ? `${(metadata.activations.sparsity * 100).toFixed(1)}%` : '—'}</span>
-          </div>
-          {metadata.activations.histBins && (
-            <Histogram bins={metadata.activations.histBins} counts={metadata.activations.histCounts} color="#10b981" label="Activation distribution" />
-          )}
-        </div>
-      )}
-      {metadata?.imagePixels && (
-        <div className="inspector-section">
-          <div className="inspector-section-title">Input Image</div>
-          <InspectorImage pixels={metadata.imagePixels} channels={metadata.imageChannels} />
-          {metadata.actualLabel != null && (
-            <div className="inspector-info" style={{ marginTop: 6 }}>
-              <span>Actual Label</span>
-              <span>{metadata.actualLabel}</span>
+        )}
+        {metadata?.weights && (
+          <div className="inspector-section">
+            <div className="inspector-section-title">Weights</div>
+            <div className="inspector-info">
+              <span>Mean</span>
+              <span>{metadata.weights.mean?.toFixed(4)}</span>
             </div>
-          )}
-        </div>
-      )}
-      {isDataNode && (
-        <div className="inspector-section">
-          <button
-            className="inspector-dataset-btn"
-            onClick={() => setDatasetDetailType(metadata.datasetType)}
-          >
-            View Dataset Details
-          </button>
-        </div>
-      )}
-      {node.type === 'subgraph.block' && node.subgraph && onSaveBlock && (
-        <div className="inspector-section">
-          <button
-            className="inspector-dataset-btn"
-            onClick={() => onSaveBlock(node.id)}
-          >
-            Save Block to Library
-          </button>
-        </div>
-      )}
-      {metadata?.outputShape && !isDataNode && graphJson && (
-        <div className="inspector-section">
-          <button
-            className="inspector-dataset-btn"
-            onClick={() => { setLayerDetailNode({ id: node.id, type: node.type }); tutorialEvent('layer-detail-opened'); }}
-          >
-            View Layer Detail
-          </button>
-        </div>
-      )}
-    </div>
+            <div className="inspector-info">
+              <span>Std</span>
+              <span>{metadata.weights.std?.toFixed(4)}</span>
+            </div>
+            <div className="inspector-info">
+              <span>Range</span>
+              <span>
+                {metadata.weights.min?.toFixed(4)} to {metadata.weights.max?.toFixed(4)}
+              </span>
+            </div>
+            {metadata.weights.histBins && (
+              <Histogram
+                bins={metadata.weights.histBins}
+                counts={metadata.weights.histCounts}
+                color="#89b4fa"
+                label="Weight distribution"
+              />
+            )}
+          </div>
+        )}
+        {metadata?.activations && (
+          <div className="inspector-section">
+            <div className="inspector-section-title">Activations</div>
+            <div className="inspector-info">
+              <span>Mean</span>
+              <span>{metadata.activations.mean?.toFixed(4)}</span>
+            </div>
+            <div className="inspector-info">
+              <span>Std</span>
+              <span>{metadata.activations.std?.toFixed(4)}</span>
+            </div>
+            <div className="inspector-info">
+              <span>Sparsity</span>
+              <span>
+                {metadata.activations.sparsity != null
+                  ? `${(metadata.activations.sparsity * 100).toFixed(1)}%`
+                  : '—'}
+              </span>
+            </div>
+            {metadata.activations.histBins && (
+              <Histogram
+                bins={metadata.activations.histBins}
+                counts={metadata.activations.histCounts}
+                color="#10b981"
+                label="Activation distribution"
+              />
+            )}
+          </div>
+        )}
+        {metadata?.imagePixels && (
+          <div className="inspector-section">
+            <div className="inspector-section-title">Input Image</div>
+            <InspectorImage pixels={metadata.imagePixels} channels={metadata.imageChannels} />
+            {metadata.actualLabel != null && (
+              <div className="inspector-info" style={{ marginTop: 6 }}>
+                <span>Actual Label</span>
+                <span>{metadata.actualLabel}</span>
+              </div>
+            )}
+          </div>
+        )}
+        {isDataNode && (
+          <div className="inspector-section">
+            <button
+              className="inspector-dataset-btn"
+              onClick={() => setDatasetDetailType(metadata.datasetType)}
+            >
+              View Dataset Details
+            </button>
+          </div>
+        )}
+        {node.type === 'subgraph.block' && node.subgraph && onSaveBlock && (
+          <div className="inspector-section">
+            <button className="inspector-dataset-btn" onClick={() => onSaveBlock(node.id)}>
+              Save Block to Library
+            </button>
+          </div>
+        )}
+        {metadata?.outputShape && !isDataNode && graphJson && (
+          <div className="inspector-section">
+            <button
+              className="inspector-dataset-btn"
+              onClick={() => {
+                setLayerDetailNode({ id: node.id, type: node.type });
+                tutorialEvent('layer-detail-opened');
+              }}
+            >
+              View Layer Detail
+            </button>
+          </div>
+        )}
+      </div>
     </>
   );
 }
@@ -239,7 +269,11 @@ function PropertyWidget({ definition, value, onChange }: WidgetProps) {
     <div className="inspector-prop">
       <label className="inspector-prop-label">
         {definition.name}
-        {definition.help && <span className="inspector-prop-help" title={definition.help}>?</span>}
+        {definition.help && (
+          <span className="inspector-prop-help" title={definition.help}>
+            ?
+          </span>
+        )}
       </label>
       <div className="inspector-prop-detail">{describeType(definition)}</div>
       {type.kind === 'number' && (
@@ -286,7 +320,9 @@ function PropertyWidget({ definition, value, onChange }: WidgetProps) {
           onChange={(e) => onChange(e.target.value)}
         >
           {type.options.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
           ))}
         </select>
       )}
@@ -324,7 +360,13 @@ function describeType(def: PropertyDefinition): string {
 
 // --- Image preview for inspector (larger) ---
 
-function InspectorImage({ pixels, channels }: { pixels: number[][] | number[][][]; channels?: number }) {
+function InspectorImage({
+  pixels,
+  channels,
+}: {
+  pixels: number[][] | number[][][];
+  channels?: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -365,7 +407,13 @@ function InspectorImage({ pixels, channels }: { pixels: number[][] | number[][][
     <div style={{ display: 'flex', justifyContent: 'center' }}>
       <canvas
         ref={canvasRef}
-        style={{ width: 112, height: 112, imageRendering: 'pixelated', borderRadius: 4, border: '1px solid #45475a' }}
+        style={{
+          width: 112,
+          height: 112,
+          imageRendering: 'pixelated',
+          borderRadius: 4,
+          border: '1px solid #45475a',
+        }}
       />
     </div>
   );
@@ -380,7 +428,9 @@ function ProbabilityBars({ probs, predicted }: { probs: number[]; predicted: num
     <div className="inspector-probs">
       {probs.map((p, i) => (
         <div key={i} className="inspector-prob-row">
-          <span className={`inspector-prob-label ${i === predicted ? 'inspector-prob-predicted' : ''}`}>
+          <span
+            className={`inspector-prob-label ${i === predicted ? 'inspector-prob-predicted' : ''}`}
+          >
             {i}
           </span>
           <div className="inspector-prob-bar-bg">
@@ -398,7 +448,17 @@ function ProbabilityBars({ probs, predicted }: { probs: number[]; predicted: num
 
 // --- Histogram ---
 
-function Histogram({ bins, counts, color, label }: { bins: number[]; counts: number[]; color: string; label: string }) {
+function Histogram({
+  bins,
+  counts,
+  color,
+  label,
+}: {
+  bins: number[];
+  counts: number[];
+  color: string;
+  label: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -433,7 +493,10 @@ function Histogram({ bins, counts, color, label }: { bins: number[]; counts: num
   return (
     <div style={{ marginTop: 6 }}>
       <div style={{ fontSize: 10, color: '#6c7086', marginBottom: 2 }}>{label}</div>
-      <canvas ref={canvasRef} style={{ width: '100%', height: 50, borderRadius: 4, background: '#313244' }} />
+      <canvas
+        ref={canvasRef}
+        style={{ width: '100%', height: 50, borderRadius: 4, background: '#313244' }}
+      />
     </div>
   );
 }

@@ -4,8 +4,24 @@
 
 import './ChatRail.css';
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Sparkles, ChevronRight, ChevronLeft, ArrowUp, Square, Settings, Wrench } from 'lucide-react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
+import {
+  Sparkles,
+  ChevronRight,
+  ChevronLeft,
+  ArrowUp,
+  Square,
+  Settings,
+  Wrench,
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { DomainCtx } from '../contexts';
@@ -48,12 +64,15 @@ export function ChatRail({ getGraphJson, graph }: Props) {
   // Uses pointer capture so the drag keeps tracking even past the thin handle.
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
-  const onResizeDown = useCallback((e: ReactPointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { startX: e.clientX, startWidth: width };
-  }, [width]);
+  const onResizeDown = useCallback(
+    (e: ReactPointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      dragRef.current = { startX: e.clientX, startWidth: width };
+    },
+    [width],
+  );
 
   const onResizeMove = useCallback((e: ReactPointerEvent) => {
     if (!dragRef.current) return;
@@ -102,7 +121,9 @@ export function ChatRail({ getGraphJson, graph }: Props) {
 
   const executeTool = useCallback(
     (name: string, args: Record<string, unknown>) =>
-      domain ? executeGraphTool(graph, domain, name, args) : Promise.resolve('error: assistant not ready'),
+      domain
+        ? executeGraphTool(graph, domain, name, args)
+        : Promise.resolve('error: assistant not ready'),
     [graph, domain],
   );
 
@@ -130,7 +151,11 @@ export function ChatRail({ getGraphJson, graph }: Props) {
 
   if (collapsed) {
     return (
-      <button className="chat-rail-handle" onClick={() => setCollapsed(false)} title="Open AI assistant (3)">
+      <button
+        className="chat-rail-handle"
+        onClick={() => setCollapsed(false)}
+        title="Open AI assistant (3)"
+      >
         <ChevronLeft size={16} />
         <Sparkles size={15} />
       </button>
@@ -154,10 +179,18 @@ export function ChatRail({ getGraphJson, graph }: Props) {
           AI Assistant
         </span>
         <div className="chat-rail-header-actions">
-          <button className="chat-rail-icon-btn" onClick={() => setSettingsOpen(true)} title="Provider settings">
+          <button
+            className="chat-rail-icon-btn"
+            onClick={() => setSettingsOpen(true)}
+            title="Provider settings"
+          >
             <Settings size={15} />
           </button>
-          <button className="chat-rail-collapse" onClick={() => setCollapsed(true)} title="Collapse assistant (3)">
+          <button
+            className="chat-rail-collapse"
+            onClick={() => setCollapsed(true)}
+            title="Collapse assistant (3)"
+          >
             <ChevronRight size={16} />
           </button>
         </div>
@@ -169,9 +202,9 @@ export function ChatRail({ getGraphJson, graph }: Props) {
             <Sparkles size={22} />
             <p className="chat-rail-empty-title">Ask me to build or explain</p>
             <p className="chat-rail-empty-desc">
-              I can read your graph, explain it, and edit it — add or remove
-              nodes, wire them up, and change properties. Pick a provider in
-              settings (a paid API key or a local model), then ask away.
+              I can read your graph, explain it, and edit it — add or remove nodes, wire them up,
+              and change properties. Pick a provider in settings (a paid API key or a local model),
+              then ask away.
             </p>
             <button className="chat-rail-empty-btn" onClick={() => setSettingsOpen(true)}>
               <Settings size={13} /> Configure provider

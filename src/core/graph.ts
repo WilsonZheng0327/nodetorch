@@ -102,9 +102,7 @@ export function removeNode(graph: Graph, nodeId: string): void {
   if (!graph.nodes.has(nodeId)) {
     throw new Error(`Node "${nodeId}" not found`);
   }
-  graph.edges = graph.edges.filter(
-    (e) => e.source.nodeId !== nodeId && e.target.nodeId !== nodeId,
-  );
+  graph.edges = graph.edges.filter((e) => e.source.nodeId !== nodeId && e.target.nodeId !== nodeId);
   graph.nodes.delete(nodeId);
 }
 
@@ -124,7 +122,9 @@ export function addEdge(graph: Graph, edge: Edge): void {
       e.target.portId === edge.target.portId,
   );
   if (duplicate) {
-    throw new Error(`Edge from ${edge.source.nodeId}.${edge.source.portId} to ${edge.target.nodeId}.${edge.target.portId} already exists`);
+    throw new Error(
+      `Edge from ${edge.source.nodeId}.${edge.source.portId} to ${edge.target.nodeId}.${edge.target.portId} already exists`,
+    );
   }
   graph.edges.push(edge);
 }
@@ -257,14 +257,10 @@ export function createEdge(
 
 /** Returns node IDs directly upstream of a given node (one hop back). */
 export function getUpstreamNodes(graph: Graph, nodeId: string): string[] {
-  return graph.edges
-    .filter((e) => e.target.nodeId === nodeId)
-    .map((e) => e.source.nodeId);
+  return graph.edges.filter((e) => e.target.nodeId === nodeId).map((e) => e.source.nodeId);
 }
 
 /** Returns node IDs directly downstream of a given node (one hop forward). */
 export function getDownstreamNodes(graph: Graph, nodeId: string): string[] {
-  return graph.edges
-    .filter((e) => e.source.nodeId === nodeId)
-    .map((e) => e.target.nodeId);
+  return graph.edges.filter((e) => e.source.nodeId === nodeId).map((e) => e.target.nodeId);
 }

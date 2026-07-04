@@ -171,7 +171,10 @@ export class ExecutionEngine {
           metadata: {
             outputShape: Object.values(outputs)[0],
             paramCount: totalParams || undefined,
-            paramBreakdown: paramParts.length > 0 ? paramParts.join(' + ') + ` = ${totalParams.toLocaleString()}` : undefined,
+            paramBreakdown:
+              paramParts.length > 0
+                ? paramParts.join(' + ') + ` = ${totalParams.toLocaleString()}`
+                : undefined,
             shapes: Object.entries(outputs).map(([key, val]) => ({
               label: key,
               value: Array.isArray(val) ? val : String(val),

@@ -6,16 +6,45 @@ export const tinyShakespeareNode: NodeDefinition = {
   displayName: 'Tiny Shakespeare',
   description: 'Character-level language modeling on Shakespeare (~1MB)',
   category: ['Data', 'Text'],
-  learnMore: 'A small corpus of Shakespeare plays used for character-level language modeling. The model learns to predict the next character given previous characters. This is the simplest form of autoregressive text generation — the same principle behind GPT, but at the character level instead of word/subword tokens.',
+  learnMore:
+    'A small corpus of Shakespeare plays used for character-level language modeling. The model learns to predict the next character given previous characters. This is the simplest form of autoregressive text generation — the same principle behind GPT, but at the character level instead of word/subword tokens.',
 
   getProperties: () => [
-    { id: 'batchSize', name: 'Batch Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 64, affects: 'execution', help: 'Number of sequences per training step.' },
-    { id: 'seqLen', name: 'Sequence Length', type: { kind: 'number', min: 16, max: 512, integer: true }, defaultValue: 128, affects: 'execution', help: 'Number of characters per sequence. Longer = more context for the model but more memory. 128 is a good balance for character-level models.' },
+    {
+      id: 'batchSize',
+      name: 'Batch Size',
+      type: { kind: 'number', min: 1, integer: true },
+      defaultValue: 64,
+      affects: 'execution',
+      help: 'Number of sequences per training step.',
+    },
+    {
+      id: 'seqLen',
+      name: 'Sequence Length',
+      type: { kind: 'number', min: 16, max: 512, integer: true },
+      defaultValue: 128,
+      affects: 'execution',
+      help: 'Number of characters per sequence. Longer = more context for the model but more memory. 128 is a good balance for character-level models.',
+    },
   ],
 
   getPorts: () => [
-    { id: 'out', name: 'Input Chars', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
-    { id: 'labels', name: 'Target Chars', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'out',
+      name: 'Input Chars',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
+    {
+      id: 'labels',
+      name: 'Target Chars',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

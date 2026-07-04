@@ -7,7 +7,8 @@ export const graphInputNode: NodeDefinition = {
   type: 'subgraph.input',
   version: 1,
   displayName: 'Custom Block Input',
-  description: 'Data entering this custom block from outside. Place inside a Custom Block to define its input ports.',
+  description:
+    'Data entering this custom block from outside. Place inside a Custom Block to define its input ports.',
   category: ['Custom Block'],
   color: '#f59e0b',
 
@@ -33,7 +34,9 @@ export const graphInputNode: NodeDefinition = {
   // the label leaves existing connections intact. The name is display-only.
   getPorts: (properties) => {
     const count = properties.portCount ?? 1;
-    const names = String(properties.portNames ?? '').split(',').map((s: string) => s.trim());
+    const names = String(properties.portNames ?? '')
+      .split(',')
+      .map((s: string) => s.trim());
     return Array.from({ length: count }, (_, i) => ({
       id: i === 0 ? 'in' : `port_${i}`,
       name: names[i] || (i === 0 ? 'in' : `in ${i}`),

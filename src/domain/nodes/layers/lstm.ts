@@ -13,20 +13,77 @@ export const lstmNode: NodeDefinition = {
   displayName: 'LSTM',
   description: 'Long Short-Term Memory recurrent layer',
   category: ['ML', 'Layers', 'Recurrent'],
-  learnMore: 'Processes sequences one step at a time while maintaining a memory cell. Uses gates (input, forget, output) to control what information to keep or discard. Better than simple RNNs at capturing long-range dependencies. The go-to architecture for sequence tasks before transformers.',
+  learnMore:
+    'Processes sequences one step at a time while maintaining a memory cell. Uses gates (input, forget, output) to control what information to keep or discard. Better than simple RNNs at capturing long-range dependencies. The go-to architecture for sequence tasks before transformers.',
 
   getProperties: () => [
-    { id: 'hiddenSize', name: 'Hidden Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 128, affects: 'execution', help: 'Size of the hidden state vector. Larger = more capacity to remember patterns. Common: 64, 128, 256.' },
-    { id: 'numLayers', name: 'Num Layers', type: { kind: 'number', min: 1, integer: true }, defaultValue: 1, affects: 'execution', help: 'Stack multiple LSTM layers. More layers = deeper model but harder to train. 1-2 is typical.' },
-    { id: 'bidirectional', name: 'Bidirectional', type: { kind: 'boolean' }, defaultValue: false, affects: 'execution', help: 'Process sequence in both directions. Doubles output size but captures both past and future context.' },
-    { id: 'dropout', name: 'Dropout', type: { kind: 'number', min: 0, max: 1, step: 0.1 }, defaultValue: 0, affects: 'execution', help: 'Dropout between stacked LSTM layers (only used when numLayers > 1). Helps prevent overfitting.' },
+    {
+      id: 'hiddenSize',
+      name: 'Hidden Size',
+      type: { kind: 'number', min: 1, integer: true },
+      defaultValue: 128,
+      affects: 'execution',
+      help: 'Size of the hidden state vector. Larger = more capacity to remember patterns. Common: 64, 128, 256.',
+    },
+    {
+      id: 'numLayers',
+      name: 'Num Layers',
+      type: { kind: 'number', min: 1, integer: true },
+      defaultValue: 1,
+      affects: 'execution',
+      help: 'Stack multiple LSTM layers. More layers = deeper model but harder to train. 1-2 is typical.',
+    },
+    {
+      id: 'bidirectional',
+      name: 'Bidirectional',
+      type: { kind: 'boolean' },
+      defaultValue: false,
+      affects: 'execution',
+      help: 'Process sequence in both directions. Doubles output size but captures both past and future context.',
+    },
+    {
+      id: 'dropout',
+      name: 'Dropout',
+      type: { kind: 'number', min: 0, max: 1, step: 0.1 },
+      defaultValue: 0,
+      affects: 'execution',
+      help: 'Dropout between stacked LSTM layers (only used when numLayers > 1). Helps prevent overfitting.',
+    },
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
-    { id: 'hidden', name: 'Hidden', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
-    { id: 'cell', name: 'Cell', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
+    {
+      id: 'hidden',
+      name: 'Hidden',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
+    {
+      id: 'cell',
+      name: 'Cell',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -36,7 +93,10 @@ export const lstmNode: NodeDefinition = {
         if (!input) return { outputs: {} };
 
         if (input.length !== 3) {
-          return { outputs: {}, metadata: { error: `Input should be [B, seq_len, input_size], got [${input}]` } };
+          return {
+            outputs: {},
+            metadata: { error: `Input should be [B, seq_len, input_size], got [${input}]` },
+          };
         }
 
         const [B, seqLen, inputSize] = input;

@@ -68,7 +68,8 @@ function Histogram({ data, color }: { data: HistogramData; color: string }) {
     const barWidth = w / data.counts.length;
 
     const vmin = data.bins[0];
-    const vmax = data.bins[data.bins.length - 1] + (data.bins.length > 1 ? data.bins[1] - data.bins[0] : 1);
+    const vmax =
+      data.bins[data.bins.length - 1] + (data.bins.length > 1 ? data.bins[1] - data.bins[0] : 1);
     const vrange = vmax - vmin || 1;
 
     ctx.clearRect(0, 0, w, h);

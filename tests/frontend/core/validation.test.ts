@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  createGraph,
-  createNode,
-  createEdge,
-  addNode,
-  addEdge,
-} from '../../../src/core/graph';
+import { createGraph, createNode, createEdge, addNode, addEdge } from '../../../src/core/graph';
 import { validateForward, validateTraining } from '../../../src/core/validation';
 import { NodeRegistry } from '../../../src/core/nodedef';
 import type { NodeDefinition, PortDefinition } from '../../../src/core/nodedef';
@@ -13,11 +7,7 @@ import type { NodeDefinition, PortDefinition } from '../../../src/core/nodedef';
 // ---------------------------------------------------------------------------
 // Helper: create a minimal NodeDefinition
 // ---------------------------------------------------------------------------
-function makeDef(
-  type: string,
-  displayName: string,
-  ports: PortDefinition[],
-): NodeDefinition {
+function makeDef(type: string, displayName: string, ports: PortDefinition[]): NodeDefinition {
   return {
     type,
     version: 1,
@@ -37,7 +27,14 @@ function inputPort(id: string, name: string, optional = false): PortDefinition {
 
 /** Shorthand for an output port. */
 function outputPort(id: string, name: string): PortDefinition {
-  return { id, name, direction: 'output', dataType: 'tensor', allowMultiple: false, optional: false };
+  return {
+    id,
+    name,
+    direction: 'output',
+    dataType: 'tensor',
+    allowMultiple: false,
+    optional: false,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -46,44 +43,43 @@ function outputPort(id: string, name: string): PortDefinition {
 function buildRegistry(): NodeRegistry {
   const registry = new NodeRegistry();
 
-  registry.register(makeDef('data.mnist', 'MNIST', [
-    outputPort('images', 'Images'),
-    outputPort('labels', 'Labels'),
-  ]));
+  registry.register(
+    makeDef('data.mnist', 'MNIST', [
+      outputPort('images', 'Images'),
+      outputPort('labels', 'Labels'),
+    ]),
+  );
 
-  registry.register(makeDef('data.cifar10', 'CIFAR-10', [
-    outputPort('images', 'Images'),
-    outputPort('labels', 'Labels'),
-  ]));
+  registry.register(
+    makeDef('data.cifar10', 'CIFAR-10', [
+      outputPort('images', 'Images'),
+      outputPort('labels', 'Labels'),
+    ]),
+  );
 
-  registry.register(makeDef('ml.layers.conv2d', 'Conv2d', [
-    inputPort('in', 'Input'),
-    outputPort('out', 'Output'),
-  ]));
+  registry.register(
+    makeDef('ml.layers.conv2d', 'Conv2d', [inputPort('in', 'Input'), outputPort('out', 'Output')]),
+  );
 
-  registry.register(makeDef('ml.layers.linear', 'Linear', [
-    inputPort('in', 'Input'),
-    outputPort('out', 'Output'),
-  ]));
+  registry.register(
+    makeDef('ml.layers.linear', 'Linear', [inputPort('in', 'Input'), outputPort('out', 'Output')]),
+  );
 
-  registry.register(makeDef('ml.layers.relu', 'ReLU', [
-    inputPort('in', 'Input'),
-    outputPort('out', 'Output'),
-  ]));
+  registry.register(
+    makeDef('ml.layers.relu', 'ReLU', [inputPort('in', 'Input'), outputPort('out', 'Output')]),
+  );
 
-  registry.register(makeDef('ml.loss.cross_entropy', 'CrossEntropyLoss', [
-    inputPort('predictions', 'Predictions'),
-    inputPort('labels', 'Labels'),
-    outputPort('loss', 'Loss'),
-  ]));
+  registry.register(
+    makeDef('ml.loss.cross_entropy', 'CrossEntropyLoss', [
+      inputPort('predictions', 'Predictions'),
+      inputPort('labels', 'Labels'),
+      outputPort('loss', 'Loss'),
+    ]),
+  );
 
-  registry.register(makeDef('ml.optimizers.sgd', 'SGD', [
-    inputPort('loss', 'Loss'),
-  ]));
+  registry.register(makeDef('ml.optimizers.sgd', 'SGD', [inputPort('loss', 'Loss')]));
 
-  registry.register(makeDef('ml.optimizers.adam', 'Adam', [
-    inputPort('loss', 'Loss'),
-  ]));
+  registry.register(makeDef('ml.optimizers.adam', 'Adam', [inputPort('loss', 'Loss')]));
 
   return registry;
 }
@@ -144,11 +140,13 @@ describe('validateForward', () => {
   it('does not flag optional ports that lack connections', () => {
     // Create a node type with an optional input
     const registry = buildRegistry();
-    registry.register(makeDef('custom.optional', 'OptionalInput', [
-      inputPort('required', 'Required', false),
-      inputPort('extra', 'Extra', true),
-      outputPort('out', 'Output'),
-    ]));
+    registry.register(
+      makeDef('custom.optional', 'OptionalInput', [
+        inputPort('required', 'Required', false),
+        inputPort('extra', 'Extra', true),
+        outputPort('out', 'Output'),
+      ]),
+    );
 
     const g = createGraph('g', 'test');
     addNode(g, createNode('data', 'data.mnist'));
@@ -201,10 +199,12 @@ describe('validateTraining', () => {
   it('errors when no data node is present', () => {
     // Use a registry with a source node that has no required inputs
     const registry = buildRegistry();
-    registry.register(makeDef('custom.source', 'Source', [
-      outputPort('out', 'Output'),
-      outputPort('labels', 'Labels'),
-    ]));
+    registry.register(
+      makeDef('custom.source', 'Source', [
+        outputPort('out', 'Output'),
+        outputPort('labels', 'Labels'),
+      ]),
+    );
 
     const g = createGraph('g', 'test');
     addNode(g, createNode('src', 'custom.source'));
@@ -338,10 +338,12 @@ describe('validateTraining', () => {
     // Use a custom source node to feed data into loss so forward validation passes
     // but the reachability check from the data node still fails.
     const registry = buildRegistry();
-    registry.register(makeDef('custom.source', 'Source', [
-      outputPort('out', 'Output'),
-      outputPort('labels', 'Labels'),
-    ]));
+    registry.register(
+      makeDef('custom.source', 'Source', [
+        outputPort('out', 'Output'),
+        outputPort('labels', 'Labels'),
+      ]),
+    );
 
     const g = createGraph('g', 'test');
     addNode(g, createNode('data', 'data.mnist'));

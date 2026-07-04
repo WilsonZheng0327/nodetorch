@@ -51,31 +51,59 @@ export function StageDetail({ stage }: { stage: Stage }) {
   );
 }
 
-function TransformationDispatcher({ transformation }: { transformation: NonNullable<Stage['transformation']> }) {
+function TransformationDispatcher({
+  transformation,
+}: {
+  transformation: NonNullable<Stage['transformation']>;
+}) {
   switch (transformation.type) {
-    case 'conv2d': return <Conv2dViz t={transformation} />;
-    case 'linear': return <LinearViz t={transformation} />;
-    case 'activation': return <ActivationViz t={transformation} />;
-    case 'softmax': return <SoftmaxViz t={transformation} />;
-    case 'norm': return <NormViz t={transformation} />;
-    case 'pool': return <PoolViz t={transformation} />;
-    case 'flatten': return <FlattenViz t={transformation} />;
-    case 'upsample': return <UpsampleViz t={transformation} />;
-    case 'dropout': return <DropoutViz t={transformation} />;
-    case 'cross_entropy': return <CrossEntropyViz t={transformation} />;
-    case 'noise_scheduler': return <NoiseSchedulerViz t={transformation} />;
-    case 'mse_loss': return <MseLossViz t={transformation} />;
-    case 'concat': return <ConcatViz t={transformation} />;
-    case 'add': return <AddViz t={transformation} />;
-    case 'pretrained': return <PretrainedViz t={transformation} />;
-    case 'reparameterize': return <ReparameterizeViz t={transformation} />;
-    case 'reshape': return <ReshapeViz t={transformation} />;
-    case 'gan_loss': return <GanLossViz t={transformation} />;
-    case 'vae_loss': return <VaeLossViz t={transformation} />;
-    case 'data': return <DataViz t={transformation} />;
-    case 'loss': return <LossViz t={transformation} />;
-    case 'attention': return <AttentionViz t={transformation} />;
-    case 'default': return <DefaultViz t={transformation} />;
-    default: return <div className="tfm-empty">Unknown transformation type</div>;
+    case 'conv2d':
+      return <Conv2dViz t={transformation} />;
+    case 'linear':
+      return <LinearViz t={transformation} />;
+    case 'activation':
+      return <ActivationViz t={transformation} />;
+    case 'softmax':
+      return <SoftmaxViz t={transformation} />;
+    case 'norm':
+      return <NormViz t={transformation} />;
+    case 'pool':
+      return <PoolViz t={transformation} />;
+    case 'flatten':
+      return <FlattenViz t={transformation} />;
+    case 'upsample':
+      return <UpsampleViz t={transformation} />;
+    case 'dropout':
+      return <DropoutViz t={transformation} />;
+    case 'cross_entropy':
+      return <CrossEntropyViz t={transformation} />;
+    case 'noise_scheduler':
+      return <NoiseSchedulerViz t={transformation} />;
+    case 'mse_loss':
+      return <MseLossViz t={transformation} />;
+    case 'concat':
+      return <ConcatViz t={transformation} />;
+    case 'add':
+      return <AddViz t={transformation} />;
+    case 'pretrained':
+      return <PretrainedViz t={transformation} />;
+    case 'reparameterize':
+      return <ReparameterizeViz t={transformation} />;
+    case 'reshape':
+      return <ReshapeViz t={transformation} />;
+    case 'gan_loss':
+      return <GanLossViz t={transformation} />;
+    case 'vae_loss':
+      return <VaeLossViz t={transformation} />;
+    case 'data':
+      return <DataViz t={transformation} />;
+    case 'loss':
+      return <LossViz t={transformation} />;
+    case 'attention':
+      return <AttentionViz t={transformation} />;
+    case 'default':
+      return <DefaultViz t={transformation} />;
+    default:
+      return <div className="tfm-empty">Unknown transformation type</div>;
   }
 }

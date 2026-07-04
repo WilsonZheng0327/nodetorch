@@ -32,7 +32,11 @@ function makeApi() {
     },
     removeEdge: async (s, sp, t, tp) => {
       const i = g.edges.findIndex(
-        (e) => e.source.nodeId === s && e.source.portId === sp && e.target.nodeId === t && e.target.portId === tp,
+        (e) =>
+          e.source.nodeId === s &&
+          e.source.portId === sp &&
+          e.target.nodeId === t &&
+          e.target.portId === tp,
       );
       if (i < 0) return false;
       g.edges.splice(i, 1);
@@ -69,36 +73,95 @@ function makeApi() {
 describe('executeGraphTool', () => {
   it('set_node_property applies, and errors on missing node / invalid key', async () => {
     const { api, g } = makeApi();
-    expect(await executeGraphTool(api, domain, 'set_node_property', { nodeId: 'c1', key: 'outChannels', value: 64 })).toMatch(/^ok/);
+    expect(
+      await executeGraphTool(api, domain, 'set_node_property', {
+        nodeId: 'c1',
+        key: 'outChannels',
+        value: 64,
+      }),
+    ).toMatch(/^ok/);
     expect(g.nodes.get('c1')!.properties.outChannels).toBe(64);
-    expect(await executeGraphTool(api, domain, 'set_node_property', { nodeId: 'nope', key: 'x', value: 1 })).toMatch(/^error/);
-    expect(await executeGraphTool(api, domain, 'set_node_property', { nodeId: 'c1', key: 'bogus', value: 1 })).toMatch(/^error/);
+    expect(
+      await executeGraphTool(api, domain, 'set_node_property', {
+        nodeId: 'nope',
+        key: 'x',
+        value: 1,
+      }),
+    ).toMatch(/^error/);
+    expect(
+      await executeGraphTool(api, domain, 'set_node_property', {
+        nodeId: 'c1',
+        key: 'bogus',
+        value: 1,
+      }),
+    ).toMatch(/^error/);
   });
 
   it('add_node ok for a valid type, error for unknown, honors a requested id', async () => {
     const { api, g } = makeApi();
-    expect(await executeGraphTool(api, domain, 'add_node', { type: 'ml.activations.relu' })).toMatch(/^ok: added ml\.activations\.relu/);
+    expect(
+      await executeGraphTool(api, domain, 'add_node', { type: 'ml.activations.relu' }),
+    ).toMatch(/^ok: added ml\.activations\.relu/);
     expect([...g.nodes.values()].some((n) => n.type === 'ml.activations.relu')).toBe(true);
-    expect(await executeGraphTool(api, domain, 'add_node', { type: 'not.a.type' })).toMatch(/^error/);
-    expect(await executeGraphTool(api, domain, 'add_node', { type: 'ml.activations.relu', id: 'relu1' })).toMatch(/as "relu1"/);
+    expect(await executeGraphTool(api, domain, 'add_node', { type: 'not.a.type' })).toMatch(
+      /^error/,
+    );
+    expect(
+      await executeGraphTool(api, domain, 'add_node', { type: 'ml.activations.relu', id: 'relu1' }),
+    ).toMatch(/as "relu1"/);
     expect(g.nodes.has('relu1')).toBe(true);
   });
 
   it('connect validates and errors on missing node / invalid port', async () => {
     const { api, g } = makeApi();
     addNode(g, createNode('r1', 'ml.activations.relu', { x: 1, y: 0 }, {}));
-    expect(await executeGraphTool(api, domain, 'connect', { sourceId: 'c1', sourcePort: 'out', targetId: 'r1', targetPort: 'in' })).toMatch(/^ok/);
-    expect(await executeGraphTool(api, domain, 'connect', { sourceId: 'c1', sourcePort: 'out', targetId: 'nope', targetPort: 'in' })).toMatch(/^error/);
-    expect(await executeGraphTool(api, domain, 'connect', { sourceId: 'c1', sourcePort: 'out', targetId: 'r1', targetPort: 'bad' })).toMatch(/invalid connection/);
+    expect(
+      await executeGraphTool(api, domain, 'connect', {
+        sourceId: 'c1',
+        sourcePort: 'out',
+        targetId: 'r1',
+        targetPort: 'in',
+      }),
+    ).toMatch(/^ok/);
+    expect(
+      await executeGraphTool(api, domain, 'connect', {
+        sourceId: 'c1',
+        sourcePort: 'out',
+        targetId: 'nope',
+        targetPort: 'in',
+      }),
+    ).toMatch(/^error/);
+    expect(
+      await executeGraphTool(api, domain, 'connect', {
+        sourceId: 'c1',
+        sourcePort: 'out',
+        targetId: 'r1',
+        targetPort: 'bad',
+      }),
+    ).toMatch(/invalid connection/);
   });
 
   it('remove_node / remove_edge', async () => {
     const { api, g } = makeApi();
     addNode(g, createNode('r1', 'ml.activations.relu', { x: 1, y: 0 }, {}));
     addEdge(g, createEdge('e1', 'c1', 'out', 'r1', 'in'));
-    expect(await executeGraphTool(api, domain, 'remove_edge', { sourceId: 'c1', sourcePort: 'out', targetId: 'r1', targetPort: 'in' })).toMatch(/^ok/);
+    expect(
+      await executeGraphTool(api, domain, 'remove_edge', {
+        sourceId: 'c1',
+        sourcePort: 'out',
+        targetId: 'r1',
+        targetPort: 'in',
+      }),
+    ).toMatch(/^ok/);
     expect(g.edges.length).toBe(0);
-    expect(await executeGraphTool(api, domain, 'remove_edge', { sourceId: 'c1', sourcePort: 'out', targetId: 'r1', targetPort: 'in' })).toMatch(/^error/);
+    expect(
+      await executeGraphTool(api, domain, 'remove_edge', {
+        sourceId: 'c1',
+        sourcePort: 'out',
+        targetId: 'r1',
+        targetPort: 'in',
+      }),
+    ).toMatch(/^error/);
     expect(await executeGraphTool(api, domain, 'remove_node', { nodeId: 'c1' })).toMatch(/^ok/);
     expect(g.nodes.has('c1')).toBe(false);
   });
@@ -113,7 +176,9 @@ describe('executeGraphTool', () => {
 
   it('add_block passes the filename through', async () => {
     const { api, flags } = makeApi();
-    expect(await executeGraphTool(api, domain, 'add_block', { filename: 'resblock.json' })).toMatch(/^ok/);
+    expect(await executeGraphTool(api, domain, 'add_block', { filename: 'resblock.json' })).toMatch(
+      /^ok/,
+    );
     expect(flags.blockAdded).toBe('resblock.json');
   });
 
@@ -131,7 +196,9 @@ describe('executeGraphTool', () => {
     expect(await executeGraphTool(api, domain, 'exit_block', {})).toMatch(/^ok/);
     expect(flags.exited).toBe(1);
 
-    expect(await executeGraphTool(api, domain, 'save_block', { nodeId: 'blk1', name: 'Renamed' })).toMatch(/^ok/);
+    expect(
+      await executeGraphTool(api, domain, 'save_block', { nodeId: 'blk1', name: 'Renamed' }),
+    ).toMatch(/^ok/);
     expect(flags.saved).toBe('blk1');
     expect(g.nodes.get('blk1')!.properties.blockName).toBe('Renamed');
     expect(await executeGraphTool(api, domain, 'save_block', { nodeId: 'c1' })).toMatch(/^error/);
@@ -150,7 +217,9 @@ describe('executeGraphTool', () => {
   it('validate returns a forward/training report', async () => {
     const { api } = makeApi();
     expect(await executeGraphTool(api, domain, 'validate', { mode: 'forward' })).toMatch(/forward/);
-    expect(await executeGraphTool(api, domain, 'validate', { mode: 'training' })).toMatch(/training/);
+    expect(await executeGraphTool(api, domain, 'validate', { mode: 'training' })).toMatch(
+      /training/,
+    );
   });
 
   it('validate surfaces per-node shape errors, not just structural ones', async () => {
@@ -168,7 +237,9 @@ describe('executeGraphTool', () => {
   it('get_training_results reports state and formats the epoch history', async () => {
     const { api } = makeApi();
     // Untrained → says so.
-    expect(await executeGraphTool(api, domain, 'get_training_results', {})).toMatch(/not been trained/);
+    expect(await executeGraphTool(api, domain, 'get_training_results', {})).toMatch(
+      /not been trained/,
+    );
 
     // With history → a per-epoch table picking columns from the metrics present.
     api.trainingProgress = [
@@ -182,7 +253,9 @@ describe('executeGraphTool', () => {
 
     // Stale flag surfaces a warning.
     api.modelStale = true;
-    expect(await executeGraphTool(api, domain, 'get_training_results', {})).toMatch(/stale|no longer reflect/i);
+    expect(await executeGraphTool(api, domain, 'get_training_results', {})).toMatch(
+      /stale|no longer reflect/i,
+    );
   });
 
   it('reports unknown tools', async () => {

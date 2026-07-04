@@ -7,7 +7,8 @@ export const graphOutputNode: NodeDefinition = {
   type: 'subgraph.output',
   version: 1,
   displayName: 'Custom Block Output',
-  description: 'Data leaving this custom block to outside. Place inside a Custom Block to define its output ports.',
+  description:
+    'Data leaving this custom block to outside. Place inside a Custom Block to define its output ports.',
   category: ['Custom Block'],
   color: '#8b5cf6',
 
@@ -33,7 +34,9 @@ export const graphOutputNode: NodeDefinition = {
   // the label leaves existing connections intact. The name is display-only.
   getPorts: (properties) => {
     const count = properties.portCount ?? 1;
-    const names = String(properties.portNames ?? '').split(',').map((s: string) => s.trim());
+    const names = String(properties.portNames ?? '')
+      .split(',')
+      .map((s: string) => s.trim());
     return Array.from({ length: count }, (_, i) => ({
       id: i === 0 ? 'out' : `port_${i}`,
       name: names[i] || (i === 0 ? 'out' : `out ${i}`),

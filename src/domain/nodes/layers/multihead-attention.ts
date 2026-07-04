@@ -12,7 +12,8 @@ export const multiHeadAttentionNode: NodeDefinition = {
   displayName: 'MultiHeadAttention',
   description: 'Multi-head attention (self or cross)',
   category: ['ML', 'Layers', 'Attention'],
-  learnMore: 'The core of transformer models. Each "head" learns to attend to different aspects of the input \u2014 one might focus on syntax, another on meaning. For self-attention, connect the same input to all three ports (Query, Key, Value). This lets each position in the sequence look at every other position.',
+  learnMore:
+    'The core of transformer models. Each "head" learns to attend to different aspects of the input \u2014 one might focus on syntax, another on meaning. For self-attention, connect the same input to all three ports (Query, Key, Value). This lets each position in the sequence look at every other position.',
 
   getProperties: () => [
     {
@@ -21,7 +22,7 @@ export const multiHeadAttentionNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 256,
       affects: 'execution',
-      help: 'Dimension of input embeddings. Must match the embedding layer\'s output. Must be divisible by numHeads.',
+      help: "Dimension of input embeddings. Must match the embedding layer's output. Must be divisible by numHeads.",
     },
     {
       id: 'numHeads',
@@ -50,10 +51,38 @@ export const multiHeadAttentionNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'query', name: 'Query', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'key', name: 'Key', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'value', name: 'Value', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'query',
+      name: 'Query',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'key',
+      name: 'Key',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'value',
+      name: 'Value',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -67,15 +96,28 @@ export const multiHeadAttentionNode: NodeDefinition = {
         const { embedDim, numHeads } = properties;
 
         if (embedDim % numHeads !== 0) {
-          return { outputs: {}, metadata: { error: `embed_dim (${embedDim}) must be divisible by num_heads (${numHeads})` } };
+          return {
+            outputs: {},
+            metadata: {
+              error: `embed_dim (${embedDim}) must be divisible by num_heads (${numHeads})`,
+            },
+          };
         }
 
         if (query.length !== 3) {
-          return { outputs: {}, metadata: { error: `Query should be [B, seq_len, embed_dim], got [${query}]` } };
+          return {
+            outputs: {},
+            metadata: { error: `Query should be [B, seq_len, embed_dim], got [${query}]` },
+          };
         }
 
         if (key && key[key.length - 1] !== query[query.length - 1]) {
-          return { outputs: {}, metadata: { error: `Key embed dim ${key[key.length - 1]} != Query embed dim ${query[query.length - 1]}` } };
+          return {
+            outputs: {},
+            metadata: {
+              error: `Key embed dim ${key[key.length - 1]} != Query embed dim ${query[query.length - 1]}`,
+            },
+          };
         }
 
         // Output has same shape as query: [B, seq_q, embed_dim]
@@ -83,7 +125,8 @@ export const multiHeadAttentionNode: NodeDefinition = {
         const headDim = embedDim / numHeads;
 
         // Params: 3 projection matrices (Q, K, V) + output projection, each with bias
-        const paramCount = (3 * embedDim * embedDim + 3 * embedDim) + (embedDim * embedDim + embedDim);
+        const paramCount =
+          3 * embedDim * embedDim + 3 * embedDim + (embedDim * embedDim + embedDim);
 
         return {
           outputs: { out: outShape },

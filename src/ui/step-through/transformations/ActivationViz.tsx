@@ -10,23 +10,37 @@ import { fmtAxis } from './format';
 
 function getCurve(fn: string, slope?: number): (x: number) => number {
   switch (fn) {
-    case 'relu': return (x) => Math.max(0, x);
-    case 'sigmoid': return (x) => 1 / (1 + Math.exp(-x));
-    case 'tanh': return (x) => Math.tanh(x);
-    case 'gelu': return (x) => 0.5 * x * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (x + 0.044715 * x * x * x)));
-    case 'leaky_relu': { const s = slope ?? 0.01; return (x) => x >= 0 ? x : s * x; }
-    default: return (x) => x;
+    case 'relu':
+      return (x) => Math.max(0, x);
+    case 'sigmoid':
+      return (x) => 1 / (1 + Math.exp(-x));
+    case 'tanh':
+      return (x) => Math.tanh(x);
+    case 'gelu':
+      return (x) => 0.5 * x * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (x + 0.044715 * x * x * x)));
+    case 'leaky_relu': {
+      const s = slope ?? 0.01;
+      return (x) => (x >= 0 ? x : s * x);
+    }
+    default:
+      return (x) => x;
   }
 }
 
 function getLabel(fn: string, slope?: number): string {
   switch (fn) {
-    case 'relu': return 'ReLU: y = max(0, x)';
-    case 'sigmoid': return 'Sigmoid: y = 1/(1+e\u207Bx)';
-    case 'tanh': return 'Tanh: y = tanh(x)';
-    case 'gelu': return 'GELU';
-    case 'leaky_relu': return `Leaky ReLU: y = max(${slope ?? 0.01}x, x)`;
-    default: return fn;
+    case 'relu':
+      return 'ReLU: y = max(0, x)';
+    case 'sigmoid':
+      return 'Sigmoid: y = 1/(1+e\u207Bx)';
+    case 'tanh':
+      return 'Tanh: y = tanh(x)';
+    case 'gelu':
+      return 'GELU';
+    case 'leaky_relu':
+      return `Leaky ReLU: y = max(${slope ?? 0.01}x, x)`;
+    default:
+      return fn;
   }
 }
 
@@ -51,12 +65,20 @@ export function ActivationViz({ t }: { t: ActivationTransformation }) {
         <div className="tfm-before-after">
           <div className="tfm-ba-pane">
             <div className="tfm-ba-label">Before</div>
-            {t.inputMaps ? <FeatureMapsGrid data={t.inputMaps} /> : <div className="tfm-empty">&mdash;</div>}
+            {t.inputMaps ? (
+              <FeatureMapsGrid data={t.inputMaps} />
+            ) : (
+              <div className="tfm-empty">&mdash;</div>
+            )}
           </div>
           <div className="tfm-ba-divider" />
           <div className="tfm-ba-pane">
             <div className="tfm-ba-label">After</div>
-            {t.outputMaps ? <FeatureMapsGrid data={t.outputMaps} /> : <div className="tfm-empty">&mdash;</div>}
+            {t.outputMaps ? (
+              <FeatureMapsGrid data={t.outputMaps} />
+            ) : (
+              <div className="tfm-empty">&mdash;</div>
+            )}
           </div>
         </div>
       )}
@@ -65,11 +87,25 @@ export function ActivationViz({ t }: { t: ActivationTransformation }) {
       {hasHist && (
         <div className="tfm-before-after">
           <div className="tfm-ba-pane">
-            <FixedRangeHistogram data={t.inputHist!} color="#6c7086" label="Before" xMin={xMin} xMax={xMax} yMax={yMax} />
+            <FixedRangeHistogram
+              data={t.inputHist!}
+              color="#6c7086"
+              label="Before"
+              xMin={xMin}
+              xMax={xMax}
+              yMax={yMax}
+            />
           </div>
           <div className="tfm-ba-divider" />
           <div className="tfm-ba-pane">
-            <FixedRangeHistogram data={t.outputHist!} color="#89b4fa" label="After" xMin={xMin} xMax={xMax} yMax={yMax} />
+            <FixedRangeHistogram
+              data={t.outputHist!}
+              color="#89b4fa"
+              label="After"
+              xMin={xMin}
+              xMax={xMax}
+              yMax={yMax}
+            />
           </div>
         </div>
       )}
@@ -78,13 +114,17 @@ export function ActivationViz({ t }: { t: ActivationTransformation }) {
       <div className="tfm-activation-stats">
         {t.deadFraction != null && (
           <div className="tfm-stat">
-            <span className="tfm-stat-value" style={{ color: '#f38ba8' }}>{(t.deadFraction * 100).toFixed(0)}%</span>
+            <span className="tfm-stat-value" style={{ color: '#f38ba8' }}>
+              {(t.deadFraction * 100).toFixed(0)}%
+            </span>
             <span className="tfm-stat-label">values zeroed</span>
           </div>
         )}
         {t.saturatedFraction != null && (
           <div className="tfm-stat">
-            <span className="tfm-stat-value" style={{ color: '#f9e2af' }}>{(t.saturatedFraction * 100).toFixed(0)}%</span>
+            <span className="tfm-stat-value" style={{ color: '#f9e2af' }}>
+              {(t.saturatedFraction * 100).toFixed(0)}%
+            </span>
             <span className="tfm-stat-label">in saturated region</span>
           </div>
         )}
@@ -94,7 +134,17 @@ export function ActivationViz({ t }: { t: ActivationTransformation }) {
 }
 
 /** Standalone activation curve diagram — shows the function shape with proper axes. */
-function ActivationCurve({ fn, xMin, xMax, negativeSlope }: { fn: string; xMin: number; xMax: number; negativeSlope?: number }) {
+function ActivationCurve({
+  fn,
+  xMin,
+  xMax,
+  negativeSlope,
+}: {
+  fn: string;
+  xMin: number;
+  xMax: number;
+  negativeSlope?: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -145,11 +195,17 @@ function ActivationCurve({ fn, xMin, xMax, negativeSlope }: { fn: string; xMin: 
     ctx.lineWidth = 1;
     if (xMin < 0 && xMax > 0) {
       const zx = toX(0);
-      ctx.beginPath(); ctx.moveTo(zx, padT); ctx.lineTo(zx, padT + plotH); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(zx, padT);
+      ctx.lineTo(zx, padT + plotH);
+      ctx.stroke();
     }
     if (yMin < 0 && yMax > 0) {
       const zy = toY(0);
-      ctx.beginPath(); ctx.moveTo(padL, zy); ctx.lineTo(padL + plotW, zy); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(padL, zy);
+      ctx.lineTo(padL + plotW, zy);
+      ctx.stroke();
     }
 
     // Curve
@@ -161,7 +217,8 @@ function ActivationCurve({ fn, xMin, xMax, negativeSlope }: { fn: string; xMin: 
       const yVal = curveFn(xVal);
       const cx = toX(xVal);
       const cy = toY(yVal);
-      if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+      if (i === 0) ctx.moveTo(cx, cy);
+      else ctx.lineTo(cx, cy);
     }
     ctx.stroke();
 
@@ -193,9 +250,20 @@ function ActivationCurve({ fn, xMin, xMax, negativeSlope }: { fn: string; xMin: 
 }
 
 /** Histogram drawn within a fixed x-range (no curve overlay). */
-function FixedRangeHistogram({ data, color, label, xMin, xMax, yMax }: {
-  data: HistogramData; color: string; label: string;
-  xMin: number; xMax: number; yMax: number;
+function FixedRangeHistogram({
+  data,
+  color,
+  label,
+  xMin,
+  xMax,
+  yMax,
+}: {
+  data: HistogramData;
+  color: string;
+  label: string;
+  xMin: number;
+  xMax: number;
+  yMax: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 

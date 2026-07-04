@@ -10,7 +10,9 @@ export function PretrainedViz({ t }: { t: PretrainedTransformation }) {
       <div className="tfm-pretrained-card">
         <div className="tfm-pretrained-header">
           <span className="tfm-pretrained-name">{t.modelName}</span>
-          <span className={`tfm-pretrained-badge ${t.frozen ? 'tfm-pretrained-frozen' : 'tfm-pretrained-tuning'}`}>
+          <span
+            className={`tfm-pretrained-badge ${t.frozen ? 'tfm-pretrained-frozen' : 'tfm-pretrained-tuning'}`}
+          >
             {t.frozen ? 'Frozen' : 'Fine-tuning'}
           </span>
         </div>
@@ -25,11 +27,17 @@ export function PretrainedViz({ t }: { t: PretrainedTransformation }) {
           </div>
           <div className="tfm-pretrained-row">
             <span className="tfm-pretrained-key">Parameters</span>
-            <span className="tfm-pretrained-val">{t.totalParams} total, {t.trainableParams ?? '0'} trainable</span>
+            <span className="tfm-pretrained-val">
+              {t.totalParams} total, {t.trainableParams ?? '0'} trainable
+            </span>
           </div>
           <div className="tfm-pretrained-row">
             <span className="tfm-pretrained-key">Mode</span>
-            <span className="tfm-pretrained-val">{t.mode === 'features' ? 'Feature extractor → 512-dim' : 'Full model → 1000 ImageNet classes'}</span>
+            <span className="tfm-pretrained-val">
+              {t.mode === 'features'
+                ? 'Feature extractor → 512-dim'
+                : 'Full model → 1000 ImageNet classes'}
+            </span>
           </div>
         </div>
       </div>
@@ -52,14 +60,22 @@ export function PretrainedViz({ t }: { t: PretrainedTransformation }) {
       {/* Before / After */}
       <div className="tfm-before-after">
         <div className="tfm-ba-pane">
-          <div className="tfm-ba-label">Input {t.inputShape ? `[${t.inputShape.join(', ')}]` : ''}</div>
+          <div className="tfm-ba-label">
+            Input {t.inputShape ? `[${t.inputShape.join(', ')}]` : ''}
+          </div>
           {t.inputFmaps && <FeatureMapsGrid data={t.inputFmaps} />}
         </div>
         <div className="tfm-ba-divider" />
         <div className="tfm-ba-pane">
-          <div className="tfm-ba-label">Output {t.outputShape ? `[${t.outputShape.join(', ')}]` : ''}</div>
+          <div className="tfm-ba-label">
+            Output {t.outputShape ? `[${t.outputShape.join(', ')}]` : ''}
+          </div>
           {t.outputVector && (
-            <VectorBars values={t.outputVector} height={180} label={`${t.outputDim ?? t.outputVector.length}-dim feature vector`} />
+            <VectorBars
+              values={t.outputVector}
+              height={180}
+              label={`${t.outputDim ?? t.outputVector.length}-dim feature vector`}
+            />
           )}
           {t.outputFmaps && <FeatureMapsGrid data={t.outputFmaps} />}
           {t.outputHist && <Histogram data={t.outputHist} label="Feature distribution" />}

@@ -13,7 +13,8 @@ export const positionalEncodingNode: NodeDefinition = {
   displayName: 'PositionalEncoding',
   description: 'Adds position info to token embeddings (required for transformers)',
   category: ['ML', 'Layers'],
-  learnMore: 'Self-attention treats input as a set of vectors — it has no idea which token came first. PositionalEncoding adds a unique signature for each position so the model knows the order. "Learned" trains a separate vector per position (like an extra Embedding). "Sinusoidal" uses fixed sine/cosine waves at different frequencies — no parameters, generalizes to longer sequences than seen in training. Either way, it gets added to the token embeddings before attention.',
+  learnMore:
+    'Self-attention treats input as a set of vectors — it has no idea which token came first. PositionalEncoding adds a unique signature for each position so the model knows the order. "Learned" trains a separate vector per position (like an extra Embedding). "Sinusoidal" uses fixed sine/cosine waves at different frequencies — no parameters, generalizes to longer sequences than seen in training. Either way, it gets added to the token embeddings before attention.',
 
   getProperties: () => [
     {
@@ -41,8 +42,22 @@ export const positionalEncodingNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Embeddings', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Embeddings + Position', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Embeddings',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Embeddings + Position',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -54,7 +69,9 @@ export const positionalEncodingNode: NodeDefinition = {
         if (input.length !== 3) {
           return {
             outputs: {},
-            metadata: { error: `Input should be [B, seq_len, embed_dim], got [${input.join(', ')}]` },
+            metadata: {
+              error: `Input should be [B, seq_len, embed_dim], got [${input.join(', ')}]`,
+            },
           };
         }
 
@@ -78,9 +95,10 @@ export const positionalEncodingNode: NodeDefinition = {
           metadata: {
             outputShape: outShape,
             paramCount,
-            paramBreakdown: encodingType === 'learned'
-              ? `position table: ${maxLen}×${embedDim} = ${paramCount.toLocaleString()}`
-              : 'no parameters (fixed sinusoidal table)',
+            paramBreakdown:
+              encodingType === 'learned'
+                ? `position table: ${maxLen}×${embedDim} = ${paramCount.toLocaleString()}`
+                : 'no parameters (fixed sinusoidal table)',
             shapes: [
               { label: 'Output', value: outShape },
               { label: 'Type', value: encodingType === 'learned' ? 'Learned' : 'Sinusoidal' },

@@ -1,6 +1,11 @@
 // Default/fallback transformation — generic output visualization
 
-import type { DefaultTransformation, DataTransformation, DropoutTransformation, LossTransformation } from '../types';
+import type {
+  DefaultTransformation,
+  DataTransformation,
+  DropoutTransformation,
+  LossTransformation,
+} from '../types';
 import { FeatureMapsGrid, VectorBars, Histogram, Arrow } from './shared';
 
 export function DefaultViz({ t }: { t: DefaultTransformation }) {
@@ -51,12 +56,20 @@ export function DropoutViz({ t }: { t: DropoutTransformation }) {
         <div className="tfm-before-after">
           <div className="tfm-ba-pane">
             <div className="tfm-ba-label">Before</div>
-            {t.inputMaps ? <FeatureMapsGrid data={t.inputMaps} /> : <div className="tfm-empty">&mdash;</div>}
+            {t.inputMaps ? (
+              <FeatureMapsGrid data={t.inputMaps} />
+            ) : (
+              <div className="tfm-empty">&mdash;</div>
+            )}
           </div>
           <div className="tfm-ba-divider" />
           <div className="tfm-ba-pane">
             <div className="tfm-ba-label">After</div>
-            {t.outputMaps ? <FeatureMapsGrid data={t.outputMaps} /> : <div className="tfm-empty">&mdash;</div>}
+            {t.outputMaps ? (
+              <FeatureMapsGrid data={t.outputMaps} />
+            ) : (
+              <div className="tfm-empty">&mdash;</div>
+            )}
           </div>
         </div>
       )}

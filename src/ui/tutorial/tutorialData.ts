@@ -8,8 +8,8 @@
 export interface TutorialTask {
   id: string;
   text: string;
-  hint?: string;        // extra help shown on hover/expand
-  autoDetect?: string;  // event key that auto-completes this task
+  hint?: string; // extra help shown on hover/expand
+  autoDetect?: string; // event key that auto-completes this task
 }
 
 export interface TutorialGoal {
@@ -23,7 +23,8 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
   {
     id: 'ui-basics',
     title: 'UI Basics — Getting Around',
-    description: 'Learn how to navigate NodeTorch: discover tooltips, inspect nodes, and use the dashboard. No model-building yet — just exploring the interface.',
+    description:
+      'Learn how to navigate NodeTorch: discover tooltips, inspect nodes, and use the dashboard. No model-building yet — just exploring the interface.',
     tasks: [
       {
         id: 'hover-toolbar',
@@ -47,7 +48,7 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
       },
       {
         id: 'inspector-learn',
-        text: 'Read a node\'s educational description',
+        text: "Read a node's educational description",
         hint: 'Click any node. The inspector on the right shows a "Learn More" paragraph at the top — a plain-English explanation of what that node does and why it matters.',
       },
       {
@@ -71,7 +72,8 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
   {
     id: 'build',
     title: 'Build a CNN for CIFAR-10',
-    description: 'Build a small convolutional neural network that classifies 32x32 color images into 10 categories (airplane, car, bird, cat, deer, dog, frog, horse, ship, truck).',
+    description:
+      'Build a small convolutional neural network that classifies 32x32 color images into 10 categories (airplane, car, bird, cat, deer, dog, frog, horse, ship, truck).',
     tasks: [
       {
         id: 'open-palette',
@@ -208,7 +210,8 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
   {
     id: 'vae',
     title: 'VAE — Generative Image Model',
-    description: 'A Variational Autoencoder learns a smooth "latent space" it can sample from to generate new images. Unlike a regular autoencoder, the encoder outputs a distribution (mean + variance) instead of a point — enabling interpolation and generation.',
+    description:
+      'A Variational Autoencoder learns a smooth "latent space" it can sample from to generate new images. Unlike a regular autoencoder, the encoder outputs a distribution (mean + variance) instead of a point — enabling interpolation and generation.',
     tasks: [
       {
         id: 'vae-load',
@@ -241,7 +244,7 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
       {
         id: 'vae-step-through',
         text: 'Step through the VAE forward pass',
-        hint: 'Open Step Through. You\'ll see the input encoded into mean/logvar, the sampling step, then the decoder reconstructing the image. Compare the reconstruction to the original.',
+        hint: "Open Step Through. You'll see the input encoded into mean/logvar, the sampling step, then the decoder reconstructing the image. Compare the reconstruction to the original.",
         autoDetect: 'step-through-opened',
       },
     ],
@@ -249,7 +252,8 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
   {
     id: 'gan',
     title: 'GAN — Adversarial Training',
-    description: 'A Generative Adversarial Network pits two networks against each other: a Generator creates fake images from random noise, and a Discriminator tries to tell real from fake. They improve by competing — no reconstruction loss needed.',
+    description:
+      'A Generative Adversarial Network pits two networks against each other: a Generator creates fake images from random noise, and a Discriminator tries to tell real from fake. They improve by competing — no reconstruction loss needed.',
     tasks: [
       {
         id: 'gan-load',
@@ -270,7 +274,7 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
       {
         id: 'gan-train',
         text: 'Train the GAN',
-        hint: 'Click Train. The dashboard shows both D-Loss and G-Loss curves. Healthy training: they oscillate, neither wins too decisively. If D-Loss → 0, the discriminator has won (generator can\'t fool it). If G-Loss → 0, the discriminator collapsed.',
+        hint: "Click Train. The dashboard shows both D-Loss and G-Loss curves. Healthy training: they oscillate, neither wins too decisively. If D-Loss → 0, the discriminator has won (generator can't fool it). If G-Loss → 0, the discriminator collapsed.",
         autoDetect: 'training-started',
       },
       {
@@ -283,7 +287,8 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
   {
     id: 'diffusion',
     title: 'Diffusion — Iterative Denoising',
-    description: 'Diffusion models generate images by iteratively denoising pure noise. During training, they learn to predict the noise added to real images at varying intensity levels. At inference, they reverse the process step by step.',
+    description:
+      'Diffusion models generate images by iteratively denoising pure noise. During training, they learn to predict the noise added to real images at varying intensity levels. At inference, they reverse the process step by step.',
     tasks: [
       {
         id: 'diff-load',
@@ -294,7 +299,7 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
       {
         id: 'diff-scheduler',
         text: 'Inspect the Noise Scheduler node',
-        hint: 'This node picks a random timestep per sample, adds proportional noise to the image, and outputs (noisy_image, original_noise, timestep_channel). The model\'s job: given the noisy image + timestep, predict the noise.',
+        hint: "This node picks a random timestep per sample, adds proportional noise to the image, and outputs (noisy_image, original_noise, timestep_channel). The model's job: given the noisy image + timestep, predict the noise.",
       },
       {
         id: 'diff-timestep-embed',
@@ -304,7 +309,7 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
       {
         id: 'diff-train',
         text: 'Train the Diffusion model',
-        hint: 'Click Train. Loss = MSE between predicted noise and actual noise added. It\'s a regression task, not classification — the model just learns to denoise at every intensity level.',
+        hint: "Click Train. Loss = MSE between predicted noise and actual noise added. It's a regression task, not classification — the model just learns to denoise at every intensity level.",
         autoDetect: 'training-started',
       },
       {
@@ -318,7 +323,8 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
   {
     id: 'autoregressive',
     title: 'Language Model — Autoregressive Generation',
-    description: 'A character-level language model predicts the next character given previous characters. Train it on Shakespeare and generate new text one character at a time. This is the same principle behind GPT — just smaller and character-level.',
+    description:
+      'A character-level language model predicts the next character given previous characters. Train it on Shakespeare and generate new text one character at a time. This is the same principle behind GPT — just smaller and character-level.',
     tasks: [
       {
         id: 'ar-load',
@@ -329,7 +335,7 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
       {
         id: 'ar-embedding',
         text: 'Click the Embedding node',
-        hint: 'Text can\'t go straight into a neural net — characters are discrete integer IDs. The Embedding layer maps each character ID (0-64 for 65 unique chars) to a learnable dense vector, giving the model a continuous representation.',
+        hint: "Text can't go straight into a neural net — characters are discrete integer IDs. The Embedding layer maps each character ID (0-64 for 65 unique chars) to a learnable dense vector, giving the model a continuous representation.",
       },
       {
         id: 'ar-train',
@@ -353,4 +359,4 @@ export const TUTORIAL_GOALS: TutorialGoal[] = [
 ];
 
 /** All task IDs in order */
-export const ALL_TASK_IDS = TUTORIAL_GOALS.flatMap(g => g.tasks.map(t => t.id));
+export const ALL_TASK_IDS = TUTORIAL_GOALS.flatMap((g) => g.tasks.map((t) => t.id));

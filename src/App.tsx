@@ -10,7 +10,11 @@ import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './ui/contexts';
 import { LeftRail } from './ui/sidebar/LeftRail';
 import { ChatRail } from './ui/chat/ChatRail';
 import { Toolbar } from './ui/Toolbar';
-import { TrainingDashboard, type ModelLayerInfo, type EpochData } from './ui/dashboard/TrainingDashboard';
+import {
+  TrainingDashboard,
+  type ModelLayerInfo,
+  type EpochData,
+} from './ui/dashboard/TrainingDashboard';
 import { StepThroughPanel } from './ui/step-through/StepThroughPanel';
 import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
@@ -51,16 +55,21 @@ export default function App() {
   const nodeTypes = useNodeTypes(domain);
   const graph = useGraph(domain);
 
-  const graphActions = useMemo(() => ({
-    removeNode: graph.removeNode,
-  }), [graph.removeNode]);
+  const graphActions = useMemo(
+    () => ({
+      removeNode: graph.removeNode,
+    }),
+    [graph.removeNode],
+  );
 
-  const vizCtx = useMemo(() => ({
-    pinnedVizNodes: graph.pinnedVizNodes,
-    toggleVizPin: graph.toggleVizPin,
-    liveSnapshots: graph.liveSnapshots,
-  }), [graph.pinnedVizNodes, graph.toggleVizPin, graph.liveSnapshots]);
-
+  const vizCtx = useMemo(
+    () => ({
+      pinnedVizNodes: graph.pinnedVizNodes,
+      toggleVizPin: graph.toggleVizPin,
+      liveSnapshots: graph.liveSnapshots,
+    }),
+    [graph.pinnedVizNodes, graph.toggleVizPin, graph.liveSnapshots],
+  );
 
   // Model summary derived from graph nodes (after shape inference)
   const modelSummary = useMemo((): ModelLayerInfo[] => {
@@ -86,9 +95,10 @@ export default function App() {
   // Bumped on Test press to focus the dashboard's Test tab.
   const [testFocus, setTestFocus] = useState(0);
 
-  const selectedNode = selectedNodeIds.length === 1
-    ? graph.currentGraph.nodes.get(selectedNodeIds[0]) ?? null
-    : null;
+  const selectedNode =
+    selectedNodeIds.length === 1
+      ? (graph.currentGraph.nodes.get(selectedNodeIds[0]) ?? null)
+      : null;
 
   // Track selected node IDs (supports multi-select)
   const onSelectionChange = useCallback(({ nodes }: { nodes: RF.Node[] }) => {
@@ -115,12 +125,15 @@ export default function App() {
   );
 
   // Double-click a subgraph node to enter it
-  const onNodeDoubleClick = useCallback((_event: React.MouseEvent, node: RF.Node) => {
-    const instance = graph.currentGraph.nodes.get(node.id);
-    if (instance?.type === 'subgraph.block' && instance.subgraph) {
-      graph.enterSubgraph(node.id);
-    }
-  }, [graph]);
+  const onNodeDoubleClick = useCallback(
+    (_event: React.MouseEvent, node: RF.Node) => {
+      const instance = graph.currentGraph.nodes.get(node.id);
+      if (instance?.type === 'subgraph.block' && instance.subgraph) {
+        graph.enterSubgraph(node.id);
+      }
+    },
+    [graph],
+  );
 
   // Drag-and-drop from palette onto canvas
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -128,13 +141,17 @@ export default function App() {
 
   // Arrow keys / WASD for smooth panning. Hold Shift for fast pan.
   useEffect(() => {
-    const PAN_SPEED = 8;          // pixels per frame
-    const PAN_SPEED_FAST = 28;    // with Shift held
+    const PAN_SPEED = 8; // pixels per frame
+    const PAN_SPEED_FAST = 28; // with Shift held
     const keyDirs: Record<string, { x: number; y: number }> = {
-      ArrowUp: { x: 0, y: 1 }, ArrowDown: { x: 0, y: -1 },
-      ArrowLeft: { x: 1, y: 0 }, ArrowRight: { x: -1, y: 0 },
-      w: { x: 0, y: 1 }, s: { x: 0, y: -1 },
-      a: { x: 1, y: 0 }, d: { x: -1, y: 0 },
+      ArrowUp: { x: 0, y: 1 },
+      ArrowDown: { x: 0, y: -1 },
+      ArrowLeft: { x: 1, y: 0 },
+      ArrowRight: { x: -1, y: 0 },
+      w: { x: 0, y: 1 },
+      s: { x: 0, y: -1 },
+      a: { x: 1, y: 0 },
+      d: { x: -1, y: 0 },
     };
 
     const held = new Set<string>();
@@ -146,10 +163,14 @@ export default function App() {
         frameId = null;
         return;
       }
-      let dx = 0, dy = 0;
+      let dx = 0,
+        dy = 0;
       for (const key of held) {
         const dir = keyDirs[key];
-        if (dir) { dx += dir.x; dy += dir.y; }
+        if (dir) {
+          dx += dir.x;
+          dy += dir.y;
+        }
       }
       if (dx !== 0 || dy !== 0) {
         const speed = shiftHeld ? PAN_SPEED_FAST : PAN_SPEED;
@@ -288,7 +309,9 @@ export default function App() {
           setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200);
         }
       })
-      .catch(() => { /* backend not running yet */ });
+      .catch(() => {
+        /* backend not running yet */
+      });
   }, []);
 
   // Fit view when navigating into/out of subgraphs
@@ -302,123 +325,140 @@ export default function App() {
 
   return (
     <DomainCtx.Provider value={domain}>
-    <GraphActionsCtx.Provider value={graphActions}>
-    <VizCtx.Provider value={vizCtx}>
-    <BackpropCtx.Provider value={graph.backpropAnim}>
-      <div className="app-shell">
-        <div ref={reactFlowWrapper} className="canvas-area">
-        <RF.ReactFlow
-          nodes={graph.rfNodes}
-          edges={graph.rfEdges}
-          onNodesChange={graph.onNodesChange}
-          onEdgesChange={graph.onEdgesChange}
-          onConnect={graph.connect}
-          isValidConnection={graph.isValidConnection}
-          onEdgeClick={() => {/* no-op: right-click only */}}
-          onEdgeContextMenu={onEdgeContextMenu}
-          onNodeClick={onNodeClick}
-          onNodeDoubleClick={onNodeDoubleClick}
-          onSelectionChange={onSelectionChange}
-          onInit={setReactFlowInstance}
-          onDragOver={onDragOver}
-          onDrop={onDrop}
-          nodeTypes={nodeTypes}
-          edgesFocusable={false}
-          selectionKeyCode="Control"
-          multiSelectionKeyCode="Shift"
-          fitView
-          defaultEdgeOptions={{ animated: true }}
-        >
-          <RF.Background />
-          {/* Minimap + controls, bottom-left of the page (same 300px width as
+      <GraphActionsCtx.Provider value={graphActions}>
+        <VizCtx.Provider value={vizCtx}>
+          <BackpropCtx.Provider value={graph.backpropAnim}>
+            <div className="app-shell">
+              <div ref={reactFlowWrapper} className="canvas-area">
+                <RF.ReactFlow
+                  nodes={graph.rfNodes}
+                  edges={graph.rfEdges}
+                  onNodesChange={graph.onNodesChange}
+                  onEdgesChange={graph.onEdgesChange}
+                  onConnect={graph.connect}
+                  isValidConnection={graph.isValidConnection}
+                  onEdgeClick={() => {
+                    /* no-op: right-click only */
+                  }}
+                  onEdgeContextMenu={onEdgeContextMenu}
+                  onNodeClick={onNodeClick}
+                  onNodeDoubleClick={onNodeDoubleClick}
+                  onSelectionChange={onSelectionChange}
+                  onInit={setReactFlowInstance}
+                  onDragOver={onDragOver}
+                  onDrop={onDrop}
+                  nodeTypes={nodeTypes}
+                  edgesFocusable={false}
+                  selectionKeyCode="Control"
+                  multiSelectionKeyCode="Shift"
+                  fitView
+                  defaultEdgeOptions={{ animated: true }}
+                >
+                  <RF.Background />
+                  {/* Minimap + controls, bottom-left of the page (same 300px width as
               the floating left rail above). */}
-          <RF.Panel position="bottom-left" className="bottom-panel">
-            <RF.MiniMap
-              className="minimap-themed"
-              pannable
-              zoomable
-              style={{ width: 180, height: 108, margin: 0 }}
-              maskColor="rgba(17, 17, 27, 0.7)"
-              nodeColor={(node) => {
-                const inst = graph.graph.nodes.get(node.id);
-                if (!inst) return '#45475a';
-                const def = domain.nodeRegistry.get(inst.type);
-                if (!def) return '#45475a';
-                return def.color ?? getCategoryColor(def.category);
-              }}
-            />
-            <RF.Controls
-              orientation="vertical"
-              showInteractive={false}
-              className="controls-themed"
-            />
-          </RF.Panel>
-        </RF.ReactFlow>
-        {graph.connectionError && (
-          <div className="connection-error-toast">{graph.connectionError}</div>
-        )}
-        <Toolbar
-          onSave={graph.saveGraph}
-          onLoad={(json: string) => { graph.loadGraph(json); setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200); }}
-          onClear={graph.clearGraph}
-          onOrganize={graph.organizeGraph}
-          onShowAllViz={graph.showAllViz}
-          onHideAllViz={graph.hideAllViz}
-          onStepThrough={() => { setStepThroughOpen(true); tutorialEvent('step-through-opened'); }}
-          onSimulateBackprop={graph.simulateBackprop}
-          onSaveModel={graph.saveModel}
-          onLoadModel={graph.loadModel}
-          onSaveWeights={graph.saveWeights}
-          onLoadWeights={graph.loadWeights}
-          onExportPython={graph.exportPython}
-          onInfer={graph.runInfer}
-          onTest={() => { if (graph.modelTrained && !graph.modelStale) { setDashboardOpen(true); setTestFocus((n) => n + 1); } return graph.runTest(); }}
-          onTrain={() => { setDashboardOpen(true); return graph.runTrain(); }}
-          onCancel={graph.cancelTrain}
-          onShowShortcuts={() => setShortcutsOpen(true)}
-          status={graph.status}
-          modelTrained={graph.modelTrained}
-          modelStale={graph.modelStale}
-        />
-        <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
-        <LeftRail
-          savedBlocks={graph.savedBlocks}
-          onDeleteBlock={graph.deleteBlock}
-          node={selectedNode}
-          selectedCount={selectedNodeIds.length}
-          onPropertyChange={graph.updateProperty}
-          onSaveBlock={graph.saveBlock}
-          graphJson={graph.saveGraph()}
-        />
-        <TutorialPanel />
-        {/* EpochRecord (useGraph) and EpochData describe the same streamed
+                  <RF.Panel position="bottom-left" className="bottom-panel">
+                    <RF.MiniMap
+                      className="minimap-themed"
+                      pannable
+                      zoomable
+                      style={{ width: 180, height: 108, margin: 0 }}
+                      maskColor="rgba(17, 17, 27, 0.7)"
+                      nodeColor={(node) => {
+                        const inst = graph.graph.nodes.get(node.id);
+                        if (!inst) return '#45475a';
+                        const def = domain.nodeRegistry.get(inst.type);
+                        if (!def) return '#45475a';
+                        return def.color ?? getCategoryColor(def.category);
+                      }}
+                    />
+                    <RF.Controls
+                      orientation="vertical"
+                      showInteractive={false}
+                      className="controls-themed"
+                    />
+                  </RF.Panel>
+                </RF.ReactFlow>
+                {graph.connectionError && (
+                  <div className="connection-error-toast">{graph.connectionError}</div>
+                )}
+                <Toolbar
+                  onSave={graph.saveGraph}
+                  onLoad={(json: string) => {
+                    graph.loadGraph(json);
+                    setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200);
+                  }}
+                  onClear={graph.clearGraph}
+                  onOrganize={graph.organizeGraph}
+                  onShowAllViz={graph.showAllViz}
+                  onHideAllViz={graph.hideAllViz}
+                  onStepThrough={() => {
+                    setStepThroughOpen(true);
+                    tutorialEvent('step-through-opened');
+                  }}
+                  onSimulateBackprop={graph.simulateBackprop}
+                  onSaveModel={graph.saveModel}
+                  onLoadModel={graph.loadModel}
+                  onSaveWeights={graph.saveWeights}
+                  onLoadWeights={graph.loadWeights}
+                  onExportPython={graph.exportPython}
+                  onInfer={graph.runInfer}
+                  onTest={() => {
+                    if (graph.modelTrained && !graph.modelStale) {
+                      setDashboardOpen(true);
+                      setTestFocus((n) => n + 1);
+                    }
+                    return graph.runTest();
+                  }}
+                  onTrain={() => {
+                    setDashboardOpen(true);
+                    return graph.runTrain();
+                  }}
+                  onCancel={graph.cancelTrain}
+                  onShowShortcuts={() => setShortcutsOpen(true)}
+                  status={graph.status}
+                  modelTrained={graph.modelTrained}
+                  modelStale={graph.modelStale}
+                />
+                <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
+                <LeftRail
+                  savedBlocks={graph.savedBlocks}
+                  onDeleteBlock={graph.deleteBlock}
+                  node={selectedNode}
+                  selectedCount={selectedNodeIds.length}
+                  onPropertyChange={graph.updateProperty}
+                  onSaveBlock={graph.saveBlock}
+                  graphJson={graph.saveGraph()}
+                />
+                <TutorialPanel />
+                {/* EpochRecord (useGraph) and EpochData describe the same streamed
             per-epoch data; they should be unified into one shared type. */}
-        <TrainingDashboard
-          progress={graph.trainingProgress as EpochData[]}
-          isTraining={graph.trainingActive}
-          batchProgress={graph.batchProgress}
-          selectedEpoch={graph.selectedEpoch}
-          onSelectEpoch={graph.setSelectedEpoch}
-          totalSnapshotEpochs={graph.snapshotHistory.length}
-          modelSummary={modelSummary}
-          testResult={graph.testResult}
-          isTesting={graph.testing}
-          focusTestSignal={testFocus}
-          open={dashboardOpen}
-          onOpenChange={setDashboardOpen}
-        />
-        <StepThroughPanel
-          open={stepThroughOpen}
-          graphJson={graph.saveGraph()}
-          onClose={() => setStepThroughOpen(false)}
-        />
-        <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-        <ChatRail getGraphJson={() => graph.saveGraph()} graph={graph} />
-        </div>
-      </div>
-    </BackpropCtx.Provider>
-    </VizCtx.Provider>
-    </GraphActionsCtx.Provider>
+                <TrainingDashboard
+                  progress={graph.trainingProgress as EpochData[]}
+                  isTraining={graph.trainingActive}
+                  batchProgress={graph.batchProgress}
+                  selectedEpoch={graph.selectedEpoch}
+                  onSelectEpoch={graph.setSelectedEpoch}
+                  totalSnapshotEpochs={graph.snapshotHistory.length}
+                  modelSummary={modelSummary}
+                  testResult={graph.testResult}
+                  isTesting={graph.testing}
+                  focusTestSignal={testFocus}
+                  open={dashboardOpen}
+                  onOpenChange={setDashboardOpen}
+                />
+                <StepThroughPanel
+                  open={stepThroughOpen}
+                  graphJson={graph.saveGraph()}
+                  onClose={() => setStepThroughOpen(false)}
+                />
+                <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+                <ChatRail getGraphJson={() => graph.saveGraph()} graph={graph} />
+              </div>
+            </div>
+          </BackpropCtx.Provider>
+        </VizCtx.Provider>
+      </GraphActionsCtx.Provider>
     </DomainCtx.Provider>
   );
 }

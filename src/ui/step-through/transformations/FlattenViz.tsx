@@ -20,7 +20,9 @@ export function FlattenViz({ t }: { t: FlattenTransformation }) {
         <span className="tfm-flatten-calc-arrow">&rarr;</span>
         <span className="tfm-flatten-calc-after">[{product}]</span>
         {dims.length > 1 && (
-          <span className="tfm-flatten-calc-explain">{dimStr} = {product}</span>
+          <span className="tfm-flatten-calc-explain">
+            {dimStr} = {product}
+          </span>
         )}
       </div>
 
@@ -43,10 +45,10 @@ export function FlattenViz({ t }: { t: FlattenTransformation }) {
 
       {/* After: flattened pixel strip */}
       <div className="tfm-flatten-after">
-        <div className="tfm-ba-label">After &middot; {t.outputLength} values unrolled into a single row</div>
-        {t.flatPixels && t.flatPixels.length > 0 && (
-          <FlatPixelStrip pixels={t.flatPixels} />
-        )}
+        <div className="tfm-ba-label">
+          After &middot; {t.outputLength} values unrolled into a single row
+        </div>
+        {t.flatPixels && t.flatPixels.length > 0 && <FlatPixelStrip pixels={t.flatPixels} />}
       </div>
     </div>
   );
@@ -57,7 +59,7 @@ export function FlattenViz({ t }: { t: FlattenTransformation }) {
 function FlatPixelStrip({ pixels }: { pixels: number[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pixelSize = 4; // each value = 4×4 px square
-  const stripH = 32;   // strip height in px
+  const stripH = 32; // strip height in px
 
   useEffect(() => {
     const canvas = canvasRef.current;

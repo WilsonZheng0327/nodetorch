@@ -23,7 +23,9 @@ export function LinearViz({ t }: { t: LinearTransformation }) {
           <span className="tfm-linear-op">@</span>
           <div className="tfm-linear-term">
             <span className="tfm-linear-label">weights</span>
-            <span className="tfm-linear-shape tfm-linear-w-color">[{t.inputDim}, {t.outputDim}]</span>
+            <span className="tfm-linear-shape tfm-linear-w-color">
+              [{t.inputDim}, {t.outputDim}]
+            </span>
           </div>
           <span className="tfm-linear-op">+</span>
           <div className="tfm-linear-term">
@@ -36,11 +38,19 @@ export function LinearViz({ t }: { t: LinearTransformation }) {
       {/* Before/after values */}
       <div className="tfm-before-after">
         <div className="tfm-ba-pane">
-          <VectorBars values={t.inputVector} height={200} label={`Before \u00b7 ${t.inputDim} values`} />
+          <VectorBars
+            values={t.inputVector}
+            height={200}
+            label={`Before \u00b7 ${t.inputDim} values`}
+          />
         </div>
         <div className="tfm-ba-divider" />
         <div className="tfm-ba-pane">
-          <VectorBars values={t.outputVector} height={200} label={`After \u00b7 ${t.outputDim} values`} />
+          <VectorBars
+            values={t.outputVector}
+            height={200}
+            label={`After \u00b7 ${t.outputDim} values`}
+          />
         </div>
       </div>
     </div>

@@ -54,20 +54,28 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
   const isPinned = viz?.pinnedVizNodes.has(id) ?? false;
   const liveSnap = viz?.liveSnapshots[id];
   // Build snapshot from live data or fallback to lastResult metadata
-  const vizSnapshot: VizSnapshot | null = liveSnap ?? (metadata ? {
-    weights: metadata.weights,
-    gradients: metadata.gradients,
-    activations: metadata.activations,
-    batchnorm: metadata.batchnorm,
-  } : null);
+  const vizSnapshot: VizSnapshot | null =
+    liveSnap ??
+    (metadata
+      ? {
+          weights: metadata.weights,
+          gradients: metadata.gradients,
+          activations: metadata.activations,
+          batchnorm: metadata.batchnorm,
+        }
+      : null);
 
   return (
     <div
       className={`layer-node ${pulse ? 'layer-node-backprop-pulse' : ''}`}
-      style={pulse ? ({
-        '--backprop-delay': `${pulse.delayMs}ms`,
-        '--backprop-intensity': `${pulse.intensity}`,
-      } as CSSProperties) : undefined}
+      style={
+        pulse
+          ? ({
+              '--backprop-delay': `${pulse.delayMs}ms`,
+              '--backprop-intensity': `${pulse.intensity}`,
+            } as CSSProperties)
+          : undefined
+      }
     >
       <div className="layer-node-header" style={{ backgroundColor: color }}>
         {viz && (
@@ -77,14 +85,16 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
             title={isPinned ? 'Hide visualization' : 'Show visualization'}
           >
             <svg width="12" height="12" viewBox="0 0 12 12">
-              <rect x="1" y="6" width="2" height="6" fill="currentColor"/>
-              <rect x="5" y="3" width="2" height="9" fill="currentColor"/>
-              <rect x="9" y="0" width="2" height="12" fill="currentColor"/>
+              <rect x="1" y="6" width="2" height="6" fill="currentColor" />
+              <rect x="5" y="3" width="2" height="9" fill="currentColor" />
+              <rect x="9" y="0" width="2" height="12" fill="currentColor" />
             </svg>
           </button>
         )}
         <span className="layer-node-title">
-          {instance.type === 'subgraph.block' ? (instance.properties.blockName || def.displayName) : def.displayName}
+          {instance.type === 'subgraph.block'
+            ? instance.properties.blockName || def.displayName
+            : def.displayName}
         </span>
         {actions && (
           <button
@@ -106,21 +116,26 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
         ))}
 
         {/* Error message */}
-        {metadata?.error && (
-          <div className="layer-node-error">{metadata.error}</div>
-        )}
+        {metadata?.error && <div className="layer-node-error">{metadata.error}</div>}
 
         {/* Labeled shapes — e.g. "Output: [1, 64, 26, 26]", "Labels: [1]" */}
         {metadata?.shapes ? (
           metadata.shapes.map((s: { label: string; value: any[] | string }) => (
-            <div key={s.label} className={`layer-node-shape ${metadata?.error ? 'layer-node-shape-error' : ''}`}>
+            <div
+              key={s.label}
+              className={`layer-node-shape ${metadata?.error ? 'layer-node-shape-error' : ''}`}
+            >
               <span className="shape-label">{s.label}</span>
               <span>{Array.isArray(s.value) ? `[${s.value.join(', ')}]` : s.value}</span>
             </div>
           ))
         ) : metadata?.outputShape ? (
           <div className={`layer-node-shape ${metadata?.error ? 'layer-node-shape-error' : ''}`}>
-            <span>{Array.isArray(metadata.outputShape) ? `[${metadata.outputShape.join(', ')}]` : metadata.outputShape}</span>
+            <span>
+              {Array.isArray(metadata.outputShape)
+                ? `[${metadata.outputShape.join(', ')}]`
+                : metadata.outputShape}
+            </span>
           </div>
         ) : !metadata?.finalLoss && !metadata?.prediction && !metadata?.actualLabel ? (
           <div className="layer-node-shape">
@@ -130,9 +145,7 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
 
         {/* Param count from metadata */}
         {metadata?.paramCount != null && (
-          <div className="layer-node-params">
-            {metadata.paramCount.toLocaleString()} params
-          </div>
+          <div className="layer-node-params">{metadata.paramCount.toLocaleString()} params</div>
         )}
 
         {/* Training results for optimizer nodes */}
@@ -165,12 +178,18 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
 
         {/* Inference: prediction on the final layer */}
         {metadata?.prediction && (
-          <div className={`layer-node-shape ${
-            metadata.prediction.predictedClass === metadata.prediction._actualLabel
-              ? 'layer-node-shape-success' : ''
-          }`}>
+          <div
+            className={`layer-node-shape ${
+              metadata.prediction.predictedClass === metadata.prediction._actualLabel
+                ? 'layer-node-shape-success'
+                : ''
+            }`}
+          >
             <span className="shape-label">Predicted</span>
-            <span>{metadata.prediction.predictedClass} ({(metadata.prediction.confidence * 100).toFixed(1)}%)</span>
+            <span>
+              {metadata.prediction.predictedClass} (
+              {(metadata.prediction.confidence * 100).toFixed(1)}%)
+            </span>
           </div>
         )}
 
@@ -184,25 +203,25 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
 
         {/* Input ports — inside body so they center on body, not header */}
         {inputPorts.map((port, i) => (
-          <div key={port.id} className="port port-input" style={{ top: `${((i + 1) / (inputPorts.length + 1)) * 100}%` }}>
-            <RF.Handle
-              id={port.id}
-              type="target"
-              position={RF.Position.Left}
-            />
+          <div
+            key={port.id}
+            className="port port-input"
+            style={{ top: `${((i + 1) / (inputPorts.length + 1)) * 100}%` }}
+          >
+            <RF.Handle id={port.id} type="target" position={RF.Position.Left} />
             <span className="port-label port-label-left">{port.name}</span>
           </div>
         ))}
 
         {/* Output ports */}
         {outputPorts.map((port, i) => (
-          <div key={port.id} className="port port-output" style={{ top: `${((i + 1) / (outputPorts.length + 1)) * 100}%` }}>
+          <div
+            key={port.id}
+            className="port port-output"
+            style={{ top: `${((i + 1) / (outputPorts.length + 1)) * 100}%` }}
+          >
             <span className="port-label port-label-right">{port.name}</span>
-            <RF.Handle
-              id={port.id}
-              type="source"
-              position={RF.Position.Right}
-            />
+            <RF.Handle id={port.id} type="source" position={RF.Position.Right} />
           </div>
         ))}
       </div>
@@ -215,7 +234,15 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
 
 // --- Image preview (renders pixel data to a small canvas) ---
 
-function ImagePreview({ pixels, size, channels }: { pixels: number[][] | number[][][]; size: number; channels?: number }) {
+function ImagePreview({
+  pixels,
+  size,
+  channels,
+}: {
+  pixels: number[][] | number[][][];
+  size: number;
+  channels?: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -255,10 +282,7 @@ function ImagePreview({ pixels, size, channels }: { pixels: number[][] | number[
 
   return (
     <div className="layer-node-image">
-      <canvas
-        ref={canvasRef}
-        style={{ width: size, height: size, imageRendering: 'pixelated' }}
-      />
+      <canvas ref={canvasRef} style={{ width: size, height: size, imageRendering: 'pixelated' }} />
     </div>
   );
 }

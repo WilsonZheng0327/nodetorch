@@ -56,7 +56,6 @@ const SHORTCUTS: { category: string; items: Shortcut[] }[] = [
   },
 ];
 
-
 export function ShortcutsHelp({ open, onClose }: Props) {
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -73,7 +72,9 @@ export function ShortcutsHelp({ open, onClose }: Props) {
       <div className="shortcuts-modal" onClick={(e) => e.stopPropagation()}>
         <div className="shortcuts-header">
           <span>Keyboard Shortcuts</span>
-          <button className="shortcuts-close" onClick={onClose}>&times;</button>
+          <button className="shortcuts-close" onClick={onClose}>
+            &times;
+          </button>
         </div>
         <div className="shortcuts-body">
           {SHORTCUTS.map((cat) => (

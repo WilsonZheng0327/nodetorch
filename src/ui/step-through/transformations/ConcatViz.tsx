@@ -7,7 +7,8 @@ import { FeatureMapsGrid, VectorBars } from './shared';
 export function ConcatViz({ t }: { t: ConcatTransformation }) {
   const allVectors =
     t.inputs.every((i) => !i.featureMaps && !i.isConstant && !!i.vector) &&
-    !t.outputFmaps && !!t.outputVector;
+    !t.outputFmaps &&
+    !!t.outputVector;
   const barHeight = allVectors ? 160 : 100;
 
   return (
@@ -20,7 +21,11 @@ export function ConcatViz({ t }: { t: ConcatTransformation }) {
             {inp.isConstant ? (
               <div className="tfm-concat-constant">
                 <div className="tfm-concat-constant-val">{inp.constantValue?.toFixed(2)}</div>
-                <div className="tfm-concat-constant-desc">constant value<br />every pixel</div>
+                <div className="tfm-concat-constant-desc">
+                  constant value
+                  <br />
+                  every pixel
+                </div>
               </div>
             ) : (
               <>

@@ -3,8 +3,4 @@ import { sgdNode } from './sgd';
 import { adamNode } from './adam';
 import { adamwNode } from './adamw';
 
-export const optimizerNodes: NodeDefinition[] = [
-  sgdNode,
-  adamNode,
-  adamwNode,
-];
+export const optimizerNodes: NodeDefinition[] = [sgdNode, adamNode, adamwNode];

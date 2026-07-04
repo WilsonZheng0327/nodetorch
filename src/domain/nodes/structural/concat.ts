@@ -9,7 +9,8 @@ export const concatNode: NodeDefinition = {
   displayName: 'Concat',
   description: 'Concatenate tensors along a dimension',
   category: ['ML', 'Structural'],
-  learnMore: 'Joins tensors along a dimension. In U-Nets, skip connections use concatenation instead of addition \u2014 the encoder features are concatenated with the decoder features to preserve spatial detail. Use dim=1 to concatenate channels.',
+  learnMore:
+    'Joins tensors along a dimension. In U-Nets, skip connections use concatenation instead of addition \u2014 the encoder features are concatenated with the decoder features to preserve spatial detail. Use dim=1 to concatenate channels.',
 
   getProperties: () => [
     {
@@ -40,7 +41,14 @@ export const concatNode: NodeDefinition = {
         allowMultiple: false,
         optional: i >= 2, // first two required, rest optional
       })),
-      { id: 'out', name: 'Output', direction: 'output' as const, dataType: 'tensor', allowMultiple: true, optional: false },
+      {
+        id: 'out',
+        name: 'Output',
+        direction: 'output' as const,
+        dataType: 'tensor',
+        allowMultiple: true,
+        optional: false,
+      },
     ];
   },
 
@@ -60,11 +68,17 @@ export const concatNode: NodeDefinition = {
         const first = shapes[0];
         for (let i = 1; i < shapes.length; i++) {
           if (shapes[i].length !== first.length) {
-            return { outputs: {}, metadata: { error: `Rank mismatch: [${first}] vs [${shapes[i]}]` } };
+            return {
+              outputs: {},
+              metadata: { error: `Rank mismatch: [${first}] vs [${shapes[i]}]` },
+            };
           }
           for (let d = 0; d < first.length; d++) {
             if (d !== dim && shapes[i][d] !== first[d]) {
-              return { outputs: {}, metadata: { error: `Shape mismatch at dim ${d}: ${first[d]} vs ${shapes[i][d]}` } };
+              return {
+                outputs: {},
+                metadata: { error: `Shape mismatch at dim ${d}: ${first[d]} vs ${shapes[i][d]}` },
+              };
             }
           }
         }

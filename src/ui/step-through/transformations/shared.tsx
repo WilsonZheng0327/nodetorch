@@ -11,7 +11,8 @@ export function FeatureMapsGrid({ data, label }: { data: FeatureMaps; label?: st
     <div className="tfm-fmaps">
       {label && (
         <div className="tfm-fmaps-label">
-          {label} &middot; {data.showing} of {data.channels} ch &middot; {data.height}&times;{data.width}
+          {label} &middot; {data.showing} of {data.channels} ch &middot; {data.height}&times;
+          {data.width}
         </div>
       )}
       <div className="tfm-fmaps-grid">
@@ -24,7 +25,15 @@ export function FeatureMapsGrid({ data, label }: { data: FeatureMaps; label?: st
 }
 
 /** Single grayscale image canvas with a label. */
-export function GrayscaleCanvas({ pixels, label, size = 72 }: { pixels: number[][]; label?: string; size?: number }) {
+export function GrayscaleCanvas({
+  pixels,
+  label,
+  size = 72,
+}: {
+  pixels: number[][];
+  label?: string;
+  size?: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -40,14 +49,21 @@ export function GrayscaleCanvas({ pixels, label, size = 72 }: { pixels: number[]
       for (let x = 0; x < w; x++) {
         const idx = (y * w + x) * 4;
         const v = pixels[y][x];
-        data.data[idx] = v; data.data[idx + 1] = v; data.data[idx + 2] = v; data.data[idx + 3] = 255;
+        data.data[idx] = v;
+        data.data[idx + 1] = v;
+        data.data[idx + 2] = v;
+        data.data[idx + 3] = 255;
       }
     }
     ctx.putImageData(data, 0, 0);
   }, [pixels]);
   return (
     <div className="tfm-fmap-item">
-      <canvas ref={canvasRef} style={{ width: size, height: size, imageRendering: 'pixelated' }} className="tfm-fmap-canvas" />
+      <canvas
+        ref={canvasRef}
+        style={{ width: size, height: size, imageRendering: 'pixelated' }}
+        className="tfm-fmap-canvas"
+      />
       {label && <span className="tfm-fmap-label">{label}</span>}
     </div>
   );
@@ -65,7 +81,15 @@ export function Arrow({ label }: { label?: string }) {
 
 /** Bar chart with Y-axis labels and gridlines.
  *  Always includes 0 and leaves padding above 0 even if all values are negative. */
-export function VectorBars({ values, height = 180, label }: { values: number[]; height?: number; label?: string }) {
+export function VectorBars({
+  values,
+  height = 180,
+  label,
+}: {
+  values: number[];
+  height?: number;
+  label?: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -91,8 +115,8 @@ export function VectorBars({ values, height = 180, label }: { values: number[]; 
     // Always include 0, and add ~15% padding above 0 if all values are on one side
     let vmin = Math.min(dataMin, 0);
     let vmax = Math.max(dataMax, 0);
-    if (dataMax <= 0) vmax = Math.abs(vmin) * 0.15;  // all negative: show some space above 0
-    if (dataMin >= 0) vmin = -vmax * 0.08;            // all positive: show a sliver below 0
+    if (dataMax <= 0) vmax = Math.abs(vmin) * 0.15; // all negative: show some space above 0
+    if (dataMin >= 0) vmin = -vmax * 0.08; // all positive: show a sliver below 0
     const range = vmax - vmin || 1;
 
     ctx.clearRect(0, 0, W, H);
@@ -103,9 +127,12 @@ export function VectorBars({ values, height = 180, label }: { values: number[]; 
     const ticks: number[] = [];
     for (let i = 0; i <= nTicks; i++) ticks.push(vmin + i * step);
     // Snap a tick to 0 if close, or insert 0
-    const zeroIdx = ticks.findIndex(t => Math.abs(t) < step * 0.15);
+    const zeroIdx = ticks.findIndex((t) => Math.abs(t) < step * 0.15);
     if (zeroIdx >= 0) ticks[zeroIdx] = 0;
-    else { ticks.push(0); ticks.sort((a, b) => a - b); }
+    else {
+      ticks.push(0);
+      ticks.sort((a, b) => a - b);
+    }
 
     ctx.font = '12px JetBrains Mono, monospace';
     ctx.textAlign = 'right';
@@ -150,14 +177,29 @@ export function VectorBars({ values, height = 180, label }: { values: number[]; 
 }
 
 /** Histogram chart. Accepts optional yMax for syncing Y axes across paired histograms. */
-export function Histogram({ data, color = '#89b4fa', label, yMax }: {
-  data: HistogramData; color?: string; label?: string; yMax?: number;
+export function Histogram({
+  data,
+  color = '#89b4fa',
+  label,
+  yMax,
+}: {
+  data: HistogramData;
+  color?: string;
+  label?: string;
+  yMax?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !data?.bins || data.bins.length === 0 || !data.counts || data.counts.length === 0) return;
+    if (
+      !canvas ||
+      !data?.bins ||
+      data.bins.length === 0 ||
+      !data.counts ||
+      data.counts.length === 0
+    )
+      return;
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
@@ -173,7 +215,8 @@ export function Histogram({ data, color = '#89b4fa', label, yMax }: {
     if (maxCount === 0) return;
     const barWidth = w / data.counts.length;
     const vmin = data.bins[0];
-    const vmax = data.bins[data.bins.length - 1] + (data.bins.length > 1 ? data.bins[1] - data.bins[0] : 1);
+    const vmax =
+      data.bins[data.bins.length - 1] + (data.bins.length > 1 ? data.bins[1] - data.bins[0] : 1);
     const vrange = vmax - vmin || 1;
 
     ctx.clearRect(0, 0, w, h);
@@ -222,8 +265,18 @@ export function Histogram({ data, color = '#89b4fa', label, yMax }: {
 }
 
 /** 2D heatmap canvas (cool colormap). */
-export function HeatmapCanvas({ data, rows, cols, min, max }: {
-  data: number[][]; rows: number; cols: number; min: number; max: number;
+export function HeatmapCanvas({
+  data,
+  rows,
+  cols,
+  min,
+  max,
+}: {
+  data: number[][];
+  rows: number;
+  cols: number;
+  min: number;
+  max: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {

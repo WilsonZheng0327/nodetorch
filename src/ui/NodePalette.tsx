@@ -27,7 +27,8 @@ const TOP_LEVEL_ORDER = ['Data', 'ML', 'Custom Block'];
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   Data: 'Image and text datasets for training and testing.',
   ML: 'Layers, activations, losses, and optimizers.',
-  'Custom Block': 'Reusable sub-graphs built from existing nodes. Double-click to edit within the subgraph.',
+  'Custom Block':
+    'Reusable sub-graphs built from existing nodes. Double-click to edit within the subgraph.',
 };
 
 function buildCategoryTree(defs: NodeDefinition[]): Map<string, CategoryNode> {
@@ -104,7 +105,13 @@ type IsOpen = (path: string, depth: number) => boolean;
 type Toggle = (path: string, depth: number) => void;
 
 // Recursive category renderer
-function CategoryGroup({ node, depth, path, isOpen, toggle }: {
+function CategoryGroup({
+  node,
+  depth,
+  path,
+  isOpen,
+  toggle,
+}: {
   node: CategoryNode;
   depth: number;
   path: string;
@@ -127,7 +134,9 @@ function CategoryGroup({ node, depth, path, isOpen, toggle }: {
         data-depth={depth}
         onClick={() => toggle(path, depth)}
       >
-        <span className="palette-folder-icon">{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
+        <span className="palette-folder-icon">
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        </span>
         <span className="palette-folder-name">{node.name}</span>
       </button>
 
@@ -189,10 +198,11 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
   const allDefs = domain.nodeRegistry.list();
   const query = search.toLowerCase();
   const filteredDefs = query
-    ? allDefs.filter((d) =>
-        d.displayName.toLowerCase().includes(query) ||
-        d.description.toLowerCase().includes(query) ||
-        d.category.some((c) => c.toLowerCase().includes(query)),
+    ? allDefs.filter(
+        (d) =>
+          d.displayName.toLowerCase().includes(query) ||
+          d.description.toLowerCase().includes(query) ||
+          d.category.some((c) => c.toLowerCase().includes(query)),
       )
     : allDefs;
   const tree = buildCategoryTree(filteredDefs);
@@ -238,15 +248,28 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
       </div>
 
       {Array.from(tree.values()).map((node) => (
-        <CategoryGroup key={node.name} node={node} depth={0} path={node.name} isOpen={isOpen} toggle={toggle} />
+        <CategoryGroup
+          key={node.name}
+          node={node}
+          depth={0}
+          path={node.name}
+          isOpen={isOpen}
+          toggle={toggle}
+        />
       ))}
 
       {/* Saved blocks — collapsible, same chrome as a top-level category */}
       {showSaved && (
         <div className="palette-root">
           <div className="palette-divider" />
-          <button className="palette-folder palette-folder-root" data-depth={0} onClick={() => toggle(SAVED_PATH, 0)}>
-            <span className="palette-folder-icon">{savedOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
+          <button
+            className="palette-folder palette-folder-root"
+            data-depth={0}
+            onClick={() => toggle(SAVED_PATH, 0)}
+          >
+            <span className="palette-folder-icon">
+              {savedOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </span>
             <span className="palette-folder-name">Saved Blocks</span>
           </button>
           <div className="palette-folder-desc">
@@ -267,13 +290,15 @@ export function NodePalette({ savedBlocks, onDeleteBlock }: PaletteProps) {
                     <span className="palette-item-name">{block.name}</span>
                     <span className="palette-item-desc">{block.description}</span>
                   </div>
-                  {!block.preset && <button
-                    className="palette-saved-block-delete"
-                    onClick={() => onDeleteBlock(block.filename)}
-                    title="Delete block"
-                  >
-                    &times;
-                  </button>}
+                  {!block.preset && (
+                    <button
+                      className="palette-saved-block-delete"
+                      onClick={() => onDeleteBlock(block.filename)}
+                      title="Delete block"
+                    >
+                      &times;
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

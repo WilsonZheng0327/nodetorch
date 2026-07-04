@@ -9,7 +9,8 @@ import { FeatureMapsGrid, VectorBars } from './shared';
 export function AddViz({ t }: { t: AddTransformation }) {
   // When every panel is a vector chart (no feature maps), let the columns
   // fill the container width — bar charts read much better at full width.
-  const allVectors = t.inputs.every((i) => !i.featureMaps && !!i.vector) && !t.output && !!t.outputVector;
+  const allVectors =
+    t.inputs.every((i) => !i.featureMaps && !!i.vector) && !t.output && !!t.outputVector;
   const barHeight = allVectors ? 180 : 120;
 
   return (

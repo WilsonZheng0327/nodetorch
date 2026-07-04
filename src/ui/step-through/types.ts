@@ -5,9 +5,9 @@
 // --- Shared building blocks ---
 
 export interface FeatureMaps {
-  maps: number[][][];    // [channel][y][x] of 0-255 byte values
-  channels: number;      // total channels in the tensor
-  showing: number;       // how many channels returned
+  maps: number[][][]; // [channel][y][x] of 0-255 byte values
+  channels: number; // total channels in the tensor
+  showing: number; // how many channels returned
   height: number;
   width: number;
 }
@@ -34,11 +34,11 @@ export interface Conv2dTransformation {
     kernelW: number;
   } | null;
   // Interactive detail
-  rawInputs?: number[][][];     // [in_ch][H][W] actual float values per input channel
+  rawInputs?: number[][][]; // [in_ch][H][W] actual float values per input channel
   rawInputH?: number;
   rawInputW?: number;
-  rawOutputs?: number[][][];    // [filter][H][W] actual float values per filter
-  allKernels?: number[][][][];  // [filter][in_ch][kH][kW] full kernel weights
+  rawOutputs?: number[][][]; // [filter][H][W] actual float values per filter
+  allKernels?: number[][][][]; // [filter][in_ch][kH][kW] full kernel weights
   biases?: number[];
   stride?: number[];
   padding?: number[];
@@ -68,7 +68,7 @@ export interface ActivationTransformation {
   outputHist?: HistogramData;
   sharedXMin?: number;
   sharedXMax?: number;
-  negativeSlope?: number;   // LeakyReLU actual slope
+  negativeSlope?: number; // LeakyReLU actual slope
 }
 
 /** Softmax: raw logits → probabilities */
@@ -102,7 +102,7 @@ export interface PoolTransformation {
   poolSize?: number[];
   strideSize?: number[];
   paddingSize?: number[];
-  channelValues?: number[];   // per-channel scalar values when output is 1x1
+  channelValues?: number[]; // per-channel scalar values when output is 1x1
 }
 
 /** Flatten: 3D → 1D (before feature maps + after pixel strip) */
@@ -151,8 +151,8 @@ export interface DataTransformation {
   type: 'data';
   featureMaps?: FeatureMaps;
   vector?: { values: number[]; totalLength: number };
-  rawHist?: HistogramData;    // before normalization (0-1 pixel values)
-  normHist?: HistogramData;   // after normalization (centered around 0)
+  rawHist?: HistogramData; // before normalization (0-1 pixel values)
+  normHist?: HistogramData; // after normalization (centered around 0)
 }
 
 /** GAN Loss: real vs fake discriminator scores */
@@ -282,7 +282,11 @@ export interface MseLossTransformation {
 /** Add (residual): shows all inputs and the element-wise sum */
 export interface AddTransformation {
   type: 'add';
-  inputs: { label: string; featureMaps?: FeatureMaps; vector?: { values: number[]; totalLength: number } }[];
+  inputs: {
+    label: string;
+    featureMaps?: FeatureMaps;
+    vector?: { values: number[]; totalLength: number };
+  }[];
   output: FeatureMaps | null;
   outputVector?: { values: number[]; totalLength: number };
 }
@@ -291,24 +295,27 @@ export interface AddTransformation {
 export interface AttentionTransformation {
   type: 'attention';
   numHeads: number;
-  seqLen: number;          // true sequence length (before downsampling)
-  displaySize: number;     // size of the matrices actually sent (≤ seqLen)
+  seqLen: number; // true sequence length (before downsampling)
+  displaySize: number; // size of the matrices actually sent (≤ seqLen)
   causalMask: boolean;
-  perHeadWeights: number[][][];   // [head][query_pos][key_pos] at displaySize
-  avgWeights: number[][];         // [query_pos][key_pos] at displaySize
-  headEntropy?: number[];         // normalized 0-1 per head; low = focused, high = diffuse
-  tokens?: string[];              // per-position labels (only when no downsampling)
-  focusRow?: AttentionFocusRow;   // default-selected query row (last position)
+  perHeadWeights: number[][][]; // [head][query_pos][key_pos] at displaySize
+  avgWeights: number[][]; // [query_pos][key_pos] at displaySize
+  headEntropy?: number[]; // normalized 0-1 per head; low = focused, high = diffuse
+  tokens?: string[]; // per-position labels (only when no downsampling)
+  focusRow?: AttentionFocusRow; // default-selected query row (last position)
 }
 
-export interface AttentionTop { index: number; weight: number; }
+export interface AttentionTop {
+  index: number;
+  weight: number;
+}
 export interface AttentionFocusRow {
   queryIndex: number;
   queryToken: string | null;
   fullLen: number;
   shownLen: number;
-  perHeadRow: number[][];       // [head][key_pos]
-  avgRow: number[];             // [key_pos]
+  perHeadRow: number[][]; // [head][key_pos]
+  avgRow: number[]; // [key_pos]
   perHeadTop: AttentionTop[][]; // [head] -> top-K
   avgTop: AttentionTop[];
   labels: string[] | null;
@@ -386,14 +393,36 @@ export interface StepThroughResult {
 }
 
 // --- Backward (placeholder) ---
-export interface BackwardStage extends Stage { gradientShape?: number[]; }
-export interface BackwardStepThroughResult { stages: BackwardStage[]; loss: number; sample: SampleInfo; modelState?: ModelState; }
+export interface BackwardStage extends Stage {
+  gradientShape?: number[];
+}
+export interface BackwardStepThroughResult {
+  stages: BackwardStage[];
+  loss: number;
+  sample: SampleInfo;
+  modelState?: ModelState;
+}
 
 export type StepThroughMode = 'forward' | 'backward' | 'denoise' | 'generate';
 
 // --- Text generation ---
-export interface TextGenerationResult { prompt: string; generated: string; fullText: string; tokens: { char: string; prob: number }[]; }
+export interface TextGenerationResult {
+  prompt: string;
+  generated: string;
+  fullText: string;
+  tokens: { char: string; prob: number }[];
+}
 
 // --- Diffusion denoising ---
-export interface DenoiseStep { timestep: number; pixels: (number[][] | number[][][])[]; }
-export interface DenoiseStepThroughResult { steps: DenoiseStep[]; numTimesteps: number; numSamples: number; imageH: number; imageW: number; channels: number; }
+export interface DenoiseStep {
+  timestep: number;
+  pixels: (number[][] | number[][][])[];
+}
+export interface DenoiseStepThroughResult {
+  steps: DenoiseStep[];
+  numTimesteps: number;
+  numSamples: number;
+  imageH: number;
+  imageW: number;
+  channels: number;
+}

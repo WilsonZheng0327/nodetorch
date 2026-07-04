@@ -7,7 +7,8 @@ export const adamwNode: NodeDefinition = {
   description: 'AdamW optimizer (decoupled weight decay)',
   category: ['ML', 'Optimizers'],
   color: '#8b5cf6',
-  learnMore: 'A corrected version of Adam where weight decay is applied separately from the gradient update. This "decoupled" weight decay is mathematically more correct and often produces better generalization. Preferred over Adam when using weight decay regularization.',
+  learnMore:
+    'A corrected version of Adam where weight decay is applied separately from the gradient update. This "decoupled" weight decay is mathematically more correct and often produces better generalization. Preferred over Adam when using weight decay regularization.',
 
   getProperties: () => [
     {
@@ -38,7 +39,7 @@ export const adamwNode: NodeDefinition = {
       type: { kind: 'number', min: 0, step: 0.001 },
       defaultValue: 0.01,
       affects: 'execution',
-      help: 'Decoupled weight decay (better than L2 for Adam). Default 0.01 is usually good. Unlike Adam\'s weight decay, this is applied separately from the gradient update.',
+      help: "Decoupled weight decay (better than L2 for Adam). Default 0.01 is usually good. Unlike Adam's weight decay, this is applied separately from the gradient update.",
     },
     {
       id: 'epochs',
@@ -86,7 +87,7 @@ export const adamwNode: NodeDefinition = {
       type: { kind: 'number', min: 0, integer: true },
       defaultValue: 0,
       affects: 'execution',
-      help: 'Stop training if validation loss doesn\'t improve for this many epochs. 0 = disabled. Try 5-10 to prevent overfitting.',
+      help: "Stop training if validation loss doesn't improve for this many epochs. 0 = disabled. Try 5-10 to prevent overfitting.",
     },
     {
       id: 'gradClip',
@@ -99,7 +100,14 @@ export const adamwNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'loss', name: 'Loss', direction: 'input', dataType: 'scalar', allowMultiple: false, optional: false },
+    {
+      id: 'loss',
+      name: 'Loss',
+      direction: 'input',
+      dataType: 'scalar',
+      allowMultiple: false,
+      optional: false,
+    },
   ],
 
   executors: {},

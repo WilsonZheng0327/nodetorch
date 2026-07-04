@@ -5,7 +5,7 @@ import { FeatureMapsGrid } from './shared';
 
 export function VaeLossViz({ t }: { t: VaeLossTransformation }) {
   const beta = t.beta ?? 1.0;
-  const computed = (t.reconLoss != null && t.klLoss != null) ? t.reconLoss + beta * t.klLoss : null;
+  const computed = t.reconLoss != null && t.klLoss != null ? t.reconLoss + beta * t.klLoss : null;
 
   return (
     <div className="tfm-vae-loss">
@@ -26,7 +26,9 @@ export function VaeLossViz({ t }: { t: VaeLossTransformation }) {
 
       {/* Loss breakdown */}
       <div className="tfm-section">
-        <div className="tfm-section-title">Loss = MSE(recon, original) + {beta !== 1 ? `${beta} \u00d7 ` : ''}KL(mean, logvar)</div>
+        <div className="tfm-section-title">
+          Loss = MSE(recon, original) + {beta !== 1 ? `${beta} \u00d7 ` : ''}KL(mean, logvar)
+        </div>
         <div className="tfm-vae-loss-breakdown">
           {t.reconLoss != null && (
             <div className="tfm-vae-loss-item">
@@ -36,7 +38,9 @@ export function VaeLossViz({ t }: { t: VaeLossTransformation }) {
           )}
           {t.klLoss != null && (
             <div className="tfm-vae-loss-item">
-              <span className="tfm-vae-loss-name">KL Divergence{beta !== 1 ? ` (\u00d7${beta})` : ''}</span>
+              <span className="tfm-vae-loss-name">
+                KL Divergence{beta !== 1 ? ` (\u00d7${beta})` : ''}
+              </span>
               <span className="tfm-vae-loss-value">{(beta * t.klLoss).toFixed(4)}</span>
               {beta !== 1 && <span className="tfm-vae-loss-raw">(raw: {t.klLoss.toFixed(4)})</span>}
             </div>
@@ -49,7 +53,8 @@ export function VaeLossViz({ t }: { t: VaeLossTransformation }) {
           )}
           {computed != null && t.totalLoss != null && Math.abs(computed - t.totalLoss) > 0.01 && (
             <div className="tfm-note">
-              Note: computed {computed.toFixed(4)} vs actual {t.totalLoss.toFixed(4)} — small difference from numerical precision
+              Note: computed {computed.toFixed(4)} vs actual {t.totalLoss.toFixed(4)} — small
+              difference from numerical precision
             </div>
           )}
         </div>

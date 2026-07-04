@@ -97,7 +97,10 @@ export function LeftRail({
     return (
       <button
         className="left-rail-handle"
-        onClick={() => { setCollapsed(false); if (tab === 'nodes') tutorialEvent('palette-opened'); }}
+        onClick={() => {
+          setCollapsed(false);
+          if (tab === 'nodes') tutorialEvent('palette-opened');
+        }}
         title="Expand panel (1)"
       >
         <Blocks size={15} />

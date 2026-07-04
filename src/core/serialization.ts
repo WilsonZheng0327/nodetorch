@@ -9,13 +9,7 @@
 // `deserializeGraph` so a malformed, outdated, or unknown-node file fails with a
 // readable message instead of throwing half-way through `createNode`/`addEdge`.
 
-import {
-  type Graph,
-  createGraph,
-  createNode,
-  addNode,
-  addEdge,
-} from './graph';
+import { type Graph, createGraph, createNode, addNode, addEdge } from './graph';
 
 /** A node as stored in a SerializedGraph (positions + properties, no runtime state). */
 export interface SerializedNode {
@@ -31,7 +25,11 @@ export interface SerializedGraphData {
   id: string;
   name: string;
   nodes: SerializedNode[];
-  edges: { id: string; source: { nodeId: string; portId: string }; target: { nodeId: string; portId: string } }[];
+  edges: {
+    id: string;
+    source: { nodeId: string; portId: string };
+    target: { nodeId: string; portId: string };
+  }[];
 }
 
 /** The versioned top-level wrapper actually written to files / sent to the backend. */
@@ -143,14 +141,17 @@ function validateGraphData(
     if (ids.has(n.id)) issues.push(`${path}: duplicate node id "${n.id}".`);
     ids.add(n.id);
     if (isKnownType && !isKnownType(n.type)) {
-      issues.push(`${path}: unknown node type "${n.type}" (node "${n.id}") — it may come from a newer version.`);
+      issues.push(
+        `${path}: unknown node type "${n.type}" (node "${n.id}") — it may come from a newer version.`,
+      );
     }
     if (n.subgraph) validateGraphData(n.subgraph, isKnownType, issues, `${path} › ${n.id}`);
   }
 
   const seen = new Set<string>();
   for (const e of g.edges ?? []) {
-    const s = e?.source, t = e?.target;
+    const s = e?.source,
+      t = e?.target;
     if (!s || !t) {
       issues.push(`${path}: an edge is missing its source or target.`);
       continue;

@@ -13,7 +13,7 @@ import type { AttentionTransformation, AttentionFocusRow } from '../types';
 
 const MIN_CANVAS = 96;
 const INLINE_MAX_CANVAS = 480;
-const MAX_TOKEN_LABEL_LEN = 8;   // truncate token strings beyond this with "…"
+const MAX_TOKEN_LABEL_LEN = 8; // truncate token strings beyond this with "…"
 
 export function AttentionViz({ t }: { t: AttentionTransformation }) {
   const [selected, setSelected] = useState<number>(0);
@@ -25,7 +25,10 @@ export function AttentionViz({ t }: { t: AttentionTransformation }) {
   useEffect(() => {
     if (!expanded) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); setExpanded(false); }
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setExpanded(false);
+      }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
@@ -44,11 +47,17 @@ export function AttentionViz({ t }: { t: AttentionTransformation }) {
             key={i}
             className={`tfm-attn-tab ${selected === i ? 'tfm-attn-tab-active' : ''}`}
             onClick={() => setSelected(i)}
-            title={ent != null ? `Head ${i + 1} — focus score ${ent.toFixed(2)} (${entLabel?.label})` : `Head ${i + 1}`}
+            title={
+              ent != null
+                ? `Head ${i + 1} — focus score ${ent.toFixed(2)} (${entLabel?.label})`
+                : `Head ${i + 1}`
+            }
           >
             Head {i + 1}
             {entLabel != null && (
-              <span className={`tfm-attn-entropy tfm-attn-entropy-${entLabel.cls}`}>{entLabel.label}</span>
+              <span className={`tfm-attn-entropy tfm-attn-entropy-${entLabel.cls}`}>
+                {entLabel.label}
+              </span>
             )}
           </button>
         );
@@ -57,7 +66,9 @@ export function AttentionViz({ t }: { t: AttentionTransformation }) {
         className="tfm-attn-help"
         onClick={() => setHelpOpen((o) => !o)}
         title="What does focus mean?"
-      >?</button>
+      >
+        ?
+      </button>
 
       <div className="tfm-attn-meta">
         {t.numHeads} head{t.numHeads > 1 ? 's' : ''} · {t.seqLen} pos
@@ -66,7 +77,11 @@ export function AttentionViz({ t }: { t: AttentionTransformation }) {
       </div>
 
       {!expanded && (
-        <button className="tfm-attn-expand" onClick={() => setExpanded(true)} title="Expand to full screen">
+        <button
+          className="tfm-attn-expand"
+          onClick={() => setExpanded(true)}
+          title="Expand to full screen"
+        >
           ⛶ Expand
         </button>
       )}
@@ -75,11 +90,21 @@ export function AttentionViz({ t }: { t: AttentionTransformation }) {
 
   const helpBlurb = helpOpen && (
     <div className="tfm-attn-help-blurb">
-      <b>Focus score</b> = how concentrated each head's attention is, averaged across query positions.
+      <b>Focus score</b> = how concentrated each head's attention is, averaged across query
+      positions.
       <ul>
-        <li><span className="tfm-attn-help-pill tfm-attn-entropy-sharp">focused</span> — attends to a few positions (often nearby tokens or specific syntactic roles)</li>
-        <li><span className="tfm-attn-help-pill tfm-attn-entropy-mid">mixed</span> — combines a handful of positions</li>
-        <li><span className="tfm-attn-help-pill tfm-attn-entropy-diffuse">diffuse</span> — spreads attention broadly, close to uniform</li>
+        <li>
+          <span className="tfm-attn-help-pill tfm-attn-entropy-sharp">focused</span> — attends to a
+          few positions (often nearby tokens or specific syntactic roles)
+        </li>
+        <li>
+          <span className="tfm-attn-help-pill tfm-attn-entropy-mid">mixed</span> — combines a
+          handful of positions
+        </li>
+        <li>
+          <span className="tfm-attn-help-pill tfm-attn-entropy-diffuse">diffuse</span> — spreads
+          attention broadly, close to uniform
+        </li>
       </ul>
       Computed as normalized Shannon entropy of each row (0 = single position, 1 = uniform).
     </div>
@@ -96,7 +121,10 @@ export function AttentionViz({ t }: { t: AttentionTransformation }) {
             matrix={matrix}
             tokens={t.tokens}
             focusIdx={focusIdx}
-            onPickRow={(idx) => { setFocusIdx(idx); setExpanded(true); }}
+            onPickRow={(idx) => {
+              setFocusIdx(idx);
+              setExpanded(true);
+            }}
             maxCanvas={INLINE_MAX_CANVAS}
           />
           <AttentionLegend />
@@ -119,7 +147,9 @@ export function AttentionViz({ t }: { t: AttentionTransformation }) {
             <span className="tfm-attention-modal-title">
               Attention · Head {selected + 1}
               {t.headEntropy?.[selected] != null && (
-                <span className={`tfm-attn-entropy tfm-attn-entropy-${entropyLabel(t.headEntropy[selected]).cls}`}>
+                <span
+                  className={`tfm-attn-entropy tfm-attn-entropy-${entropyLabel(t.headEntropy[selected]).cls}`}
+                >
                   {entropyLabel(t.headEntropy[selected]).label}
                 </span>
               )}
@@ -135,7 +165,13 @@ export function AttentionViz({ t }: { t: AttentionTransformation }) {
                 </button>
               ))}
             </div>
-            <button className="tfm-attention-modal-close" onClick={() => setExpanded(false)} title="Close (Esc)">×</button>
+            <button
+              className="tfm-attention-modal-close"
+              onClick={() => setExpanded(false)}
+              title="Close (Esc)"
+            >
+              ×
+            </button>
           </div>
 
           <div className="tfm-attention-modal-body">
@@ -180,7 +216,13 @@ interface HeatmapProps {
 function AttentionHeatmap({ matrix, tokens, focusIdx, onPickRow, maxCanvas }: HeatmapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const size = matrix.length;
-  const [hover, setHover] = useState<{ r: number; c: number; v: number; x: number; y: number } | null>(null);
+  const [hover, setHover] = useState<{
+    r: number;
+    c: number;
+    v: number;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const cell = useMemo(() => {
     if (size === 0) return 4;
@@ -197,27 +239,40 @@ function AttentionHeatmap({ matrix, tokens, focusIdx, onPickRow, maxCanvas }: He
     return m > 0 ? m : 1;
   }, [matrix]);
 
-  useEffect(() => paintHeatmap(canvasRef.current, matrix, cell, size, globalMax, focusIdx),
-    [matrix, cell, size, globalMax, focusIdx]);
+  useEffect(
+    () => paintHeatmap(canvasRef.current, matrix, cell, size, globalMax, focusIdx),
+    [matrix, cell, size, globalMax, focusIdx],
+  );
 
-  const onMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const c = Math.floor((x / rect.width) * size);
-    const r = Math.floor((y / rect.height) * size);
-    if (r < 0 || r >= size || c < 0 || c >= size) { setHover(null); return; }
-    setHover({ r, c, v: matrix[r][c], x, y });
-  }, [matrix, size]);
+  const onMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const c = Math.floor((x / rect.width) * size);
+      const r = Math.floor((y / rect.height) * size);
+      if (r < 0 || r >= size || c < 0 || c >= size) {
+        setHover(null);
+        return;
+      }
+      setHover({ r, c, v: matrix[r][c], x, y });
+    },
+    [matrix, size],
+  );
 
   const onLeave = () => setHover(null);
-  const onClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const r = Math.floor(((e.clientY - rect.top) / rect.height) * size);
-    if (r >= 0 && r < size) onPickRow(r);
-  }, [size, onPickRow]);
+  const onClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const r = Math.floor(((e.clientY - rect.top) / rect.height) * size);
+      if (r >= 0 && r < size) onPickRow(r);
+    },
+    [size, onPickRow],
+  );
 
   const renderScale = canvasSize / (size * cell);
 
@@ -228,12 +283,19 @@ function AttentionHeatmap({ matrix, tokens, focusIdx, onPickRow, maxCanvas }: He
         <canvas
           ref={canvasRef}
           className="tfm-attention-canvas"
-          style={{ width: canvasSize, height: canvasSize, imageRendering: 'pixelated', cursor: 'crosshair' }}
+          style={{
+            width: canvasSize,
+            height: canvasSize,
+            imageRendering: 'pixelated',
+            cursor: 'crosshair',
+          }}
           onMouseMove={onMove}
           onMouseLeave={onLeave}
           onClick={onClick}
         />
-        {showLabels && tokens && <TokenAxes tokens={tokens} cell={cell * renderScale} canvasSize={canvasSize} />}
+        {showLabels && tokens && (
+          <TokenAxes tokens={tokens} cell={cell * renderScale} canvasSize={canvasSize} />
+        )}
         {hover && <HoverTooltip hover={hover} tokens={tokens} canvasSize={canvasSize} />}
       </div>
       <div className="tfm-attention-axis-label tfm-attention-axis-x">Key →</div>
@@ -248,7 +310,13 @@ function ExpandedHeatmap({ matrix, tokens, focusIdx, onPickRow }: Omit<HeatmapPr
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const size = matrix.length;
-  const [hover, setHover] = useState<{ r: number; c: number; v: number; x: number; y: number } | null>(null);
+  const [hover, setHover] = useState<{
+    r: number;
+    c: number;
+    v: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [viewport, setViewport] = useState({ w: 800, h: 600 });
 
   useEffect(() => {
@@ -291,26 +359,39 @@ function ExpandedHeatmap({ matrix, tokens, focusIdx, onPickRow }: Omit<HeatmapPr
     return m > 0 ? m : 1;
   }, [matrix]);
 
-  useEffect(() => paintHeatmap(canvasRef.current, matrix, cell, size, globalMax, focusIdx),
-    [matrix, cell, size, globalMax, focusIdx]);
+  useEffect(
+    () => paintHeatmap(canvasRef.current, matrix, cell, size, globalMax, focusIdx),
+    [matrix, cell, size, globalMax, focusIdx],
+  );
 
-  const onMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const c = Math.floor((x / rect.width) * size);
-    const r = Math.floor((y / rect.height) * size);
-    if (r < 0 || r >= size || c < 0 || c >= size) { setHover(null); return; }
-    setHover({ r, c, v: matrix[r][c], x, y });
-  }, [matrix, size]);
+  const onMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const c = Math.floor((x / rect.width) * size);
+      const r = Math.floor((y / rect.height) * size);
+      if (r < 0 || r >= size || c < 0 || c >= size) {
+        setHover(null);
+        return;
+      }
+      setHover({ r, c, v: matrix[r][c], x, y });
+    },
+    [matrix, size],
+  );
 
-  const onClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const r = Math.floor(((e.clientY - rect.top) / rect.height) * size);
-    if (r >= 0 && r < size) onPickRow(r);
-  }, [size, onPickRow]);
+  const onClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const r = Math.floor(((e.clientY - rect.top) / rect.height) * size);
+      if (r >= 0 && r < size) onPickRow(r);
+    },
+    [size, onPickRow],
+  );
 
   return (
     <div className="tfm-attention-expanded-wrap" ref={wrapRef}>
@@ -320,12 +401,19 @@ function ExpandedHeatmap({ matrix, tokens, focusIdx, onPickRow }: Omit<HeatmapPr
           <canvas
             ref={canvasRef}
             className="tfm-attention-canvas"
-            style={{ width: canvasSize, height: canvasSize, imageRendering: 'pixelated', cursor: 'crosshair' }}
+            style={{
+              width: canvasSize,
+              height: canvasSize,
+              imageRendering: 'pixelated',
+              cursor: 'crosshair',
+            }}
             onMouseMove={onMove}
             onMouseLeave={() => setHover(null)}
             onClick={onClick}
           />
-          {showLabels && tokens && <TokenAxes tokens={tokens} cell={cell} canvasSize={canvasSize} />}
+          {showLabels && tokens && (
+            <TokenAxes tokens={tokens} cell={cell} canvasSize={canvasSize} />
+          )}
           {hover && <HoverTooltip hover={hover} tokens={tokens} canvasSize={canvasSize} />}
         </div>
         <div className="tfm-attention-axis-label tfm-attention-axis-x">Key →</div>
@@ -347,7 +435,8 @@ function paintHeatmap(
   if (!canvas || size === 0) return;
   canvas.width = size * cell;
   canvas.height = size * cell;
-  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
 
   const img = ctx.createImageData(size * cell, size * cell);
   for (let r = 0; r < size; r++) {
@@ -375,7 +464,15 @@ function paintHeatmap(
   }
 }
 
-function TokenAxes({ tokens, cell, canvasSize }: { tokens: string[]; cell: number; canvasSize: number }) {
+function TokenAxes({
+  tokens,
+  cell,
+  canvasSize,
+}: {
+  tokens: string[];
+  cell: number;
+  canvasSize: number;
+}) {
   return (
     <>
       <div className="tfm-attention-tokens tfm-attention-tokens-x" style={{ width: canvasSize }}>
@@ -406,7 +503,11 @@ function TokenAxes({ tokens, cell, canvasSize }: { tokens: string[]; cell: numbe
   );
 }
 
-function HoverTooltip({ hover, tokens, canvasSize }: {
+function HoverTooltip({
+  hover,
+  tokens,
+  canvasSize,
+}: {
   hover: { r: number; c: number; v: number; x: number; y: number };
   tokens?: string[];
   canvasSize: number;
@@ -416,8 +517,14 @@ function HoverTooltip({ hover, tokens, canvasSize }: {
       className="tfm-attention-tooltip"
       style={{ left: Math.min(hover.x + 12, canvasSize - 180), top: Math.max(hover.y - 48, 0) }}
     >
-      <div>q={hover.r}{tokens?.[hover.r] != null ? ` · ${displayTokenInline(tokens[hover.r])}` : ''}</div>
-      <div>k={hover.c}{tokens?.[hover.c] != null ? ` · ${displayTokenInline(tokens[hover.c])}` : ''}</div>
+      <div>
+        q={hover.r}
+        {tokens?.[hover.r] != null ? ` · ${displayTokenInline(tokens[hover.r])}` : ''}
+      </div>
+      <div>
+        k={hover.c}
+        {tokens?.[hover.c] != null ? ` · ${displayTokenInline(tokens[hover.c])}` : ''}
+      </div>
       <div className="tfm-attention-tooltip-w">{(hover.v * 100).toFixed(1)}%</div>
     </div>
   );
@@ -435,7 +542,10 @@ function AttentionLegend() {
   return (
     <div className="tfm-attention-legend">
       <div className="tfm-attention-legend-label">Low</div>
-      <div className="tfm-attention-legend-bar" style={{ background: `linear-gradient(to right, ${stops})` }} />
+      <div
+        className="tfm-attention-legend-bar"
+        style={{ background: `linear-gradient(to right, ${stops})` }}
+      />
       <div className="tfm-attention-legend-label">High</div>
     </div>
   );
@@ -446,13 +556,20 @@ function AttentionLegend() {
 interface FocusedRowProps {
   focus: AttentionFocusRow;
   selectedHead: number;
-  seqLen: number;          // true sequence length
-  displaySize: number;     // heatmap row count
+  seqLen: number; // true sequence length
+  displaySize: number; // heatmap row count
   clickedDisplayRow: number;
-  allWeights: number[][];  // [head's heatmap matrix at displaySize×displaySize]
+  allWeights: number[][]; // [head's heatmap matrix at displaySize×displaySize]
 }
 
-function FocusedRowView({ focus, selectedHead, seqLen, displaySize, clickedDisplayRow, allWeights }: FocusedRowProps) {
+function FocusedRowView({
+  focus,
+  selectedHead,
+  seqLen,
+  displaySize,
+  clickedDisplayRow,
+  allWeights,
+}: FocusedRowProps) {
   // Pick the right data source for the clicked row:
   //   - if it's the default focus row (last position by default), the backend ships full-resolution per-head data
   //   - otherwise, use the heatmap matrix row. When seqLen === displaySize, that row is already full-resolution.
@@ -476,12 +593,14 @@ function FocusedRowView({ focus, selectedHead, seqLen, displaySize, clickedDispl
   }
 
   const maxVal = Math.max(0.0001, ...row);
-  const clickedToken = labels && labels[clickedDisplayRow] != null ? labels[clickedDisplayRow] : null;
-  const queryLabel = isDefaultFocus && focus.queryToken != null
-    ? `${focus.queryIndex}: ${displayTokenInline(focus.queryToken)}`
-    : clickedToken != null
-      ? `${clickedDisplayRow}: ${displayTokenInline(clickedToken)}`
-      : `${clickedDisplayRow}`;
+  const clickedToken =
+    labels && labels[clickedDisplayRow] != null ? labels[clickedDisplayRow] : null;
+  const queryLabel =
+    isDefaultFocus && focus.queryToken != null
+      ? `${focus.queryIndex}: ${displayTokenInline(focus.queryToken)}`
+      : clickedToken != null
+        ? `${clickedDisplayRow}: ${displayTokenInline(clickedToken)}`
+        : `${clickedDisplayRow}`;
 
   return (
     <div className="tfm-attention-focus">
@@ -489,13 +608,20 @@ function FocusedRowView({ focus, selectedHead, seqLen, displaySize, clickedDispl
         <div className="tfm-attention-focus-title">
           Query position <b>{queryLabel}</b>
           {!fullResolution && (
-            <span className="tfm-attention-focus-note"> · showing downsampled row ({row.length} cells)</span>
+            <span className="tfm-attention-focus-note">
+              {' '}
+              · showing downsampled row ({row.length} cells)
+            </span>
           )}
         </div>
         <div className="tfm-attention-focus-top">
           <span className="tfm-attention-focus-top-label">Top attended:</span>
           {top.map((t, i) => (
-            <span key={i} className="tfm-attention-focus-top-chip" title={`weight ${(t.weight * 100).toFixed(2)}%`}>
+            <span
+              key={i}
+              className="tfm-attention-focus-top-chip"
+              title={`weight ${(t.weight * 100).toFixed(2)}%`}
+            >
               {labels && labels[t.index] != null
                 ? `${t.index}:${displayToken(labels[t.index])}`
                 : `pos ${t.index}`}
@@ -523,7 +649,11 @@ function FocusedRowView({ focus, selectedHead, seqLen, displaySize, clickedDispl
       {labels && (
         <div className="tfm-attention-focus-labels">
           {labels.map((tok, i) => (
-            <span key={i} className="tfm-attention-focus-label" title={`pos ${i}: ${JSON.stringify(tok)}`}>
+            <span
+              key={i}
+              className="tfm-attention-focus-label"
+              title={`pos ${i}: ${JSON.stringify(tok)}`}
+            >
               {displayToken(tok)}
             </span>
           ))}
@@ -536,7 +666,8 @@ function FocusedRowView({ focus, selectedHead, seqLen, displaySize, clickedDispl
 // ---- Helpers ----
 
 function topKFromRow(row: number[], k: number): { index: number; weight: number }[] {
-  return row.map((w, i) => ({ index: i, weight: w }))
+  return row
+    .map((w, i) => ({ index: i, weight: w }))
     .sort((a, b) => b.weight - a.weight)
     .slice(0, k);
 }

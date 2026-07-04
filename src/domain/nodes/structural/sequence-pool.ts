@@ -6,7 +6,8 @@ export const sequencePoolNode: NodeDefinition = {
   displayName: 'SeqPool',
   description: 'Pool over sequence dimension: [B, seq, H] \u2192 [B, H]',
   category: ['ML', 'Structural'],
-  learnMore: 'Reduces a sequence to a single vector. "last" takes the final timestep (captures the full sequence context in LSTMs). "mean" averages all timesteps (gives equal weight to each position). "max" takes the element-wise maximum across timesteps.',
+  learnMore:
+    'Reduces a sequence to a single vector. "last" takes the final timestep (captures the full sequence context in LSTMs). "mean" averages all timesteps (gives equal weight to each position). "max" takes the element-wise maximum across timesteps.',
 
   getProperties: () => [
     {
@@ -27,8 +28,22 @@ export const sequencePoolNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

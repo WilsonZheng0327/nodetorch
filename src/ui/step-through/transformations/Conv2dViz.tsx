@@ -31,11 +31,16 @@ export function Conv2dViz({ t }: { t: Conv2dTransformation }) {
       {t.kernels && (
         <div className="tfm-section">
           <div className="tfm-section-title">
-            Filters &middot; {t.kernels.showing} of {t.kernels.totalFilters} &middot; {kH}&times;{kW}
+            Filters &middot; {t.kernels.showing} of {t.kernels.totalFilters} &middot; {kH}&times;
+            {kW}
           </div>
           <div className="tfm-kernel-grid">
             {t.kernels.data.map((k, i) => (
-              <div key={i} className={`tfm-kernel-selectable ${i === selectedFilter ? 'tfm-kernel-selected' : ''}`} onClick={() => setSelectedFilter(i)}>
+              <div
+                key={i}
+                className={`tfm-kernel-selectable ${i === selectedFilter ? 'tfm-kernel-selected' : ''}`}
+                onClick={() => setSelectedFilter(i)}
+              >
                 <GrayscaleCanvas pixels={k} size={40} />
                 <span className="tfm-fmap-label">{i}</span>
               </div>
@@ -45,35 +50,51 @@ export function Conv2dViz({ t }: { t: Conv2dTransformation }) {
       )}
 
       {/* Interactive step-through */}
-      {hasInteractive && (
-        isTranspose ? (
+      {hasInteractive &&
+        (isTranspose ? (
           <TransposeConvInteractive
-            rawInputs={t.rawInputs!} allKernels={t.allKernels!}
+            rawInputs={t.rawInputs!}
+            allKernels={t.allKernels!}
             rawOutput={t.rawOutputs![selectedFilter] ?? t.rawOutputs![0]}
-            inH={inH} inW={inW} outH={outH} outW={outW}
-            kH={kH} kW={kW} stride={stride} padding={padding}
-            selectedFilter={selectedFilter} selectedInCh={selectedInCh}
+            inH={inH}
+            inW={inW}
+            outH={outH}
+            outW={outW}
+            kH={kH}
+            kW={kW}
+            stride={stride}
+            padding={padding}
+            selectedFilter={selectedFilter}
+            selectedInCh={selectedInCh}
             numInCh={numInCh}
-            posR={pos.r} posC={pos.c}
+            posR={pos.r}
+            posC={pos.c}
             onMove={(r, c) => setPos({ r, c })}
             onSelectInCh={setSelectedInCh}
           />
         ) : (
           <ConvInteractive
-            rawInputs={t.rawInputs!} allKernels={t.allKernels!}
+            rawInputs={t.rawInputs!}
+            allKernels={t.allKernels!}
             rawOutput={t.rawOutputs![selectedFilter] ?? t.rawOutputs![0]}
             bias={t.biases?.[selectedFilter] ?? 0}
-            inH={inH} inW={inW} outH={outH} outW={outW}
-            kH={kH} kW={kW} stride={stride} padding={padding}
-            selectedFilter={selectedFilter} selectedInCh={selectedInCh}
+            inH={inH}
+            inW={inW}
+            outH={outH}
+            outW={outW}
+            kH={kH}
+            kW={kW}
+            stride={stride}
+            padding={padding}
+            selectedFilter={selectedFilter}
+            selectedInCh={selectedInCh}
             numInCh={numInCh}
             posR={Math.min(pos.r, Math.max(0, outH - 1))}
             posC={Math.min(pos.c, Math.max(0, outW - 1))}
             onMove={(r, c) => setPos({ r, c })}
             onSelectInCh={setSelectedInCh}
           />
-        )
-      )}
+        ))}
     </div>
   );
 }
@@ -82,14 +103,46 @@ export function Conv2dViz({ t }: { t: Conv2dTransformation }) {
 // Regular Conv2d interactive
 // ============================================================================
 
-function ConvInteractive({ rawInputs, allKernels, rawOutput, bias, inH, inW, outH, outW, kH, kW, stride, padding,
-  selectedFilter, selectedInCh, numInCh, posR, posC, onMove, onSelectInCh }: {
-  rawInputs: number[][][]; allKernels: number[][][][]; rawOutput: number[][];
-  bias: number; inH: number; inW: number; outH: number; outW: number;
-  kH: number; kW: number; stride: number[]; padding: number[];
-  selectedFilter: number; selectedInCh: number; numInCh: number;
-  posR: number; posC: number;
-  onMove: (r: number, c: number) => void; onSelectInCh: (ch: number) => void;
+function ConvInteractive({
+  rawInputs,
+  allKernels,
+  rawOutput,
+  bias,
+  inH,
+  inW,
+  outH,
+  outW,
+  kH,
+  kW,
+  stride,
+  padding,
+  selectedFilter,
+  selectedInCh,
+  numInCh,
+  posR,
+  posC,
+  onMove,
+  onSelectInCh,
+}: {
+  rawInputs: number[][][];
+  allKernels: number[][][][];
+  rawOutput: number[][];
+  bias: number;
+  inH: number;
+  inW: number;
+  outH: number;
+  outW: number;
+  kH: number;
+  kW: number;
+  stride: number[];
+  padding: number[];
+  selectedFilter: number;
+  selectedInCh: number;
+  numInCh: number;
+  posR: number;
+  posC: number;
+  onMove: (r: number, c: number) => void;
+  onSelectInCh: (ch: number) => void;
 }) {
   const inR = posR * stride[0] - padding[0];
   const inC = posC * stride[1] - padding[1];
@@ -102,11 +155,13 @@ function ConvInteractive({ rawInputs, allKernels, rawOutput, bias, inH, inW, out
     let chSum = 0;
     const chInput = rawInputs[ch] ?? rawInputs[0];
     const chKernel = allKernels[selectedFilter]?.[ch] ?? allKernels[0]?.[0];
-    for (let kr = 0; kr < kH; kr++) for (let kc = 0; kc < kW; kc++) {
-      const ir = inR + kr, ic = inC + kc;
-      const inVal = (ir >= 0 && ir < inH && ic >= 0 && ic < inW) ? (chInput[ir]?.[ic] ?? 0) : 0;
-      chSum += inVal * (chKernel?.[kr]?.[kc] ?? 0);
-    }
+    for (let kr = 0; kr < kH; kr++)
+      for (let kc = 0; kc < kW; kc++) {
+        const ir = inR + kr,
+          ic = inC + kc;
+        const inVal = ir >= 0 && ir < inH && ic >= 0 && ic < inW ? (chInput[ir]?.[ic] ?? 0) : 0;
+        chSum += inVal * (chKernel?.[kr]?.[kc] ?? 0);
+      }
     perChannelSums.push(chSum);
   }
   const totalSum = perChannelSums.reduce((a, b) => a + b, 0);
@@ -114,40 +169,98 @@ function ConvInteractive({ rawInputs, allKernels, rawOutput, bias, inH, inW, out
 
   // Current channel patch
   const patchValues: { inVal: number; kVal: number }[] = [];
-  for (let kr = 0; kr < kH; kr++) for (let kc = 0; kc < kW; kc++) {
-    const ir = inR + kr, ic = inC + kc;
-    const inVal = (ir >= 0 && ir < inH && ic >= 0 && ic < inW) ? (rawInput[ir]?.[ic] ?? 0) : 0;
-    patchValues.push({ inVal, kVal: kernel?.[kr]?.[kc] ?? 0 });
-  }
+  for (let kr = 0; kr < kH; kr++)
+    for (let kc = 0; kc < kW; kc++) {
+      const ir = inR + kr,
+        ic = inC + kc;
+      const inVal = ir >= 0 && ir < inH && ic >= 0 && ic < inW ? (rawInput[ir]?.[ic] ?? 0) : 0;
+      patchValues.push({ inVal, kVal: kernel?.[kr]?.[kc] ?? 0 });
+    }
   const currentChSum = perChannelSums[selectedInCh] ?? 0;
 
   return (
     <div className="tfm-section">
-      <div className="tfm-section-title">Step Through &middot; Filter {selectedFilter} &middot; output[{posR}, {posC}]</div>
-      <div className="tfm-conv-formula">
-        output[{posR},{posC}] = {numInCh > 1 && <>&Sigma;<sub>ch</sub> </>}(input * kernel){bias !== 0 ? ' + bias' : ''} = <strong>{fmtV(outputVal)}</strong>
+      <div className="tfm-section-title">
+        Step Through &middot; Filter {selectedFilter} &middot; output[{posR}, {posC}]
       </div>
-      {numInCh > 1 && <ChannelSelector numInCh={numInCh} selectedInCh={selectedInCh} onSelectInCh={onSelectInCh} />}
+      <div className="tfm-conv-formula">
+        output[{posR},{posC}] ={' '}
+        {numInCh > 1 && (
+          <>
+            &Sigma;<sub>ch</sub>{' '}
+          </>
+        )}
+        (input * kernel){bias !== 0 ? ' + bias' : ''} = <strong>{fmtV(outputVal)}</strong>
+      </div>
+      {numInCh > 1 && (
+        <ChannelSelector
+          numInCh={numInCh}
+          selectedInCh={selectedInCh}
+          onSelectInCh={onSelectInCh}
+        />
+      )}
       <div className="tfm-conv-step">
         <div className="tfm-conv-step-panel">
           <div className="tfm-conv-step-label">Input ch {selectedInCh}</div>
-          <GridWithOverlay rawData={rawInput} rows={inH} cols={inW} overlayR={inR} overlayC={inC} overlayH={kH} overlayW={kW} overlayColor="#f9e2af"
-            onClick={(r, c) => { const outR = Math.floor((r + padding[0]) / stride[0]); const outC = Math.floor((c + padding[1]) / stride[1]); onMove(Math.max(0, Math.min(outH - 1, outR)), Math.max(0, Math.min(outW - 1, outC))); }} />
+          <GridWithOverlay
+            rawData={rawInput}
+            rows={inH}
+            cols={inW}
+            overlayR={inR}
+            overlayC={inC}
+            overlayH={kH}
+            overlayW={kW}
+            overlayColor="#f9e2af"
+            onClick={(r, c) => {
+              const outR = Math.floor((r + padding[0]) / stride[0]);
+              const outC = Math.floor((c + padding[1]) / stride[1]);
+              onMove(Math.max(0, Math.min(outH - 1, outR)), Math.max(0, Math.min(outW - 1, outC)));
+            }}
+          />
         </div>
         <div className="tfm-conv-step-calc">
           <div className="tfm-conv-step-label">Kernel &times; Patch (ch {selectedInCh})</div>
           <CalcGrid values={patchValues} kH={kH} kW={kW} />
           <div className="tfm-conv-calc-result">
-            {numInCh === 1 ? (<>sum = {fmtV(totalSum)}{bias !== 0 && ` + bias ${fmtV(bias)}`} = <strong>{fmtV(outputVal)}</strong></>) : (<>ch {selectedInCh} = {fmtV(currentChSum)}</>)}
+            {numInCh === 1 ? (
+              <>
+                sum = {fmtV(totalSum)}
+                {bias !== 0 && ` + bias ${fmtV(bias)}`} = <strong>{fmtV(outputVal)}</strong>
+              </>
+            ) : (
+              <>
+                ch {selectedInCh} = {fmtV(currentChSum)}
+              </>
+            )}
           </div>
         </div>
         <div className="tfm-conv-step-panel">
           <div className="tfm-conv-step-label">Output (filter {selectedFilter})</div>
-          <GridWithOverlay rawData={rawOutput} rows={outH} cols={outW} overlayR={posR} overlayC={posC} overlayH={1} overlayW={1} overlayColor="#89b4fa"
-            onClick={(r, c) => onMove(Math.max(0, Math.min(outH - 1, r)), Math.max(0, Math.min(outW - 1, c)))} />
+          <GridWithOverlay
+            rawData={rawOutput}
+            rows={outH}
+            cols={outW}
+            overlayR={posR}
+            overlayC={posC}
+            overlayH={1}
+            overlayW={1}
+            overlayColor="#89b4fa"
+            onClick={(r, c) =>
+              onMove(Math.max(0, Math.min(outH - 1, r)), Math.max(0, Math.min(outW - 1, c)))
+            }
+          />
         </div>
       </div>
-      {numInCh > 1 && <ChannelBreakdown perChannelSums={perChannelSums} selectedInCh={selectedInCh} onSelectInCh={onSelectInCh} totalSum={totalSum} bias={bias} outputVal={outputVal} />}
+      {numInCh > 1 && (
+        <ChannelBreakdown
+          perChannelSums={perChannelSums}
+          selectedInCh={selectedInCh}
+          onSelectInCh={onSelectInCh}
+          totalSum={totalSum}
+          bias={bias}
+          outputVal={outputVal}
+        />
+      )}
     </div>
   );
 }
@@ -156,14 +269,44 @@ function ConvInteractive({ rawInputs, allKernels, rawOutput, bias, inH, inW, out
 // ConvTranspose2d interactive — click INPUT pixel, see scattered output region
 // ============================================================================
 
-function TransposeConvInteractive({ rawInputs, allKernels, rawOutput, inH, inW, outH, outW, kH, kW, stride, padding,
-  selectedFilter, selectedInCh, numInCh, posR, posC, onMove, onSelectInCh }: {
-  rawInputs: number[][][]; allKernels: number[][][][]; rawOutput: number[][];
-  inH: number; inW: number; outH: number; outW: number;
-  kH: number; kW: number; stride: number[]; padding: number[];
-  selectedFilter: number; selectedInCh: number; numInCh: number;
-  posR: number; posC: number;
-  onMove: (r: number, c: number) => void; onSelectInCh: (ch: number) => void;
+function TransposeConvInteractive({
+  rawInputs,
+  allKernels,
+  rawOutput,
+  inH,
+  inW,
+  outH,
+  outW,
+  kH,
+  kW,
+  stride,
+  padding,
+  selectedFilter,
+  selectedInCh,
+  numInCh,
+  posR,
+  posC,
+  onMove,
+  onSelectInCh,
+}: {
+  rawInputs: number[][][];
+  allKernels: number[][][][];
+  rawOutput: number[][];
+  inH: number;
+  inW: number;
+  outH: number;
+  outW: number;
+  kH: number;
+  kW: number;
+  stride: number[];
+  padding: number[];
+  selectedFilter: number;
+  selectedInCh: number;
+  numInCh: number;
+  posR: number;
+  posC: number;
+  onMove: (r: number, c: number) => void;
+  onSelectInCh: (ch: number) => void;
 }) {
   // Clamp to input bounds
   const iR = Math.min(posR, Math.max(0, inH - 1));
@@ -179,26 +322,63 @@ function TransposeConvInteractive({ rawInputs, allKernels, rawOutput, inH, inW, 
   const outStartC = iC * stride[1] - padding[1];
 
   // Kernel × input value = contributions to output
-  const contributions: { kr: number; kc: number; kVal: number; outR: number; outC: number; contribution: number; inBounds: boolean }[] = [];
-  for (let kr = 0; kr < kH; kr++) for (let kc = 0; kc < kW; kc++) {
-    const oR = outStartR + kr;
-    const oC = outStartC + kc;
-    const kVal = kernel?.[kr]?.[kc] ?? 0;
-    contributions.push({ kr, kc, kVal, outR: oR, outC: oC, contribution: inputVal * kVal, inBounds: oR >= 0 && oR < outH && oC >= 0 && oC < outW });
-  }
+  const contributions: {
+    kr: number;
+    kc: number;
+    kVal: number;
+    outR: number;
+    outC: number;
+    contribution: number;
+    inBounds: boolean;
+  }[] = [];
+  for (let kr = 0; kr < kH; kr++)
+    for (let kc = 0; kc < kW; kc++) {
+      const oR = outStartR + kr;
+      const oC = outStartC + kc;
+      const kVal = kernel?.[kr]?.[kc] ?? 0;
+      contributions.push({
+        kr,
+        kc,
+        kVal,
+        outR: oR,
+        outC: oC,
+        contribution: inputVal * kVal,
+        inBounds: oR >= 0 && oR < outH && oC >= 0 && oC < outW,
+      });
+    }
 
   return (
     <div className="tfm-section">
-      <div className="tfm-section-title">Step Through (Transpose) &middot; Filter {selectedFilter} &middot; input[{iR}, {iC}]</div>
-      <div className="tfm-conv-formula">
-        Each input pixel is multiplied by the kernel and <em>scattered</em> to a {kH}&times;{kW} output region
+      <div className="tfm-section-title">
+        Step Through (Transpose) &middot; Filter {selectedFilter} &middot; input[{iR}, {iC}]
       </div>
-      {numInCh > 1 && <ChannelSelector numInCh={numInCh} selectedInCh={selectedInCh} onSelectInCh={onSelectInCh} />}
+      <div className="tfm-conv-formula">
+        Each input pixel is multiplied by the kernel and <em>scattered</em> to a {kH}&times;{kW}{' '}
+        output region
+      </div>
+      {numInCh > 1 && (
+        <ChannelSelector
+          numInCh={numInCh}
+          selectedInCh={selectedInCh}
+          onSelectInCh={onSelectInCh}
+        />
+      )}
       <div className="tfm-conv-step">
         <div className="tfm-conv-step-panel">
           <div className="tfm-conv-step-label">Input ch {selectedInCh}</div>
-          <GridWithOverlay rawData={rawInput} rows={inH} cols={inW} overlayR={iR} overlayC={iC} overlayH={1} overlayW={1} overlayColor="#f9e2af"
-            onClick={(r, c) => onMove(Math.max(0, Math.min(inH - 1, r)), Math.max(0, Math.min(inW - 1, c)))} />
+          <GridWithOverlay
+            rawData={rawInput}
+            rows={inH}
+            cols={inW}
+            overlayR={iR}
+            overlayC={iC}
+            overlayH={1}
+            overlayW={1}
+            overlayColor="#f9e2af"
+            onClick={(r, c) =>
+              onMove(Math.max(0, Math.min(inH - 1, r)), Math.max(0, Math.min(inW - 1, c)))
+            }
+          />
           <div className="tfm-conv-calc-pos">value = {fmtV(inputVal)}</div>
         </div>
         <div className="tfm-conv-step-calc">
@@ -209,7 +389,10 @@ function TransposeConvInteractive({ rawInputs, allKernels, rawOutput, inH, inW, 
                 {Array.from({ length: kW }, (_, kc) => {
                   const c = contributions[kr * kW + kc];
                   return (
-                    <div key={kc} className={`tfm-conv-calc-cell ${!c.inBounds ? 'tfm-conv-calc-oob' : ''}`}>
+                    <div
+                      key={kc}
+                      className={`tfm-conv-calc-cell ${!c.inBounds ? 'tfm-conv-calc-oob' : ''}`}
+                    >
                       <span className="tfm-conv-calc-k">{fmtV(c.kVal)}</span>
                       <span className="tfm-conv-calc-op">&rarr;</span>
                       <span className="tfm-conv-calc-in">{fmtV(c.contribution)}</span>
@@ -225,11 +408,17 @@ function TransposeConvInteractive({ rawInputs, allKernels, rawOutput, inH, inW, 
         </div>
         <div className="tfm-conv-step-panel">
           <div className="tfm-conv-step-label">Output (filter {selectedFilter})</div>
-          <GridWithOverlay rawData={rawOutput} rows={outH} cols={outW}
-            overlayR={Math.max(0, outStartR)} overlayC={Math.max(0, outStartC)}
-            overlayH={Math.min(kH, outH - Math.max(0, outStartR))} overlayW={Math.min(kW, outW - Math.max(0, outStartC))}
+          <GridWithOverlay
+            rawData={rawOutput}
+            rows={outH}
+            cols={outW}
+            overlayR={Math.max(0, outStartR)}
+            overlayC={Math.max(0, outStartC)}
+            overlayH={Math.min(kH, outH - Math.max(0, outStartR))}
+            overlayW={Math.min(kW, outW - Math.max(0, outStartC))}
             overlayColor="#89b4fa"
-            onClick={() => {}} />
+            onClick={() => {}}
+          />
         </div>
       </div>
     </div>
@@ -240,35 +429,78 @@ function TransposeConvInteractive({ rawInputs, allKernels, rawOutput, inH, inW, 
 // Shared sub-components
 // ============================================================================
 
-function ChannelSelector({ numInCh, selectedInCh, onSelectInCh }: { numInCh: number; selectedInCh: number; onSelectInCh: (ch: number) => void }) {
+function ChannelSelector({
+  numInCh,
+  selectedInCh,
+  onSelectInCh,
+}: {
+  numInCh: number;
+  selectedInCh: number;
+  onSelectInCh: (ch: number) => void;
+}) {
   return (
     <div className="tfm-conv-ch-selector">
       <span className="tfm-conv-ch-label">Input channel:</span>
       <div className="tfm-conv-ch-btns">
         {Array.from({ length: numInCh }, (_, i) => (
-          <button key={i} className={`tfm-conv-ch-btn ${i === selectedInCh ? 'tfm-conv-ch-btn-active' : ''}`} onClick={() => onSelectInCh(i)}>{i}</button>
+          <button
+            key={i}
+            className={`tfm-conv-ch-btn ${i === selectedInCh ? 'tfm-conv-ch-btn-active' : ''}`}
+            onClick={() => onSelectInCh(i)}
+          >
+            {i}
+          </button>
         ))}
       </div>
     </div>
   );
 }
 
-function ChannelBreakdown({ perChannelSums, selectedInCh, onSelectInCh, totalSum, bias, outputVal }: {
-  perChannelSums: number[]; selectedInCh: number; onSelectInCh: (ch: number) => void; totalSum: number; bias: number; outputVal: number;
+function ChannelBreakdown({
+  perChannelSums,
+  selectedInCh,
+  onSelectInCh,
+  totalSum,
+  bias,
+  outputVal,
+}: {
+  perChannelSums: number[];
+  selectedInCh: number;
+  onSelectInCh: (ch: number) => void;
+  totalSum: number;
+  bias: number;
+  outputVal: number;
 }) {
   return (
     <div className="tfm-conv-breakdown">
       <div className="tfm-conv-breakdown-items">
         {perChannelSums.map((s, i) => (
-          <span key={i} className={`tfm-conv-breakdown-item ${i === selectedInCh ? 'tfm-conv-breakdown-active' : ''}`} onClick={() => onSelectInCh(i)}>ch{i}: {fmtV(s)}</span>
+          <span
+            key={i}
+            className={`tfm-conv-breakdown-item ${i === selectedInCh ? 'tfm-conv-breakdown-active' : ''}`}
+            onClick={() => onSelectInCh(i)}
+          >
+            ch{i}: {fmtV(s)}
+          </span>
         ))}
       </div>
-      <div className="tfm-conv-breakdown-total">= {fmtV(totalSum)}{bias !== 0 ? ` + bias ${fmtV(bias)}` : ''} = <strong>{fmtV(outputVal)}</strong></div>
+      <div className="tfm-conv-breakdown-total">
+        = {fmtV(totalSum)}
+        {bias !== 0 ? ` + bias ${fmtV(bias)}` : ''} = <strong>{fmtV(outputVal)}</strong>
+      </div>
     </div>
   );
 }
 
-function CalcGrid({ values, kH, kW }: { values: { inVal: number; kVal: number }[]; kH: number; kW: number }) {
+function CalcGrid({
+  values,
+  kH,
+  kW,
+}: {
+  values: { inVal: number; kVal: number }[];
+  kH: number;
+  kW: number;
+}) {
   return (
     <div className="tfm-conv-calc-grid">
       {Array.from({ length: kH }, (_, kr) => (
@@ -289,10 +521,26 @@ function CalcGrid({ values, kH, kW }: { values: { inVal: number; kVal: number }[
   );
 }
 
-function GridWithOverlay({ rawData, rows, cols, overlayR, overlayC, overlayH, overlayW, overlayColor, onClick }: {
-  rawData: number[][]; rows: number; cols: number;
-  overlayR: number; overlayC: number; overlayH: number; overlayW: number;
-  overlayColor: string; onClick: (r: number, c: number) => void;
+function GridWithOverlay({
+  rawData,
+  rows,
+  cols,
+  overlayR,
+  overlayC,
+  overlayH,
+  overlayW,
+  overlayColor,
+  onClick,
+}: {
+  rawData: number[][];
+  rows: number;
+  cols: number;
+  overlayR: number;
+  overlayC: number;
+  overlayH: number;
+  overlayW: number;
+  overlayColor: string;
+  onClick: (r: number, c: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cellSize = Math.max(4, Math.min(12, Math.floor(220 / Math.max(rows, cols))));
@@ -300,21 +548,28 @@ function GridWithOverlay({ rawData, rows, cols, overlayR, overlayC, overlayH, ov
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const w = cols * cellSize, h = rows * cellSize;
-    canvas.width = w; canvas.height = h;
+    const w = cols * cellSize,
+      h = rows * cellSize;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const vals = rawData.flat();
-    const vmin = Math.min(...vals), vmax = Math.max(...vals);
+    const vmin = Math.min(...vals),
+      vmax = Math.max(...vals);
     const vrange = vmax - vmin || 1;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const v = Math.round((((rawData[r]?.[c] ?? 0) - vmin) / vrange) * 255);
-      ctx.fillStyle = `rgb(${v},${v},${v})`;
-      ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
-    }
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++) {
+        const v = Math.round((((rawData[r]?.[c] ?? 0) - vmin) / vrange) * 255);
+        ctx.fillStyle = `rgb(${v},${v},${v})`;
+        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+      }
     // Dim outside
     if (overlayH > 1 || overlayW > 1) {
-      const ox = overlayC * cellSize, oy = overlayR * cellSize, ow = overlayW * cellSize, oh = overlayH * cellSize;
+      const ox = overlayC * cellSize,
+        oy = overlayR * cellSize,
+        ow = overlayW * cellSize,
+        oh = overlayH * cellSize;
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
       if (oy > 0) ctx.fillRect(0, 0, w, Math.max(0, oy));
       const botY = oy + oh;
@@ -325,11 +580,34 @@ function GridWithOverlay({ rawData, rows, cols, overlayR, overlayC, overlayH, ov
     }
     ctx.strokeStyle = overlayColor;
     ctx.lineWidth = 2;
-    ctx.strokeRect(overlayC * cellSize + 1, overlayR * cellSize + 1, overlayW * cellSize - 2, overlayH * cellSize - 2);
+    ctx.strokeRect(
+      overlayC * cellSize + 1,
+      overlayR * cellSize + 1,
+      overlayW * cellSize - 2,
+      overlayH * cellSize - 2,
+    );
   }, [rawData, rows, cols, overlayR, overlayC, overlayH, overlayW, overlayColor, cellSize]);
 
-  return <canvas ref={canvasRef} className="tfm-conv-step-canvas" style={{ width: cols * cellSize, height: rows * cellSize, cursor: 'crosshair' }}
-    onClick={(e) => { const rect = canvasRef.current!.getBoundingClientRect(); onClick(Math.max(0, Math.min(rows - 1, Math.floor((e.clientY - rect.top) / rect.height * rows))), Math.max(0, Math.min(cols - 1, Math.floor((e.clientX - rect.left) / rect.width * cols)))); }} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="tfm-conv-step-canvas"
+      style={{ width: cols * cellSize, height: rows * cellSize, cursor: 'crosshair' }}
+      onClick={(e) => {
+        const rect = canvasRef.current!.getBoundingClientRect();
+        onClick(
+          Math.max(
+            0,
+            Math.min(rows - 1, Math.floor(((e.clientY - rect.top) / rect.height) * rows)),
+          ),
+          Math.max(
+            0,
+            Math.min(cols - 1, Math.floor(((e.clientX - rect.left) / rect.width) * cols)),
+          ),
+        );
+      }}
+    />
+  );
 }
 
 function fmtV(v: number): string {

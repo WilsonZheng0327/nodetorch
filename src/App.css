@@ -82,43 +82,43 @@
 }
 
 /* Light theme overrides for React Flow canvas */
-[data-theme="light"] .react-flow {
+[data-theme='light'] .react-flow {
   --xy-background-color: #eff1f5;
   --xy-node-background-color: #ffffff;
   --xy-edge-stroke: #9ca0b0;
   --xy-minimap-background-color: #e6e9ef;
 }
 
-[data-theme="light"] .react-flow__background {
+[data-theme='light'] .react-flow__background {
   --xy-background-pattern-color: #7c7f93;
 }
 
-[data-theme="light"] .controls-themed {
+[data-theme='light'] .controls-themed {
   background: #ffffff !important;
   border-color: #ccd0da !important;
 }
 
-[data-theme="light"] .controls-themed .react-flow__controls-button {
+[data-theme='light'] .controls-themed .react-flow__controls-button {
   background: #ffffff !important;
   color: #6c6f85 !important;
   fill: #6c6f85 !important;
 }
 
-[data-theme="light"] .controls-themed .react-flow__controls-button:hover {
+[data-theme='light'] .controls-themed .react-flow__controls-button:hover {
   background: #e6e9ef !important;
   fill: #4c4f69 !important;
 }
 
-[data-theme="light"] .minimap-themed {
+[data-theme='light'] .minimap-themed {
   background: #ffffff !important;
   border-color: #ccd0da !important;
 }
 
-[data-theme="light"] .minimap-themed .react-flow__minimap-mask {
+[data-theme='light'] .minimap-themed .react-flow__minimap-mask {
   fill: rgba(239, 241, 245, 0.7);
 }
 
-[data-theme="light"] .connection-error-toast {
+[data-theme='light'] .connection-error-toast {
   background: rgba(210, 15, 57, 0.9);
 }
 
@@ -140,6 +140,11 @@
 }
 
 @keyframes toast-fade {
-  0%, 70% { opacity: 1; }
-  100% { opacity: 0; }
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }

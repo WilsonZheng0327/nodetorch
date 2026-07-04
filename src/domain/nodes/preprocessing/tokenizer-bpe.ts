@@ -12,7 +12,8 @@ export const tokenizerBpeNode: NodeDefinition = {
   displayName: 'BPE Tokenizer',
   description: 'Byte-Pair Encoding (learned subword units)',
   category: ['ML', 'Preprocessing'],
-  learnMore: 'BPE learns merge rules from your corpus: it starts with characters, then repeatedly merges the most-frequent adjacent pair into a new token. Common words end up as single tokens; rare words break into subword pieces. This is what GPT, BERT, and most modern LMs use. The end-of-word marker (default </w>) gets appended to every word so the tokenizer can tell "play" (start of word) from "play" (middle of word) — you\'ll see this marker in many of the learned tokens.',
+  learnMore:
+    'BPE learns merge rules from your corpus: it starts with characters, then repeatedly merges the most-frequent adjacent pair into a new token. Common words end up as single tokens; rare words break into subword pieces. This is what GPT, BERT, and most modern LMs use. The end-of-word marker (default </w>) gets appended to every word so the tokenizer can tell "play" (start of word) from "play" (middle of word) — you\'ll see this marker in many of the learned tokens.',
 
   getProperties: () => [
     {
@@ -50,8 +51,22 @@ export const tokenizerBpeNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Text Data', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Token IDs', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Text Data',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Token IDs',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

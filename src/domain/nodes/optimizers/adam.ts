@@ -7,7 +7,8 @@ export const adamNode: NodeDefinition = {
   description: 'Adam optimizer (adaptive learning rate)',
   category: ['ML', 'Optimizers'],
   color: '#8b5cf6',
-  learnMore: 'Adapts the learning rate for each parameter individually based on past gradients. Combines the benefits of momentum (gradient smoothing) and RMSprop (per-parameter scaling). Works well out of the box for most problems \u2014 the go-to optimizer when you don\'t want to tune much.',
+  learnMore:
+    "Adapts the learning rate for each parameter individually based on past gradients. Combines the benefits of momentum (gradient smoothing) and RMSprop (per-parameter scaling). Works well out of the box for most problems \u2014 the go-to optimizer when you don't want to tune much.",
 
   getProperties: () => [
     {
@@ -86,7 +87,7 @@ export const adamNode: NodeDefinition = {
       type: { kind: 'number', min: 0, integer: true },
       defaultValue: 0,
       affects: 'execution',
-      help: 'Stop training if validation loss doesn\'t improve for this many epochs. 0 = disabled. Try 5-10 to prevent overfitting.',
+      help: "Stop training if validation loss doesn't improve for this many epochs. 0 = disabled. Try 5-10 to prevent overfitting.",
     },
     {
       id: 'gradClip',
@@ -99,7 +100,14 @@ export const adamNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'loss', name: 'Loss', direction: 'input', dataType: 'scalar', allowMultiple: false, optional: false },
+    {
+      id: 'loss',
+      name: 'Loss',
+      direction: 'input',
+      dataType: 'scalar',
+      allowMultiple: false,
+      optional: false,
+    },
   ],
 
   executors: {},

@@ -167,9 +167,9 @@
 }
 
 /* Tree guide-lines on nested content */
-.palette-folder-content[data-depth="1"],
-.palette-folder-content[data-depth="2"],
-.palette-folder-content[data-depth="3"] {
+.palette-folder-content[data-depth='1'],
+.palette-folder-content[data-depth='2'],
+.palette-folder-content[data-depth='3'] {
   border-left: 1px solid #313244;
   margin-left: 9px;
   padding-left: 9px;

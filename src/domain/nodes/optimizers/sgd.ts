@@ -11,7 +11,8 @@ export const sgdNode: NodeDefinition = {
   description: 'Stochastic Gradient Descent optimizer',
   category: ['ML', 'Optimizers'],
   color: '#8b5cf6',
-  learnMore: 'The classic optimizer \u2014 updates weights by subtracting the gradient scaled by the learning rate. With momentum, it also considers past gradients to smooth the updates and escape local minima. Simple, well-understood, and often the best choice for CNNs with careful learning rate tuning.',
+  learnMore:
+    'The classic optimizer \u2014 updates weights by subtracting the gradient scaled by the learning rate. With momentum, it also considers past gradients to smooth the updates and escape local minima. Simple, well-understood, and often the best choice for CNNs with careful learning rate tuning.',
 
   getProperties: () => [
     {
@@ -84,7 +85,7 @@ export const sgdNode: NodeDefinition = {
       type: { kind: 'number', min: 0, integer: true },
       defaultValue: 0,
       affects: 'execution',
-      help: 'Stop training if validation loss doesn\'t improve for this many epochs. 0 = disabled. Try 5-10 to prevent overfitting.',
+      help: "Stop training if validation loss doesn't improve for this many epochs. 0 = disabled. Try 5-10 to prevent overfitting.",
     },
     {
       id: 'gradClip',

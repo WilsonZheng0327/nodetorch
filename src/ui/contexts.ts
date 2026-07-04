@@ -27,4 +27,7 @@ export const VizCtx = createContext<{
 } | null>(null);
 
 // Backprop animation context — map of nodeId to { delayMs, intensity }
-export const BackpropCtx = createContext<Record<string, { delayMs: number; intensity: number }> | null>(null);
+export const BackpropCtx = createContext<Record<
+  string,
+  { delayMs: number; intensity: number }
+> | null>(null);

@@ -13,7 +13,11 @@ export function GeneratedTextView({ progress }: { progress: EpochData[] }) {
     .map((ep) => ({ epoch: ep.epoch, text: ep.generatedText! }));
 
   if (samples.length === 0) {
-    return <div className="dashboard-chart-placeholder">No generated samples yet — text is generated periodically during training</div>;
+    return (
+      <div className="dashboard-chart-placeholder">
+        No generated samples yet — text is generated periodically during training
+      </div>
+    );
   }
 
   return (
@@ -30,15 +34,23 @@ export function GeneratedTextView({ progress }: { progress: EpochData[] }) {
 
 // --- Tracked samples (classification / reconstruction) ---
 
-export function TrackedSamplesView({ progress, selectedEpoch }: { progress: EpochData[]; selectedEpoch: number | null }) {
+export function TrackedSamplesView({
+  progress,
+  selectedEpoch,
+}: {
+  progress: EpochData[];
+  selectedEpoch: number | null;
+}) {
   // For GAN/diffusion, show generated samples instead of tracked samples
-  const isGenerative = progress.some(ep => ep.generatedSamples?.length);
+  const isGenerative = progress.some((ep) => ep.generatedSamples?.length);
   if (isGenerative) {
     return <GeneratedSamplesView progress={progress} />;
   }
 
   if (progress.length === 0 || !progress[0].trackedSamples?.length) {
-    return <div className="dashboard-chart-placeholder">No tracked samples — train to see results</div>;
+    return (
+      <div className="dashboard-chart-placeholder">No tracked samples — train to see results</div>
+    );
   }
 
   // Get sample info from the first epoch (images don't change)
@@ -51,8 +63,8 @@ export function TrackedSamplesView({ progress, selectedEpoch }: { progress: Epoc
           key={sample.idx}
           sampleIdx={sIdx}
           sample={sample}
-          probes={progress.map(ep => ep.trackedSamples?.[sIdx])}
-          epochs={progress.map(ep => ep.epoch)}
+          probes={progress.map((ep) => ep.trackedSamples?.[sIdx])}
+          epochs={progress.map((ep) => ep.epoch)}
           selectedEpoch={selectedEpoch}
         />
       ))}
@@ -60,7 +72,12 @@ export function TrackedSamplesView({ progress, selectedEpoch }: { progress: Epoc
   );
 }
 
-function TrackedSampleRow({ sample, probes, epochs, selectedEpoch }: {
+function TrackedSampleRow({
+  sample,
+  probes,
+  epochs,
+  selectedEpoch,
+}: {
   sampleIdx: number;
   sample: TrackedSampleProbe;
   probes: (TrackedSampleProbe | undefined)[];
@@ -88,10 +105,14 @@ function TrackedSampleRow({ sample, probes, epochs, selectedEpoch }: {
         const idx = (y * w + x) * 4;
         if (isRGB) {
           const px = (pixels as number[][][])[y][x];
-          data.data[idx] = px[0]; data.data[idx + 1] = px[1]; data.data[idx + 2] = px[2];
+          data.data[idx] = px[0];
+          data.data[idx + 1] = px[1];
+          data.data[idx + 2] = px[2];
         } else {
           const v = (pixels as number[][])[y][x];
-          data.data[idx] = v; data.data[idx + 1] = v; data.data[idx + 2] = v;
+          data.data[idx] = v;
+          data.data[idx + 1] = v;
+          data.data[idx + 2] = v;
         }
         data.data[idx + 3] = 255;
       }
@@ -100,9 +121,10 @@ function TrackedSampleRow({ sample, probes, epochs, selectedEpoch }: {
   }, [sample.imagePixels]);
 
   // The epoch in view: the slider selection (1-based) or the latest.
-  const selIdx = selectedEpoch != null
-    ? Math.min(Math.max(selectedEpoch - 1, 0), probes.length - 1)
-    : probes.length - 1;
+  const selIdx =
+    selectedEpoch != null
+      ? Math.min(Math.max(selectedEpoch - 1, 0), probes.length - 1)
+      : probes.length - 1;
   const probe = probes[selIdx];
   const epochNum = epochs[selIdx];
   // Classification vs reconstruction is a fixed property of the model.
@@ -110,7 +132,7 @@ function TrackedSampleRow({ sample, probes, epochs, selectedEpoch }: {
 
   const correct = probe?.predictedClass === sample.label;
   const conf = (probe?.confidence ?? 0) * 100;
-  const maxLoss = Math.max(...probes.filter(Boolean).map(p => p!.loss ?? 0), 0.01);
+  const maxLoss = Math.max(...probes.filter(Boolean).map((p) => p!.loss ?? 0), 0.01);
   const lossPct = ((probe?.loss ?? 0) / maxLoss) * 100;
 
   return (
@@ -132,12 +154,19 @@ function TrackedSampleRow({ sample, probes, epochs, selectedEpoch }: {
             <div className="tracked-sample-timeline-header">
               <span>Confidence (epoch {epochNum})</span>
               <span className="tracked-sample-latest">
-                {probe?.predictedClass != null
-                  ? <>Predicted: {probe.predictedClass} ({conf.toFixed(1)}%)</>
-                  : 'no data'}
+                {probe?.predictedClass != null ? (
+                  <>
+                    Predicted: {probe.predictedClass} ({conf.toFixed(1)}%)
+                  </>
+                ) : (
+                  'no data'
+                )}
               </span>
             </div>
-            <div className="tracked-sample-hbar-track" title={`Epoch ${epochNum}: class ${probe?.predictedClass ?? '?'} (${conf.toFixed(1)}%)`}>
+            <div
+              className="tracked-sample-hbar-track"
+              title={`Epoch ${epochNum}: class ${probe?.predictedClass ?? '?'} (${conf.toFixed(1)}%)`}
+            >
               <div
                 className={`tracked-sample-hbar-fill ${correct ? 'tracked-sample-bar-correct' : 'tracked-sample-bar-wrong'}`}
                 style={{ width: `${conf}%` }}
@@ -148,10 +177,18 @@ function TrackedSampleRow({ sample, probes, epochs, selectedEpoch }: {
           <>
             <div className="tracked-sample-timeline-header">
               <span>Loss (epoch {epochNum})</span>
-              <span className="tracked-sample-latest">{probe?.loss != null ? probe.loss.toFixed(4) : 'no data'}</span>
+              <span className="tracked-sample-latest">
+                {probe?.loss != null ? probe.loss.toFixed(4) : 'no data'}
+              </span>
             </div>
-            <div className="tracked-sample-hbar-track" title={`Epoch ${epochNum}: loss ${(probe?.loss ?? 0).toFixed(4)}`}>
-              <div className="tracked-sample-hbar-fill tracked-sample-bar-loss" style={{ width: `${lossPct}%` }} />
+            <div
+              className="tracked-sample-hbar-track"
+              title={`Epoch ${epochNum}: loss ${(probe?.loss ?? 0).toFixed(4)}`}
+            >
+              <div
+                className="tracked-sample-hbar-fill tracked-sample-bar-loss"
+                style={{ width: `${lossPct}%` }}
+              />
             </div>
           </>
         )}
@@ -164,7 +201,7 @@ function TrackedSampleRow({ sample, probes, epochs, selectedEpoch }: {
 
 function GeneratedSamplesView({ progress }: { progress: EpochData[] }) {
   // Find epochs that have generated samples
-  const epochsWithSamples = progress.filter(ep => ep.generatedSamples?.length);
+  const epochsWithSamples = progress.filter((ep) => ep.generatedSamples?.length);
 
   if (epochsWithSamples.length === 0) {
     return (
@@ -176,7 +213,7 @@ function GeneratedSamplesView({ progress }: { progress: EpochData[] }) {
 
   return (
     <div className="generated-samples-view">
-      {epochsWithSamples.map(ep => (
+      {epochsWithSamples.map((ep) => (
         <div key={ep.epoch} className="generated-samples-epoch">
           <div className="generated-samples-epoch-label">Epoch {ep.epoch}</div>
           <div className="generated-samples-grid">
@@ -209,10 +246,14 @@ function GeneratedSampleImage({ pixels }: { pixels: number[][] | number[][][] })
         const idx = (y * w + x) * 4;
         if (isRGB) {
           const px = (pixels as number[][][])[y][x];
-          data.data[idx] = px[0]; data.data[idx + 1] = px[1]; data.data[idx + 2] = px[2];
+          data.data[idx] = px[0];
+          data.data[idx + 1] = px[1];
+          data.data[idx + 2] = px[2];
         } else {
           const v = (pixels as number[][])[y][x];
-          data.data[idx] = v; data.data[idx + 1] = v; data.data[idx + 2] = v;
+          data.data[idx] = v;
+          data.data[idx + 1] = v;
+          data.data[idx + 2] = v;
         }
         data.data[idx + 3] = 255;
       }

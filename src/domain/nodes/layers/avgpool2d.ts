@@ -6,17 +6,50 @@ export const avgPool2dNode: NodeDefinition = {
   displayName: 'AvgPool2d',
   description: '2D average pooling',
   category: ['ML', 'Layers', 'Pooling'],
-  learnMore: 'Takes the average value in each pooling window instead of the maximum. Smoother than MaxPool but can lose sharp features. Sometimes used in the final layer before classification.',
+  learnMore:
+    'Takes the average value in each pooling window instead of the maximum. Smoother than MaxPool but can lose sharp features. Sometimes used in the final layer before classification.',
 
   getProperties: () => [
-    { id: 'kernelSize', name: 'Kernel Size', type: { kind: 'number', min: 1, integer: true }, defaultValue: 2, affects: 'execution' },
-    { id: 'stride', name: 'Stride', type: { kind: 'number', min: 1, integer: true }, defaultValue: 2, affects: 'execution' },
-    { id: 'padding', name: 'Padding', type: { kind: 'number', min: 0, integer: true }, defaultValue: 0, affects: 'execution' },
+    {
+      id: 'kernelSize',
+      name: 'Kernel Size',
+      type: { kind: 'number', min: 1, integer: true },
+      defaultValue: 2,
+      affects: 'execution',
+    },
+    {
+      id: 'stride',
+      name: 'Stride',
+      type: { kind: 'number', min: 1, integer: true },
+      defaultValue: 2,
+      affects: 'execution',
+    },
+    {
+      id: 'padding',
+      name: 'Padding',
+      type: { kind: 'number', min: 0, integer: true },
+      defaultValue: 0,
+      affects: 'execution',
+    },
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -36,7 +69,10 @@ export const avgPool2dNode: NodeDefinition = {
 
         return {
           outputs: { out: [B, C, outH, outW] },
-          metadata: { outputShape: [B, C, outH, outW], shapes: [{ label: 'Output', value: [B, C, outH, outW] }] },
+          metadata: {
+            outputShape: [B, C, outH, outW],
+            shapes: [{ label: 'Output', value: [B, C, outH, outW] }],
+          },
         };
       },
     },

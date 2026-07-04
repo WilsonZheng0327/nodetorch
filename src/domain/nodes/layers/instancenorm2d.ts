@@ -6,13 +6,28 @@ export const instanceNorm2dNode: NodeDefinition = {
   displayName: 'InstanceNorm2d',
   description: 'Instance normalization — normalizes each sample independently',
   category: ['ML', 'Layers', 'Normalization'],
-  learnMore: 'Normalizes each sample and each channel independently. Popular in style transfer and image generation where you want to normalize spatial statistics without mixing information across samples.',
+  learnMore:
+    'Normalizes each sample and each channel independently. Popular in style transfer and image generation where you want to normalize spatial statistics without mixing information across samples.',
 
   getProperties: () => [],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -20,7 +35,8 @@ export const instanceNorm2dNode: NodeDefinition = {
       execute: async ({ inputs }) => {
         const input = inputs.in;
         if (!input) return { outputs: {} };
-        if (input.length !== 4) return { outputs: {}, metadata: { error: 'InstanceNorm2d expects [B, C, H, W]' } };
+        if (input.length !== 4)
+          return { outputs: {}, metadata: { error: 'InstanceNorm2d expects [B, C, H, W]' } };
 
         return {
           outputs: { out: input },

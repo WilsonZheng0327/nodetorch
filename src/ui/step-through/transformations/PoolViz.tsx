@@ -8,7 +8,9 @@ import type { PoolTransformation } from '../types';
 import { FeatureMapsGrid, VectorBars } from './shared';
 
 const KIND_LABELS: Record<string, string> = {
-  max: 'Max Pool', avg: 'Avg Pool', adaptive_avg: 'Adaptive Avg Pool',
+  max: 'Max Pool',
+  avg: 'Avg Pool',
+  adaptive_avg: 'Adaptive Avg Pool',
 };
 
 export function PoolViz({ t }: { t: PoolTransformation }) {
@@ -32,12 +34,16 @@ export function PoolViz({ t }: { t: PoolTransformation }) {
       {/* Before / After split */}
       <div className="tfm-before-after">
         <div className="tfm-ba-pane">
-          <div className="tfm-ba-label">Before &middot; {t.input.channels} ch &middot; {t.input.height}&times;{t.input.width}</div>
+          <div className="tfm-ba-label">
+            Before &middot; {t.input.channels} ch &middot; {t.input.height}&times;{t.input.width}
+          </div>
           <FeatureMapsGrid data={t.input} />
         </div>
         <div className="tfm-ba-divider" />
         <div className="tfm-ba-pane">
-          <div className="tfm-ba-label">After &middot; {t.output.channels} ch &middot; {t.output.height}&times;{t.output.width}</div>
+          <div className="tfm-ba-label">
+            After &middot; {t.output.channels} ch &middot; {t.output.height}&times;{t.output.width}
+          </div>
           {t.channelValues ? (
             <PooledValues values={t.channelValues} channels={t.output.channels} />
           ) : t.output.height <= 2 && t.output.width <= 2 ? (
@@ -55,13 +61,21 @@ export function PoolViz({ t }: { t: PoolTransformation }) {
             Step Through &middot; {KIND_LABELS[t.poolKind]} {poolH}&times;{poolW}, stride {strideH}
           </div>
           <PoolStepThrough
-            rawInput={t.rawInput!} rawOutput={t.rawOutput!}
-            inH={t.rawInputH!} inW={t.rawInputW!}
-            outH={outH} outW={outW}
-            poolH={poolH} poolW={poolW}
-            strideH={strideH} strideW={strideW}
+            rawInput={t.rawInput!}
+            rawOutput={t.rawOutput!}
+            inH={t.rawInputH!}
+            inW={t.rawInputW!}
+            outH={outH}
+            outW={outW}
+            poolH={poolH}
+            poolW={poolW}
+            strideH={strideH}
+            strideW={strideW}
             poolKind={t.poolKind}
-            posR={posR} posC={posC} inR={inR} inC={inC}
+            posR={posR}
+            posC={posC}
+            inR={inR}
+            inC={inC}
             onMove={(r, c) => setPos({ r, c })}
           />
         </div>
@@ -70,12 +84,39 @@ export function PoolViz({ t }: { t: PoolTransformation }) {
   );
 }
 
-function PoolStepThrough({ rawInput, rawOutput, inH, inW, outH, outW, poolH, poolW, strideH, strideW, poolKind, posR, posC, inR, inC, onMove }: {
-  rawInput: number[][]; rawOutput: number[][];
-  inH: number; inW: number; outH: number; outW: number;
-  poolH: number; poolW: number; strideH: number; strideW: number;
+function PoolStepThrough({
+  rawInput,
+  rawOutput,
+  inH,
+  inW,
+  outH,
+  outW,
+  poolH,
+  poolW,
+  strideH,
+  strideW,
+  poolKind,
+  posR,
+  posC,
+  inR,
+  inC,
+  onMove,
+}: {
+  rawInput: number[][];
+  rawOutput: number[][];
+  inH: number;
+  inW: number;
+  outH: number;
+  outW: number;
+  poolH: number;
+  poolW: number;
+  strideH: number;
+  strideW: number;
   poolKind: string;
-  posR: number; posC: number; inR: number; inC: number;
+  posR: number;
+  posC: number;
+  inR: number;
+  inC: number;
   onMove: (r: number, c: number) => void;
 }) {
   // Extract pool window values
@@ -86,10 +127,13 @@ function PoolStepThrough({ rawInput, rawOutput, inH, inW, outH, outW, poolH, poo
     for (let pc = 0; pc < poolW; pc++) {
       const ir = inR + pr;
       const ic = inC + pc;
-      const val = (ir >= 0 && ir < inH && ic >= 0 && ic < inW) ? rawInput[ir][ic] : 0;
+      const val = ir >= 0 && ir < inH && ic >= 0 && ic < inW ? rawInput[ir][ic] : 0;
       const idx = windowValues.length;
       windowValues.push({ val, r: ir, c: ic });
-      if (val > maxVal) { maxVal = val; maxIdx = idx; }
+      if (val > maxVal) {
+        maxVal = val;
+        maxIdx = idx;
+      }
     }
   }
   const outputVal = rawOutput[posR]?.[posC] ?? 0;
@@ -101,8 +145,13 @@ function PoolStepThrough({ rawInput, rawOutput, inH, inW, outH, outW, poolH, poo
       <div className="tfm-conv-step-panel">
         <div className="tfm-conv-step-label">Input (ch 0)</div>
         <GridCanvas
-          rawData={rawInput} rows={inH} cols={inW}
-          highlightR={inR} highlightC={inC} highlightH={poolH} highlightW={poolW}
+          rawData={rawInput}
+          rows={inH}
+          cols={inW}
+          highlightR={inR}
+          highlightC={inC}
+          highlightH={poolH}
+          highlightW={poolW}
           highlightColor="#a6e3a1"
           onClick={(r, c) => {
             const outR = Math.floor(r / strideH);
@@ -114,7 +163,9 @@ function PoolStepThrough({ rawInput, rawOutput, inH, inW, outH, outW, poolH, poo
 
       {/* Computation */}
       <div className="tfm-conv-step-calc">
-        <div className="tfm-conv-step-label">{poolH}&times;{poolW} Window</div>
+        <div className="tfm-conv-step-label">
+          {poolH}&times;{poolW} Window
+        </div>
         <div className="tfm-conv-calc-grid">
           {Array.from({ length: poolH }, (_, pr) => (
             <div key={pr} className="tfm-conv-calc-row">
@@ -123,7 +174,10 @@ function PoolStepThrough({ rawInput, rawOutput, inH, inW, outH, outW, poolH, poo
                 const wv = windowValues[idx];
                 const isSelected = isMax && idx === maxIdx;
                 return (
-                  <div key={pc} className={`tfm-pool-calc-cell ${isSelected ? 'tfm-pool-calc-selected' : ''}`}>
+                  <div
+                    key={pc}
+                    className={`tfm-pool-calc-cell ${isSelected ? 'tfm-pool-calc-selected' : ''}`}
+                  >
                     {fmtV(wv.val)}
                   </div>
                 );
@@ -133,22 +187,36 @@ function PoolStepThrough({ rawInput, rawOutput, inH, inW, outH, outW, poolH, poo
         </div>
         <div className="tfm-conv-calc-result">
           {isMax ? (
-            <span>max = <strong>{fmtV(maxVal)}</strong></span>
+            <span>
+              max = <strong>{fmtV(maxVal)}</strong>
+            </span>
           ) : (
-            <span>avg = ({windowValues.map(w => fmtV(w.val)).join(' + ')}) / {windowValues.length} = <strong>{fmtV(outputVal)}</strong></span>
+            <span>
+              avg = ({windowValues.map((w) => fmtV(w.val)).join(' + ')}) / {windowValues.length} ={' '}
+              <strong>{fmtV(outputVal)}</strong>
+            </span>
           )}
         </div>
-        <div className="tfm-conv-calc-pos">output[{posR}, {posC}]</div>
+        <div className="tfm-conv-calc-pos">
+          output[{posR}, {posC}]
+        </div>
       </div>
 
       {/* Output with highlighted pixel */}
       <div className="tfm-conv-step-panel">
         <div className="tfm-conv-step-label">Output (ch 0)</div>
         <GridCanvas
-          rawData={rawOutput} rows={outH} cols={outW}
-          highlightR={posR} highlightC={posC} highlightH={1} highlightW={1}
+          rawData={rawOutput}
+          rows={outH}
+          cols={outW}
+          highlightR={posR}
+          highlightC={posC}
+          highlightH={1}
+          highlightW={1}
           highlightColor="#89b4fa"
-          onClick={(r, c) => onMove(Math.max(0, Math.min(outH - 1, r)), Math.max(0, Math.min(outW - 1, c)))}
+          onClick={(r, c) =>
+            onMove(Math.max(0, Math.min(outH - 1, r)), Math.max(0, Math.min(outW - 1, c)))
+          }
         />
       </div>
     </div>
@@ -156,9 +224,24 @@ function PoolStepThrough({ rawInput, rawOutput, inH, inW, outH, outW, poolH, poo
 }
 
 /** Grayscale grid canvas with a highlight rectangle. Clickable. */
-function GridCanvas({ rawData, rows, cols, highlightR, highlightC, highlightH, highlightW, highlightColor, onClick }: {
-  rawData: number[][]; rows: number; cols: number;
-  highlightR: number; highlightC: number; highlightH: number; highlightW: number;
+function GridCanvas({
+  rawData,
+  rows,
+  cols,
+  highlightR,
+  highlightC,
+  highlightH,
+  highlightW,
+  highlightColor,
+  onClick,
+}: {
+  rawData: number[][];
+  rows: number;
+  cols: number;
+  highlightR: number;
+  highlightC: number;
+  highlightH: number;
+  highlightW: number;
   highlightColor: string;
   onClick: (r: number, c: number) => void;
 }) {
@@ -192,15 +275,27 @@ function GridCanvas({ rawData, rows, cols, highlightR, highlightC, highlightH, h
     ctx.strokeStyle = highlightColor;
     ctx.lineWidth = 2;
     ctx.strokeRect(
-      highlightC * cellSize + 1, highlightR * cellSize + 1,
-      highlightW * cellSize - 2, highlightH * cellSize - 2,
+      highlightC * cellSize + 1,
+      highlightR * cellSize + 1,
+      highlightW * cellSize - 2,
+      highlightH * cellSize - 2,
     );
-  }, [rawData, rows, cols, highlightR, highlightC, highlightH, highlightW, highlightColor, cellSize]);
+  }, [
+    rawData,
+    rows,
+    cols,
+    highlightR,
+    highlightC,
+    highlightH,
+    highlightW,
+    highlightColor,
+    cellSize,
+  ]);
 
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    const c = Math.floor((e.clientX - rect.left) / rect.width * cols);
-    const r = Math.floor((e.clientY - rect.top) / rect.height * rows);
+    const c = Math.floor(((e.clientX - rect.left) / rect.width) * cols);
+    const r = Math.floor(((e.clientY - rect.top) / rect.height) * rows);
     onClick(Math.max(0, Math.min(rows - 1, r)), Math.max(0, Math.min(cols - 1, c)));
   };
 
@@ -218,7 +313,9 @@ function GridCanvas({ rawData, rows, cols, highlightR, highlightC, highlightH, h
 function PooledValues({ values, channels }: { values: number[]; channels: number }) {
   return (
     <div className="tfm-pool-values">
-      <div className="tfm-pool-values-label">{values.length} of {channels} channels &mdash; one value per channel</div>
+      <div className="tfm-pool-values-label">
+        {values.length} of {channels} channels &mdash; one value per channel
+      </div>
       <VectorBars values={values} height={160} label="Per-channel pooled values" />
     </div>
   );

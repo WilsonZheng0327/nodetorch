@@ -173,7 +173,9 @@ export function TokenizerDetail({ nodeType, nodeProperties, datasetType }: Props
                   onChange={(e) => setSort(e.target.value as SortMode)}
                 >
                   {SORT_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -188,14 +190,22 @@ export function TokenizerDetail({ nodeType, nodeProperties, datasetType }: Props
                   <div className="layer-detail-loading">No tokens match "{search}"</div>
                 )}
                 {sortedVocab.slice(0, 500).map((v) => (
-                  <div key={v.id} className={v.special ? 'tokenizer-vocab-row special' : 'tokenizer-vocab-row'}>
+                  <div
+                    key={v.id}
+                    className={v.special ? 'tokenizer-vocab-row special' : 'tokenizer-vocab-row'}
+                  >
                     <span className="tokenizer-col-id">{v.id}</span>
                     <span className="tokenizer-col-token">{renderToken(v.token)}</span>
-                    <span className="tokenizer-col-freq">{v.freq ? v.freq.toLocaleString() : '—'}</span>
+                    <span className="tokenizer-col-freq">
+                      {v.freq ? v.freq.toLocaleString() : '—'}
+                    </span>
                   </div>
                 ))}
                 {sortedVocab.length > 500 && (
-                  <div className="heatmap-note">Showing first 500 of {sortedVocab.length.toLocaleString()} tokens. Use search to narrow.</div>
+                  <div className="heatmap-note">
+                    Showing first 500 of {sortedVocab.length.toLocaleString()} tokens. Use search to
+                    narrow.
+                  </div>
                 )}
               </div>
             </>
@@ -211,12 +221,16 @@ export function TokenizerDetail({ nodeType, nodeProperties, datasetType }: Props
               {data.merges.slice(0, 500).map(([a, b], i) => (
                 <div key={i} className="tokenizer-vocab-row">
                   <span className="tokenizer-col-id">{i + 1}</span>
-                  <span className="tokenizer-col-token">{renderToken(a)} + {renderToken(b)}</span>
+                  <span className="tokenizer-col-token">
+                    {renderToken(a)} + {renderToken(b)}
+                  </span>
                   <span className="tokenizer-col-freq">{renderToken(a + b)}</span>
                 </div>
               ))}
               {data.merges.length > 500 && (
-                <div className="heatmap-note">Showing first 500 of {data.merges.length.toLocaleString()} merges.</div>
+                <div className="heatmap-note">
+                  Showing first 500 of {data.merges.length.toLocaleString()} merges.
+                </div>
               )}
             </div>
           )}

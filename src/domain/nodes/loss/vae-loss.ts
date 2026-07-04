@@ -11,7 +11,8 @@ export const vaeLossNode: NodeDefinition = {
   description: 'Reconstruction + KL divergence loss for VAEs',
   category: ['ML', 'Loss'],
   color: '#ef4444',
-  learnMore: 'Combines reconstruction loss (how well the decoder recreates the input) with KL divergence (how close the latent distribution is to a standard normal). The \u03B2 parameter controls the trade-off \u2014 higher \u03B2 forces a more organized latent space but may sacrifice reconstruction quality.',
+  learnMore:
+    'Combines reconstruction loss (how well the decoder recreates the input) with KL divergence (how close the latent distribution is to a standard normal). The \u03B2 parameter controls the trade-off \u2014 higher \u03B2 forces a more organized latent space but may sacrifice reconstruction quality.',
 
   getProperties: () => [
     {
@@ -25,11 +26,46 @@ export const vaeLossNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'reconstruction', name: 'Reconstruction', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'original', name: 'Original', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'mean', name: 'Mean', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'logvar', name: 'Log Variance', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Loss', direction: 'output', dataType: 'scalar', allowMultiple: true, optional: false },
+    {
+      id: 'reconstruction',
+      name: 'Reconstruction',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'original',
+      name: 'Original',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'mean',
+      name: 'Mean',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'logvar',
+      name: 'Log Variance',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Loss',
+      direction: 'output',
+      dataType: 'scalar',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

@@ -43,7 +43,9 @@
   font-weight: 600;
   cursor: pointer;
   outline: none;
-  transition: color 0.12s, border-color 0.12s;
+  transition:
+    color 0.12s,
+    border-color 0.12s;
 }
 
 .left-rail-tab:hover {
@@ -121,7 +123,10 @@
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   outline: none;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .left-rail-handle:hover {

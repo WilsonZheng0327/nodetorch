@@ -10,7 +10,8 @@ export function SoftmaxViz({ t }: { t: SoftmaxTransformation }) {
     <div className="tfm-softmax">
       {predicted && (
         <div className="tfm-softmax-predicted">
-          Predicted: <strong>class {predicted.index}</strong> ({(predicted.value * 100).toFixed(1)}%)
+          Predicted: <strong>class {predicted.index}</strong> ({(predicted.value * 100).toFixed(1)}
+          %)
         </div>
       )}
 
@@ -36,7 +37,10 @@ export function SoftmaxViz({ t }: { t: SoftmaxTransformation }) {
               <div key={i} className="tfm-prob-row">
                 <span className="tfm-prob-idx">#{p.index}</span>
                 <div className="tfm-prob-bar-bg">
-                  <div className="tfm-prob-bar" style={{ width: `${(p.value / (t.topK[0]?.value || 1)) * 100}%` }} />
+                  <div
+                    className="tfm-prob-bar"
+                    style={{ width: `${(p.value / (t.topK[0]?.value || 1)) * 100}%` }}
+                  />
                 </div>
                 <span className="tfm-prob-val">{(p.value * 100).toFixed(1)}%</span>
               </div>

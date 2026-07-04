@@ -6,7 +6,8 @@ export const maxPool2dNode: NodeDefinition = {
   displayName: 'MaxPool2d',
   description: '2D max pooling',
   category: ['ML', 'Layers', 'Pooling'],
-  learnMore: 'Takes the maximum value in each pooling window, reducing spatial size while keeping the strongest features. A kernel of 2 with stride 2 halves the image dimensions. Provides translation invariance \u2014 the exact position of a feature matters less.',
+  learnMore:
+    'Takes the maximum value in each pooling window, reducing spatial size while keeping the strongest features. A kernel of 2 with stride 2 halves the image dimensions. Provides translation invariance \u2014 the exact position of a feature matters less.',
 
   getProperties: () => [
     {
@@ -36,8 +37,22 @@ export const maxPool2dNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -54,7 +69,9 @@ export const maxPool2dNode: NodeDefinition = {
         if (outH <= 0 || outW <= 0) {
           return {
             outputs: {},
-            metadata: { error: `Invalid output: ${outH}x${outW} (kernel ${K} too large for ${H}x${W} input)` },
+            metadata: {
+              error: `Invalid output: ${outH}x${outW} (kernel ${K} too large for ${H}x${W} input)`,
+            },
           };
         }
 

@@ -11,7 +11,8 @@ export const tokenizerWordNode: NodeDefinition = {
   displayName: 'Word Tokenizer',
   description: 'Word-level tokenization (frequency-based vocab)',
   category: ['ML', 'Preprocessing'],
-  learnMore: 'Splits text on whitespace into word tokens. The vocab is the top-K most frequent words in the corpus; everything else (rare words, words unseen at training time) becomes <unk>. Larger vocab captures more words but inflates the embedding table. Cannot represent out-of-vocabulary words at inference time — that\'s what subword tokenizers (BPE) fix.',
+  learnMore:
+    "Splits text on whitespace into word tokens. The vocab is the top-K most frequent words in the corpus; everything else (rare words, words unseen at training time) becomes <unk>. Larger vocab captures more words but inflates the embedding table. Cannot represent out-of-vocabulary words at inference time — that's what subword tokenizers (BPE) fix.",
 
   getProperties: () => [
     {
@@ -49,8 +50,22 @@ export const tokenizerWordNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Text Data', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Token IDs', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Text Data',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Token IDs',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

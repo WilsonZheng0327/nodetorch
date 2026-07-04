@@ -6,7 +6,8 @@ export const dropoutNode: NodeDefinition = {
   displayName: 'Dropout',
   description: 'Randomly zeros elements during training',
   category: ['ML', 'Layers', 'Regularization'],
-  learnMore: 'Randomly sets individual values to zero during training, forcing the network to not rely on any single neuron. A simple but effective regularization technique. Only active during training \u2014 disabled during inference. Higher p = stronger regularization.',
+  learnMore:
+    'Randomly sets individual values to zero during training, forcing the network to not rely on any single neuron. A simple but effective regularization technique. Only active during training \u2014 disabled during inference. Higher p = stronger regularization.',
 
   getProperties: () => [
     {
@@ -20,8 +21,22 @@ export const dropoutNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

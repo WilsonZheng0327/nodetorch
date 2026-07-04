@@ -74,15 +74,13 @@ export function buildNodeCatalog(domain: { nodeRegistry: NodeRegistry }): NodeCa
     const defaultProps: Record<string, unknown> = {};
     for (const p of def.getProperties()) defaultProps[p.id] = p.defaultValue;
 
-    const ports = def.getPorts(defaultProps).map(
-      (p): CatalogPort => ({
-        id: p.id,
-        direction: p.direction,
-        dataType: p.dataType,
-        allowMultiple: p.allowMultiple,
-        optional: p.optional,
-      }),
-    );
+    const ports = def.getPorts(defaultProps).map((p): CatalogPort => ({
+      id: p.id,
+      direction: p.direction,
+      dataType: p.dataType,
+      allowMultiple: p.allowMultiple,
+      optional: p.optional,
+    }));
 
     return {
       type: def.type,

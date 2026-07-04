@@ -10,7 +10,7 @@ import './TutorialPanel.css';
 
 const STORAGE_KEY = 'nodetorch-tutorial';
 const DISMISSED_KEY = 'nodetorch-tutorial-dismissed';
-const SEEN_KEY = 'nodetorch-tutorial-seen';  // set after first render
+const SEEN_KEY = 'nodetorch-tutorial-seen'; // set after first render
 
 interface TutorialState {
   completed: Set<string>;
@@ -23,7 +23,9 @@ function loadState(): TutorialState {
       const parsed = JSON.parse(raw);
       return { completed: new Set(parsed.completed ?? []) };
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return { completed: new Set() };
 }
 
@@ -37,7 +39,6 @@ function isDismissed(): boolean {
 
 /** True on the very first visit (no localStorage keys yet). */
 function isFirstVisit(): boolean {
-
   // UNCOMMENT TO SHOW TUTORIAL ON EVERY REFRESH
   // localStorage.removeItem('nodetorch-tutorial-seen')
   // localStorage.removeItem('nodetorch-tutorial')
@@ -51,12 +52,12 @@ export function TutorialPanel() {
   // Computed once via a lazy initializer (stable across renders, safe to read
   // during render — unlike a ref, whose .current the React Compiler forbids here).
   const [firstVisit] = useState(isFirstVisit);
-  const [dismissed, setDismissed] = useState(() => firstVisit ? false : isDismissed());
+  const [dismissed, setDismissed] = useState(() => (firstVisit ? false : isDismissed()));
   const [collapsed, setCollapsed] = useState(() => !firstVisit);
   const [expandedGoal, setExpandedGoal] = useState<string | null>(() => {
     const s = loadState();
     for (const goal of TUTORIAL_GOALS) {
-      if (goal.tasks.some(t => !s.completed.has(t.id))) return goal.id;
+      if (goal.tasks.some((t) => !s.completed.has(t.id))) return goal.id;
     }
     return null;
   });
@@ -67,12 +68,16 @@ export function TutorialPanel() {
   }, []);
 
   // Persist state changes
-  useEffect(() => { saveState(state); }, [state]);
+  useEffect(() => {
+    saveState(state);
+  }, [state]);
 
   // --- Dragging ---
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const dragState = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const dragState = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(
+    null,
+  );
   const didDrag = useRef(false);
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
@@ -107,12 +112,12 @@ export function TutorialPanel() {
 
   const onHeaderClick = useCallback(() => {
     if (didDrag.current) return; // suppress click after drag
-    setCollapsed(c => !c);
+    setCollapsed((c) => !c);
   }, []);
 
   // Toggle a task
   const toggleTask = useCallback((taskId: string) => {
-    setState(prev => {
+    setState((prev) => {
       const next = new Set(prev.completed);
       if (next.has(taskId)) next.delete(taskId);
       else next.add(taskId);
@@ -122,7 +127,7 @@ export function TutorialPanel() {
 
   // Auto-detect events
   const completeTask = useCallback((taskId: string) => {
-    setState(prev => {
+    setState((prev) => {
       if (prev.completed.has(taskId)) return prev;
       const next = new Set(prev.completed);
       next.add(taskId);
@@ -173,13 +178,11 @@ export function TutorialPanel() {
   if (dismissed) return null;
 
   const totalTasks = ALL_TASK_IDS.length;
-  const completedCount = ALL_TASK_IDS.filter(id => state.completed.has(id)).length;
+  const completedCount = ALL_TASK_IDS.filter((id) => state.completed.has(id)).length;
   const allDone = completedCount === totalTasks;
   const progressPct = Math.round((completedCount / totalTasks) * 100);
 
-  const posStyle = pos
-    ? { top: pos.y, left: pos.x, transform: 'none' }
-    : undefined;
+  const posStyle = pos ? { top: pos.y, left: pos.x, transform: 'none' } : undefined;
 
   return (
     <div
@@ -189,16 +192,34 @@ export function TutorialPanel() {
     >
       <div className="tutorial-header" onMouseDown={onDragStart} onClick={onHeaderClick}>
         <div className="tutorial-header-left">
-          {allDone ? <Trophy size={14} className="tutorial-trophy" /> : <span className="tutorial-progress-ring">{progressPct}%</span>}
+          {allDone ? (
+            <Trophy size={14} className="tutorial-trophy" />
+          ) : (
+            <span className="tutorial-progress-ring">{progressPct}%</span>
+          )}
           <span className="tutorial-header-title">
             {allDone ? 'Tutorial Complete!' : 'Getting Started'}
           </span>
         </div>
         <div className="tutorial-header-right">
-          <button className="tutorial-icon-btn" onClick={(e) => { e.stopPropagation(); reset(); }} title="Reset tutorial">
+          <button
+            className="tutorial-icon-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              reset();
+            }}
+            title="Reset tutorial"
+          >
             <RotateCcw size={12} />
           </button>
-          <button className="tutorial-icon-btn" onClick={(e) => { e.stopPropagation(); dismiss(); }} title="Dismiss tutorial">
+          <button
+            className="tutorial-icon-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              dismiss();
+            }}
+            title="Dismiss tutorial"
+          >
             <X size={12} />
           </button>
         </div>
@@ -210,7 +231,7 @@ export function TutorialPanel() {
             <div className="tutorial-progress-bar-fill" style={{ width: `${progressPct}%` }} />
           </div>
 
-          {TUTORIAL_GOALS.map(goal => (
+          {TUTORIAL_GOALS.map((goal) => (
             <GoalSection
               key={goal.id}
               goal={goal}
@@ -223,7 +244,8 @@ export function TutorialPanel() {
 
           {allDone && (
             <div className="tutorial-congrats">
-              You've completed all the basics! Explore presets, try different architectures, and experiment freely.
+              You've completed all the basics! Explore presets, try different architectures, and
+              experiment freely.
             </div>
           )}
         </div>
@@ -232,15 +254,21 @@ export function TutorialPanel() {
   );
 }
 
-function GoalSection({ goal, completed, expanded, onToggleExpand, onToggleTask }: {
+function GoalSection({
+  goal,
+  completed,
+  expanded,
+  onToggleExpand,
+  onToggleTask,
+}: {
   goal: TutorialGoal;
   completed: Set<string>;
   expanded: boolean;
   onToggleExpand: () => void;
   onToggleTask: (id: string) => void;
 }) {
-  const goalDone = goal.tasks.every(t => completed.has(t.id));
-  const goalProgress = goal.tasks.filter(t => completed.has(t.id)).length;
+  const goalDone = goal.tasks.every((t) => completed.has(t.id));
+  const goalProgress = goal.tasks.filter((t) => completed.has(t.id)).length;
 
   return (
     <div className={`tutorial-goal ${goalDone ? 'tutorial-goal-done' : ''}`}>
@@ -249,13 +277,15 @@ function GoalSection({ goal, completed, expanded, onToggleExpand, onToggleTask }
           {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </span>
         <span className="tutorial-goal-title">{goal.title}</span>
-        <span className="tutorial-goal-count">{goalProgress}/{goal.tasks.length}</span>
+        <span className="tutorial-goal-count">
+          {goalProgress}/{goal.tasks.length}
+        </span>
       </button>
 
       {expanded && (
         <div className="tutorial-tasks">
           <div className="tutorial-goal-desc">{goal.description}</div>
-          {goal.tasks.map(task => {
+          {goal.tasks.map((task) => {
             const done = completed.has(task.id);
             return (
               <div key={task.id} className={`tutorial-task ${done ? 'tutorial-task-done' : ''}`}>

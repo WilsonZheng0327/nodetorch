@@ -11,7 +11,8 @@ export const crossEntropyLossNode: NodeDefinition = {
   description: 'Cross-entropy loss (includes softmax)',
   category: ['ML', 'Loss'],
   color: '#ef4444',
-  learnMore: 'Measures how wrong the model\'s class predictions are. Combines softmax and negative log-likelihood in one efficient computation. Output of 0 means perfect predictions. The standard loss for classification tasks (image classification, text classification, etc.).',
+  learnMore:
+    "Measures how wrong the model's class predictions are. Combines softmax and negative log-likelihood in one efficient computation. Output of 0 means perfect predictions. The standard loss for classification tasks (image classification, text classification, etc.).",
 
   getProperties: () => [],
 
@@ -56,7 +57,9 @@ export const crossEntropyLossNode: NodeDefinition = {
         if (predictions.length !== 2 && predictions.length !== 3) {
           return {
             outputs: {},
-            metadata: { error: `Predictions should be [B, C] or [B, seq_len, C], got [${predictions.join(', ')}]` },
+            metadata: {
+              error: `Predictions should be [B, C] or [B, seq_len, C], got [${predictions.join(', ')}]`,
+            },
           };
         }
 
@@ -69,7 +72,9 @@ export const crossEntropyLossNode: NodeDefinition = {
           if (labels.length !== 2 || labels[0] !== B || labels[1] !== predictions[1]) {
             return {
               outputs: {},
-              metadata: { error: `Labels should be [${B}, ${predictions[1]}], got [${labels.join(', ')}]` },
+              metadata: {
+                error: `Labels should be [${B}, ${predictions[1]}], got [${labels.join(', ')}]`,
+              },
             };
           }
         } else {
@@ -77,7 +82,9 @@ export const crossEntropyLossNode: NodeDefinition = {
           if (labels.length !== 1 || labels[0] !== B) {
             return {
               outputs: {},
-              metadata: { error: `Labels batch size ${labels[0]} doesn't match predictions batch size ${B}` },
+              metadata: {
+                error: `Labels batch size ${labels[0]} doesn't match predictions batch size ${B}`,
+              },
             };
           }
         }

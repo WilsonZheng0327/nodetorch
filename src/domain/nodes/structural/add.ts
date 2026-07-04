@@ -20,14 +20,36 @@ export const addNode: NodeDefinition = {
   displayName: 'Add',
   description: 'Element-wise addition (for skip/residual connections)',
   category: ['ML', 'Structural'],
-  learnMore: 'Element-wise addition of two tensors \u2014 the building block of residual/skip connections. In ResNets, the input skips over a block of layers and is added back to the output. This lets gradients flow directly through the skip path, making very deep networks trainable.',
+  learnMore:
+    'Element-wise addition of two tensors \u2014 the building block of residual/skip connections. In ResNets, the input skips over a block of layers and is added back to the output. This lets gradients flow directly through the skip path, making very deep networks trainable.',
 
   getProperties: () => [],
 
   getPorts: () => [
-    { id: 'a', name: 'A', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'b', name: 'B', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'a',
+      name: 'A',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'b',
+      name: 'B',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -44,7 +66,9 @@ export const addNode: NodeDefinition = {
         if (!result) {
           return {
             outputs: {},
-            metadata: { error: `Shapes not broadcast-compatible: [${a.join(', ')}] + [${b.join(', ')}]` },
+            metadata: {
+              error: `Shapes not broadcast-compatible: [${a.join(', ')}] + [${b.join(', ')}]`,
+            },
           };
         }
 

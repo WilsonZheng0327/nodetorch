@@ -12,7 +12,8 @@ export const attentionNode: NodeDefinition = {
   displayName: 'Attention',
   description: 'Scaled dot-product attention (QK^TV)',
   category: ['ML', 'Layers', 'Attention'],
-  learnMore: 'Scaled dot-product attention \u2014 computes how much each position should attend to every other position. The attention weight between positions i and j is based on how similar their Query and Key vectors are. The foundation of all transformer architectures.',
+  learnMore:
+    'Scaled dot-product attention \u2014 computes how much each position should attend to every other position. The attention weight between positions i and j is based on how similar their Query and Key vectors are. The foundation of all transformer architectures.',
 
   getProperties: () => [
     {
@@ -33,10 +34,38 @@ export const attentionNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'query', name: 'Query', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'key', name: 'Key', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'value', name: 'Value', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'query',
+      name: 'Query',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'key',
+      name: 'Key',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'value',
+      name: 'Value',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -49,11 +78,19 @@ export const attentionNode: NodeDefinition = {
         if (!query) return { outputs: {} };
 
         if (query.length < 2) {
-          return { outputs: {}, metadata: { error: `Query should be at least 2D, got [${query}]` } };
+          return {
+            outputs: {},
+            metadata: { error: `Query should be at least 2D, got [${query}]` },
+          };
         }
 
         if (key && key[key.length - 1] !== query[query.length - 1]) {
-          return { outputs: {}, metadata: { error: `Key embed dim ${key[key.length - 1]} != Query embed dim ${query[query.length - 1]}` } };
+          return {
+            outputs: {},
+            metadata: {
+              error: `Key embed dim ${key[key.length - 1]} != Query embed dim ${query[query.length - 1]}`,
+            },
+          };
         }
 
         // Value seq_len must match Key seq_len (V is attended over same positions as K)
@@ -61,7 +98,10 @@ export const attentionNode: NodeDefinition = {
           const keySeq = key[key.length - 2];
           const valSeq = value[value.length - 2];
           if (keySeq !== valSeq) {
-            return { outputs: {}, metadata: { error: `Value seq_len ${valSeq} != Key seq_len ${keySeq}` } };
+            return {
+              outputs: {},
+              metadata: { error: `Value seq_len ${valSeq} != Key seq_len ${keySeq}` },
+            };
           }
         }
 

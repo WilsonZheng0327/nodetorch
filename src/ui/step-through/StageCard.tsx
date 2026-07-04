@@ -24,7 +24,9 @@ export function StageCard({ stage, active, onClick }: Props) {
       title={title}
     >
       {stage.blockName && <div className="stage-card-block">{stage.blockName}</div>}
-      <div className={`stage-card-name ${!hasPreview ? 'stage-card-name-large' : ''}`}>{stage.displayName}</div>
+      <div className={`stage-card-name ${!hasPreview ? 'stage-card-name-large' : ''}`}>
+        {stage.displayName}
+      </div>
       {hasPreview && (
         <div className="stage-card-preview">
           <MiniFeatureMap pixels={fmaps!.maps[0]} />
@@ -38,13 +40,20 @@ export function StageCard({ stage, active, onClick }: Props) {
 /** Only extract feature maps for spatial layers — conv, pool, upsample, data, dropout. */
 function extractOutputFeatureMaps(t: Transformation): FeatureMaps | undefined {
   switch (t.type) {
-    case 'conv2d': return t.output;
-    case 'pool': return (t.output.height > 2 && t.output.width > 2) ? t.output : undefined;
-    case 'upsample': return t.output;
-    case 'data': return t.featureMaps;
-    case 'dropout': return t.outputMaps;
-    case 'activation': return t.outputMaps;
-    default: return undefined;
+    case 'conv2d':
+      return t.output;
+    case 'pool':
+      return t.output.height > 2 && t.output.width > 2 ? t.output : undefined;
+    case 'upsample':
+      return t.output;
+    case 'data':
+      return t.featureMaps;
+    case 'dropout':
+      return t.outputMaps;
+    case 'activation':
+      return t.outputMaps;
+    default:
+      return undefined;
   }
 }
 
@@ -64,7 +73,10 @@ function MiniFeatureMap({ pixels }: { pixels: number[][] }) {
       for (let x = 0; x < w; x++) {
         const idx = (y * w + x) * 4;
         const v = pixels[y][x];
-        data.data[idx] = v; data.data[idx + 1] = v; data.data[idx + 2] = v; data.data[idx + 3] = 255;
+        data.data[idx] = v;
+        data.data[idx + 1] = v;
+        data.data[idx + 2] = v;
+        data.data[idx + 3] = 255;
       }
     }
     ctx.putImageData(data, 0, 0);

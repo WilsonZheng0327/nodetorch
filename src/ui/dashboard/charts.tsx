@@ -19,7 +19,18 @@ interface ChartProps {
   compareLabel?: string;
 }
 
-export function Chart({ data: rawData, labels, color, formatValue, selectedIndex, valData, valColor, compareData, compareColor, compareLabel }: ChartProps) {
+export function Chart({
+  data: rawData,
+  labels,
+  color,
+  formatValue,
+  selectedIndex,
+  valData,
+  valColor,
+  compareData,
+  compareColor,
+  compareLabel,
+}: ChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Track canvas client size so we re-render on resize (keeps bitmap crisp)
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
@@ -39,7 +50,7 @@ export function Chart({ data: rawData, labels, color, formatValue, selectedIndex
     if (!canvas || rawData.length === 0 || size.w === 0) return;
 
     // Guard against NaN/null/Infinity
-    const data = rawData.map((v) => (v == null || !isFinite(v)) ? 0 : v);
+    const data = rawData.map((v) => (v == null || !isFinite(v) ? 0 : v));
     // Sanitize valData (preserve null = "no val for this epoch")
     const valClean = valData?.map((v) => (v != null && isFinite(v) ? v : null));
     const compareClean = compareData?.map((v) => (v != null && isFinite(v) ? v : null));
@@ -62,8 +73,8 @@ export function Chart({ data: rawData, labels, color, formatValue, selectedIndex
     ctx.clearRect(0, 0, w, h);
 
     // Compute min/max across all series
-    const valValuesForRange = (valClean?.filter((v): v is number => v != null)) ?? [];
-    const compareValuesForRange = (compareClean?.filter((v): v is number => v != null)) ?? [];
+    const valValuesForRange = valClean?.filter((v): v is number => v != null) ?? [];
+    const compareValuesForRange = compareClean?.filter((v): v is number => v != null) ?? [];
     const allValues = [...data, ...valValuesForRange, ...compareValuesForRange];
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
@@ -187,8 +198,8 @@ export function Chart({ data: rawData, labels, color, formatValue, selectedIndex
 
     // Legend (if val line present). Sits in the top margin with breathing room above.
     if (valClean) {
-      const legendY = 18;       // text baseline
-      const legendRectY = 12;   // line sample top
+      const legendY = 18; // text baseline
+      const legendRectY = 12; // line sample top
       ctx.font = '11px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
       // Train legend
@@ -228,7 +239,9 @@ export function Chart({ data: rawData, labels, color, formatValue, selectedIndex
     const isCurrentEpoch = selectedIndex == null;
     const markerIndex = isCurrentEpoch
       ? data.length - 1
-      : (selectedIndex >= 0 && selectedIndex < data.length ? selectedIndex : -1);
+      : selectedIndex >= 0 && selectedIndex < data.length
+        ? selectedIndex
+        : -1;
     if (markerIndex >= 0) {
       const markerColor = isCurrentEpoch ? '#fe640b' : '#89b4fa';
       const sx = pad.left + (plotW * markerIndex) / Math.max(data.length - 1, 1);
@@ -253,7 +266,19 @@ export function Chart({ data: rawData, labels, color, formatValue, selectedIndex
       ctx.textAlign = 'center';
       ctx.fillText(formatValue(data[markerIndex]), sx, sy - 10);
     }
-  }, [rawData, labels, color, formatValue, selectedIndex, valData, valColor, compareData, compareColor, compareLabel, size]);
+  }, [
+    rawData,
+    labels,
+    color,
+    formatValue,
+    selectedIndex,
+    valData,
+    valColor,
+    compareData,
+    compareColor,
+    compareLabel,
+    size,
+  ]);
 
   return <canvas ref={canvasRef} className="dashboard-chart" />;
 }
@@ -329,9 +354,9 @@ export function GradientFlowChart({ data }: { data: { name: string; norm: number
   return (
     <div className="dashboard-gradflow-scroll">
       <div className="dashboard-explainer">
-        Gradient magnitude (L2 norm) per layer after backward pass. Bars near zero at early
-        layers can indicate vanishing gradients; very large bars can indicate exploding
-        gradients. Healthy training usually shows gradients within a few orders of magnitude.
+        Gradient magnitude (L2 norm) per layer after backward pass. Bars near zero at early layers
+        can indicate vanishing gradients; very large bars can indicate exploding gradients. Healthy
+        training usually shows gradients within a few orders of magnitude.
       </div>
       <canvas ref={canvasRef} className="dashboard-chart dashboard-chart-tall" />
     </div>

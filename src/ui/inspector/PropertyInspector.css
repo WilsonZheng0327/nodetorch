@@ -164,7 +164,9 @@
   cursor: pointer;
   width: 56px;
   position: relative;
-  transition: background 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
 
 .inspector-toggle-on {
@@ -177,7 +179,9 @@
   height: 16px;
   border-radius: 50%;
   background: #6c7086;
-  transition: transform 0.2s, background 0.2s;
+  transition:
+    transform 0.2s,
+    background 0.2s;
 }
 
 .inspector-toggle-on .inspector-toggle-thumb {

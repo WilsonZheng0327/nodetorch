@@ -10,7 +10,8 @@ export const embeddingNode: NodeDefinition = {
   displayName: 'Embedding',
   description: 'Token embedding lookup (maps indices to vectors)',
   category: ['ML', 'Layers'],
-  learnMore: 'Converts integer token IDs into dense vectors. Each word/token gets its own learned vector that captures its meaning. The foundation of all NLP models. Similar words end up with similar vectors after training.',
+  learnMore:
+    'Converts integer token IDs into dense vectors. Each word/token gets its own learned vector that captures its meaning. The foundation of all NLP models. Similar words end up with similar vectors after training.',
 
   getProperties: () => [
     {
@@ -19,7 +20,7 @@ export const embeddingNode: NodeDefinition = {
       type: { kind: 'number', min: 1, integer: true },
       defaultValue: 10000,
       affects: 'execution',
-      help: 'Vocabulary size — must be >= the dataset\'s vocabSize. Each unique token gets its own learned vector.',
+      help: "Vocabulary size — must be >= the dataset's vocabSize. Each unique token gets its own learned vector.",
     },
     {
       id: 'embeddingDim',
@@ -32,8 +33,22 @@ export const embeddingNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Token IDs', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Embeddings', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Token IDs',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Embeddings',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

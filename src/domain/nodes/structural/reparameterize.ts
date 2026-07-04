@@ -10,14 +10,36 @@ export const reparameterizeNode: NodeDefinition = {
   displayName: 'Reparameterize',
   description: 'VAE reparameterization trick: samples z = mean + std * noise',
   category: ['ML', 'Structural'],
-  learnMore: 'The "reparameterization trick" that makes VAEs trainable. Instead of sampling directly from the learned distribution (which blocks gradients), it samples noise separately and combines it: z = mean + std \u00d7 noise. This lets gradients flow through the mean and variance parameters.',
+  learnMore:
+    'The "reparameterization trick" that makes VAEs trainable. Instead of sampling directly from the learned distribution (which blocks gradients), it samples noise separately and combines it: z = mean + std \u00d7 noise. This lets gradients flow through the mean and variance parameters.',
 
   getProperties: () => [],
 
   getPorts: () => [
-    { id: 'mean', name: 'Mean', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'logvar', name: 'Log Variance', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'mean',
+      name: 'Mean',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'logvar',
+      name: 'Log Variance',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

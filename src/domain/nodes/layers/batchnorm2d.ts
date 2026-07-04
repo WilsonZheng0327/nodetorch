@@ -6,13 +6,28 @@ export const batchNorm2dNode: NodeDefinition = {
   displayName: 'BatchNorm2d',
   description: 'Batch normalization over 4D input',
   category: ['ML', 'Layers', 'Normalization'],
-  learnMore: 'Normalizes each channel to mean\u22480 and std\u22481, then applies learned scale and shift parameters. Makes training faster and more stable by preventing internal covariate shift. Almost always used after Conv2d and before the activation function.',
+  learnMore:
+    'Normalizes each channel to mean\u22480 and std\u22481, then applies learned scale and shift parameters. Makes training faster and more stable by preventing internal covariate shift. Almost always used after Conv2d and before the activation function.',
 
   getProperties: () => [],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

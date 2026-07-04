@@ -6,15 +6,37 @@ export const dropout2dNode: NodeDefinition = {
   displayName: 'Dropout2d',
   description: 'Spatial dropout — zeroes entire channels during training',
   category: ['ML', 'Layers', 'Regularization'],
-  learnMore: 'Drops entire channels instead of individual values. Better for convolutional networks because adjacent pixels in a feature map are correlated \u2014 dropping one pixel has little effect, but dropping the whole channel forces the network to use other features.',
+  learnMore:
+    'Drops entire channels instead of individual values. Better for convolutional networks because adjacent pixels in a feature map are correlated \u2014 dropping one pixel has little effect, but dropping the whole channel forces the network to use other features.',
 
   getProperties: () => [
-    { id: 'p', name: 'Drop Probability', type: { kind: 'number', min: 0, max: 1, step: 0.1 }, defaultValue: 0.5, affects: 'execution', help: 'Probability of zeroing entire channels (not individual pixels). Better for CNNs because it drops spatial features as a unit.' },
+    {
+      id: 'p',
+      name: 'Drop Probability',
+      type: { kind: 'number', min: 0, max: 1, step: 0.1 },
+      defaultValue: 0.5,
+      affects: 'execution',
+      help: 'Probability of zeroing entire channels (not individual pixels). Better for CNNs because it drops spatial features as a unit.',
+    },
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -22,7 +44,10 @@ export const dropout2dNode: NodeDefinition = {
       execute: async ({ inputs }) => {
         const input = inputs.in;
         if (!input) return { outputs: {} };
-        return { outputs: { out: input }, metadata: { outputShape: input, shapes: [{ label: 'Output', value: input }] } };
+        return {
+          outputs: { out: input },
+          metadata: { outputShape: input, shapes: [{ label: 'Output', value: input }] },
+        };
       },
     },
   },

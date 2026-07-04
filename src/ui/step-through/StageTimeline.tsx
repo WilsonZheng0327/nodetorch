@@ -53,7 +53,9 @@ export function StageTimeline({ stages, currentIdx, onSelect, direction = 'forwa
     items.push(
       <div key={stage.stageId} className="stage-timeline-item">
         <StageCard stage={stage} active={i === currentIdx} onClick={() => onSelect(i)} />
-        {i < stages.length - 1 && <div className="stage-timeline-arrow">{direction === 'backward' ? '←' : '→'}</div>}
+        {i < stages.length - 1 && (
+          <div className="stage-timeline-arrow">{direction === 'backward' ? '←' : '→'}</div>
+        )}
       </div>,
     );
   });

@@ -25,9 +25,7 @@ export function SystemInfoPanel({ info }: { info: SystemInfo | null }) {
   }
 
   // Build available device options
-  const deviceOptions: { value: string; label: string }[] = [
-    { value: 'cpu', label: 'CPU' },
-  ];
+  const deviceOptions: { value: string; label: string }[] = [{ value: 'cpu', label: 'CPU' }];
   if (info.cudaAvailable) {
     for (let i = 0; i < info.gpuCount; i++) {
       const name = info.gpus[i]?.name ?? `GPU ${i}`;
@@ -58,7 +56,9 @@ export function SystemInfoPanel({ info }: { info: SystemInfo | null }) {
           onChange={(e) => handleDeviceChange(e.target.value)}
         >
           {deviceOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
           ))}
         </select>
       </div>
@@ -73,7 +73,9 @@ export function SystemInfoPanel({ info }: { info: SystemInfo | null }) {
       </div>
       <div className="system-info-row">
         <span className="system-info-label">CUDA</span>
-        <span className={`system-info-value ${info.cudaAvailable ? 'system-info-ok' : 'system-info-warn'}`}>
+        <span
+          className={`system-info-value ${info.cudaAvailable ? 'system-info-ok' : 'system-info-warn'}`}
+        >
           {info.cudaAvailable ? 'Available' : 'Not available'}
         </span>
       </div>
@@ -148,7 +150,13 @@ export function ModelSummaryPanel({ layers }: { layers: ModelLayerInfo[] }) {
 // --- Runs panel (training history) ---
 
 export function RunsPanel({
-  runs, loading, onRefresh, onCompare, onDelete, compareRun, onClearCompare,
+  runs,
+  loading,
+  onRefresh,
+  onCompare,
+  onDelete,
+  compareRun,
+  onClearCompare,
 }: {
   runs: SavedRun[] | null;
   loading: boolean;
@@ -162,18 +170,26 @@ export function RunsPanel({
     return <div className="dashboard-chart-placeholder">Loading runs...</div>;
   }
   if (!runs || runs.length === 0) {
-    return <div className="dashboard-chart-placeholder">No saved runs yet — train a model to create one</div>;
+    return (
+      <div className="dashboard-chart-placeholder">
+        No saved runs yet — train a model to create one
+      </div>
+    );
   }
   return (
     <div className="runs-panel">
       <div className="runs-panel-header">
-        <span>{runs.length} saved run{runs.length === 1 ? '' : 's'}</span>
+        <span>
+          {runs.length} saved run{runs.length === 1 ? '' : 's'}
+        </span>
         {compareRun && (
           <button className="dashboard-tab" onClick={onClearCompare} title="Stop comparing">
             Clear compare ({compareRun.id.slice(-8)})
           </button>
         )}
-        <button className="dashboard-tab" onClick={onRefresh} style={{ marginLeft: 'auto' }}>Refresh</button>
+        <button className="dashboard-tab" onClick={onRefresh} style={{ marginLeft: 'auto' }}>
+          Refresh
+        </button>
       </div>
       <table className="dashboard-table">
         <thead>
@@ -199,14 +215,24 @@ export function RunsPanel({
               <td>{r.learningRate?.toExponential(1)}</td>
               <td>{r.epochs}</td>
               <td>{r.totalParams?.toLocaleString()}</td>
-              <td>{r.bestValAccuracy != null ? `${(r.bestValAccuracy * 100).toFixed(1)}%` : '—'}</td>
+              <td>
+                {r.bestValAccuracy != null ? `${(r.bestValAccuracy * 100).toFixed(1)}%` : '—'}
+              </td>
               <td>{r.finalAccuracy != null ? `${(r.finalAccuracy * 100).toFixed(1)}%` : '—'}</td>
               <td>{r.duration}s</td>
               <td>
-                <button className="runs-action-btn" onClick={() => onCompare(r.id)} title="Overlay on loss/accuracy charts">
+                <button
+                  className="runs-action-btn"
+                  onClick={() => onCompare(r.id)}
+                  title="Overlay on loss/accuracy charts"
+                >
                   Compare
                 </button>
-                <button className="runs-action-btn runs-action-delete" onClick={() => onDelete(r.id)} title="Delete">
+                <button
+                  className="runs-action-btn runs-action-delete"
+                  onClick={() => onDelete(r.id)}
+                  title="Delete"
+                >
                   ×
                 </button>
               </td>
@@ -220,19 +246,31 @@ export function RunsPanel({
 
 // --- Test Result View ---
 
-export function TestResultView({ result, isTesting }: { result?: TestResult | null; isTesting?: boolean }) {
+export function TestResultView({
+  result,
+  isTesting,
+}: {
+  result?: TestResult | null;
+  isTesting?: boolean;
+}) {
   if (isTesting && !result) {
     return <div className="dashboard-chart-placeholder">Evaluating on the held-out test set…</div>;
   }
   if (!result) {
-    return <div className="dashboard-chart-placeholder">No test results yet — click "Test" after training to evaluate on the held-out test set</div>;
+    return (
+      <div className="dashboard-chart-placeholder">
+        No test results yet — click "Test" after training to evaluate on the held-out test set
+      </div>
+    );
   }
 
   return (
     <div className="test-result-view">
       <div className="test-result-summary">
         <div className="test-result-metric">
-          <span className="test-result-metric-value">{(result.testAccuracy * 100).toFixed(1)}%</span>
+          <span className="test-result-metric-value">
+            {(result.testAccuracy * 100).toFixed(1)}%
+          </span>
           <span className="test-result-metric-label">Test Accuracy</span>
         </div>
         <div className="test-result-metric">
@@ -246,8 +284,8 @@ export function TestResultView({ result, isTesting }: { result?: TestResult | nu
       </div>
 
       <div className="test-result-note">
-        These results are on the <strong>held-out test set</strong> — data the model never saw during training.
-        This measures how well the model generalizes to new, unseen data.
+        These results are on the <strong>held-out test set</strong> — data the model never saw
+        during training. This measures how well the model generalizes to new, unseen data.
       </div>
 
       {result.perClassAccuracy.length > 0 && (
@@ -260,7 +298,11 @@ export function TestResultView({ result, isTesting }: { result?: TestResult | nu
                 <div className="test-result-class-bar-bg">
                   <div
                     className="test-result-class-bar"
-                    style={{ width: `${c.accuracy * 100}%`, background: c.accuracy >= 0.8 ? '#10b981' : c.accuracy >= 0.5 ? '#f59e0b' : '#ef4444' }}
+                    style={{
+                      width: `${c.accuracy * 100}%`,
+                      background:
+                        c.accuracy >= 0.8 ? '#10b981' : c.accuracy >= 0.5 ? '#f59e0b' : '#ef4444',
+                    }}
                   />
                 </div>
                 <span className="test-result-class-val">{(c.accuracy * 100).toFixed(1)}%</span>

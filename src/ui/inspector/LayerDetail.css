@@ -127,12 +127,7 @@
   flex: 1;
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(
-    to right,
-    rgb(0, 0, 255),
-    rgb(128, 255, 128),
-    rgb(255, 0, 0)
-  );
+  background: linear-gradient(to right, rgb(0, 0, 255), rgb(128, 255, 128), rgb(255, 0, 0));
 }
 
 .heatmap-note {

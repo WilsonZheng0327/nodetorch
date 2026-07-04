@@ -11,12 +11,16 @@ export function MseLossViz({ t }: { t: MseLossTransformation }) {
       {(t.predsFmaps || t.targetsFmaps) && (
         <div className="tfm-before-after">
           <div className="tfm-ba-pane">
-            <div className="tfm-ba-label">Predictions {t.predsShape ? `[${t.predsShape.join(', ')}]` : ''}</div>
+            <div className="tfm-ba-label">
+              Predictions {t.predsShape ? `[${t.predsShape.join(', ')}]` : ''}
+            </div>
             {t.predsFmaps && <FeatureMapsGrid data={t.predsFmaps} />}
           </div>
           <div className="tfm-ba-divider" />
           <div className="tfm-ba-pane">
-            <div className="tfm-ba-label">Targets {t.targetsShape ? `[${t.targetsShape.join(', ')}]` : ''}</div>
+            <div className="tfm-ba-label">
+              Targets {t.targetsShape ? `[${t.targetsShape.join(', ')}]` : ''}
+            </div>
             {t.targetsFmaps && <FeatureMapsGrid data={t.targetsFmaps} />}
           </div>
         </div>
@@ -60,7 +64,9 @@ export function MseLossViz({ t }: { t: MseLossTransformation }) {
           )}
           {t.loss != null && t.numElements != null && (
             <div className="tfm-mse-calc-step tfm-mse-calc-result">
-              <span className="tfm-mse-calc-desc">5. MSE = sum / {t.numElements.toLocaleString()}</span>
+              <span className="tfm-mse-calc-desc">
+                5. MSE = sum / {t.numElements.toLocaleString()}
+              </span>
               <span className="tfm-mse-calc-val tfm-mse-calc-final">{t.loss.toFixed(6)}</span>
             </div>
           )}
@@ -70,7 +76,15 @@ export function MseLossViz({ t }: { t: MseLossTransformation }) {
   );
 }
 
-function ErrorMapCanvas({ pixels, height, width }: { pixels: number[][]; height: number; width: number }) {
+function ErrorMapCanvas({
+  pixels,
+  height,
+  width,
+}: {
+  pixels: number[][];
+  height: number;
+  width: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = canvasRef.current;

@@ -94,7 +94,14 @@ export function useAgentChat(opts: Options) {
 
   const handleMessage = useCallback(
     async (ev: MessageEvent) => {
-      let msg: { type?: string; text?: string; error?: string; id?: string; name?: string; args?: Record<string, unknown> };
+      let msg: {
+        type?: string;
+        text?: string;
+        error?: string;
+        id?: string;
+        name?: string;
+        args?: Record<string, unknown>;
+      };
       try {
         msg = JSON.parse(ev.data);
       } catch {

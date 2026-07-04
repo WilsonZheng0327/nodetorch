@@ -13,7 +13,8 @@ export const tokenizerCharNode: NodeDefinition = {
   displayName: 'Char Tokenizer',
   description: 'Character-level tokenization (vocab = unique chars in corpus)',
   category: ['ML', 'Preprocessing'],
-  learnMore: 'Each character is a single token. The vocabulary is every unique character that appears in the upstream corpus — typically under 200 for English text, more for Unicode-heavy corpora. There is no vocab-size knob to set; click this node to open the detail panel and see the actual vocabulary after a dataset is connected. Small vocab is easy to learn, but sequences become very long. Classic char-level RNN/LM setups (Karpathy\'s char-rnn) use this.',
+  learnMore:
+    "Each character is a single token. The vocabulary is every unique character that appears in the upstream corpus — typically under 200 for English text, more for Unicode-heavy corpora. There is no vocab-size knob to set; click this node to open the detail panel and see the actual vocabulary after a dataset is connected. Small vocab is easy to learn, but sequences become very long. Classic char-level RNN/LM setups (Karpathy's char-rnn) use this.",
 
   getProperties: () => [
     {
@@ -35,8 +36,22 @@ export const tokenizerCharNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Text Data', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Token IDs', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Text Data',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Token IDs',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

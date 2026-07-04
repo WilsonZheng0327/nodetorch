@@ -6,7 +6,8 @@ export const softmaxNode: NodeDefinition = {
   displayName: 'Softmax',
   description: 'Softmax activation (outputs sum to 1)',
   category: ['ML', 'Layers'],
-  learnMore: 'Converts a vector of raw scores into probabilities that sum to 1. The standard final activation for multi-class classification. Applied automatically inside CrossEntropyLoss, so you usually don\'t need to add it explicitly.',
+  learnMore:
+    "Converts a vector of raw scores into probabilities that sum to 1. The standard final activation for multi-class classification. Applied automatically inside CrossEntropyLoss, so you usually don't need to add it explicitly.",
 
   getProperties: () => [
     {
@@ -20,8 +21,22 @@ export const softmaxNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -29,7 +44,10 @@ export const softmaxNode: NodeDefinition = {
       execute: async ({ inputs }) => {
         const input = inputs.in;
         if (!input || (typeof input === 'object' && !Array.isArray(input))) return { outputs: {} };
-        return { outputs: { out: input }, metadata: { outputShape: input, shapes: [{ label: 'Output', value: input }] } };
+        return {
+          outputs: { out: input },
+          metadata: { outputShape: input, shapes: [{ label: 'Output', value: input }] },
+        };
       },
     },
   },

@@ -73,7 +73,9 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
   }, [datasetType]);
 
   // Reset page when search changes
-  useEffect(() => { setPage(0); }, [search]);
+  useEffect(() => {
+    setPage(0);
+  }, [search]);
 
   // Fetch augmentation preview when datasetType or augOptions change
   useEffect(() => {
@@ -103,7 +105,9 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
       <div className="dataset-detail">
         <div className="dataset-detail-header">
           <span>Loading...</span>
-          <button className="dashboard-close" onClick={onClose}>&times;</button>
+          <button className="dashboard-close" onClick={onClose}>
+            &times;
+          </button>
         </div>
       </div>
     );
@@ -114,7 +118,9 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
       <div className="dataset-detail">
         <div className="dataset-detail-header">
           <span>Error</span>
-          <button className="dashboard-close" onClick={onClose}>&times;</button>
+          <button className="dashboard-close" onClick={onClose}>
+            &times;
+          </button>
         </div>
         <div className="dataset-detail-body">
           <div className="dataset-detail-error">{error}</div>
@@ -124,9 +130,7 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
   }
 
   const PAGE_SIZE = 20;
-  const filteredLabels = info.labels.filter((l) =>
-    l.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredLabels = info.labels.filter((l) => l.toLowerCase().includes(search.toLowerCase()));
   const totalPages = Math.ceil(filteredLabels.length / PAGE_SIZE);
   const pagedLabels = filteredLabels.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
@@ -134,7 +138,9 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
     <div className="dataset-detail">
       <div className="dataset-detail-header">
         <span className="dataset-detail-title">{info.name}</span>
-        <button className="dashboard-close" onClick={onClose}>&times;</button>
+        <button className="dashboard-close" onClick={onClose}>
+          &times;
+        </button>
       </div>
 
       <div className="dataset-detail-body">
@@ -143,7 +149,9 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
           {info.imageSize && info.channels != null && (
             <div className="dataset-detail-stat">
               <span className="dataset-detail-stat-label">Image Size</span>
-              <span>{info.imageSize.join('x')}, {info.channels === 1 ? 'grayscale' : 'RGB'}</span>
+              <span>
+                {info.imageSize.join('x')}, {info.channels === 1 ? 'grayscale' : 'RGB'}
+              </span>
             </div>
           )}
           {info.isText && (
@@ -153,7 +161,9 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
             </div>
           )}
           <div className="dataset-detail-stat">
-            <span className="dataset-detail-stat-label">{info.testSamples != null ? 'Train / Test' : 'Train Samples'}</span>
+            <span className="dataset-detail-stat-label">
+              {info.testSamples != null ? 'Train / Test' : 'Train Samples'}
+            </span>
             <span>
               {info.trainSamples.toLocaleString()}
               {info.testSamples != null && ` / ${info.testSamples.toLocaleString()}`}
@@ -182,7 +192,10 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
             <div className="dataset-detail-section-label">Augmentation Preview</div>
             <div className="dataset-detail-aug-grid">
               <div className="dataset-detail-aug-item">
-                <MiniImage pixels={augPreview.original.pixels} channels={augPreview.original.channels} />
+                <MiniImage
+                  pixels={augPreview.original.pixels}
+                  channels={augPreview.original.channels}
+                />
                 <span className="dataset-detail-aug-label">original</span>
               </div>
               {augPreview.variants.map((v, i) => (
@@ -208,7 +221,9 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
                 <span className="dataset-detail-label-name">{key}</span>
                 <div className="dataset-detail-texts">
                   {texts.map((text, i) => (
-                    <div key={i} className="dataset-detail-text-sample">{text}</div>
+                    <div key={i} className="dataset-detail-text-sample">
+                      {text}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -241,7 +256,9 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
                   {info.sampleTexts && (
                     <div className="dataset-detail-texts">
                       {(info.sampleTexts[label] ?? []).map((text, i) => (
-                        <div key={i} className="dataset-detail-text-sample">{text}</div>
+                        <div key={i} className="dataset-detail-text-sample">
+                          {text}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -262,7 +279,8 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
                   Prev
                 </button>
                 <span className="dataset-detail-page-info">
-                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredLabels.length)} of {filteredLabels.length}
+                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredLabels.length)}{' '}
+                  of {filteredLabels.length}
                 </span>
                 <button
                   className="dataset-detail-page-btn"
@@ -289,7 +307,9 @@ function MiniImage({ pixels, channels }: { pixels: number[][] | number[][][]; ch
     if (!canvas || !pixels || pixels.length === 0) return;
 
     const h = pixels.length;
-    const w = Array.isArray(pixels[0][0]) ? (pixels[0] as number[][]).length : (pixels[0] as number[]).length;
+    const w = Array.isArray(pixels[0][0])
+      ? (pixels[0] as number[][]).length
+      : (pixels[0] as number[]).length;
     canvas.width = w;
     canvas.height = h;
 

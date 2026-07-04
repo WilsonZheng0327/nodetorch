@@ -7,14 +7,36 @@ export const mseLossNode: NodeDefinition = {
   description: 'Mean Squared Error loss (regression)',
   category: ['ML', 'Loss'],
   color: '#ef4444',
-  learnMore: 'Measures the average squared difference between predictions and targets. Used for regression tasks and reconstruction (autoencoders, diffusion). Penalizes large errors more than small ones because of the squaring.',
+  learnMore:
+    'Measures the average squared difference between predictions and targets. Used for regression tasks and reconstruction (autoencoders, diffusion). Penalizes large errors more than small ones because of the squaring.',
 
   getProperties: () => [],
 
   getPorts: () => [
-    { id: 'predictions', name: 'Predictions', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'labels', name: 'Targets', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Loss', direction: 'output', dataType: 'scalar', allowMultiple: true, optional: false },
+    {
+      id: 'predictions',
+      name: 'Predictions',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'labels',
+      name: 'Targets',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Loss',
+      direction: 'output',
+      dataType: 'scalar',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -28,7 +50,9 @@ export const mseLossNode: NodeDefinition = {
         if (JSON.stringify(predictions) !== JSON.stringify(labels)) {
           return {
             outputs: {},
-            metadata: { error: `Shape mismatch: predictions ${JSON.stringify(predictions)} vs targets ${JSON.stringify(labels)}` },
+            metadata: {
+              error: `Shape mismatch: predictions ${JSON.stringify(predictions)} vs targets ${JSON.stringify(labels)}`,
+            },
           };
         }
 

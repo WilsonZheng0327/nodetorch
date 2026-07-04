@@ -10,7 +10,8 @@ export const layerNormNode: NodeDefinition = {
   displayName: 'LayerNorm',
   description: 'Layer normalization (used in transformers)',
   category: ['ML', 'Layers', 'Normalization'],
-  learnMore: 'Normalizes across features within each sample (unlike BatchNorm which normalizes across the batch). The standard normalization for transformer models because it works well with variable-length sequences and small batches.',
+  learnMore:
+    'Normalizes across features within each sample (unlike BatchNorm which normalizes across the batch). The standard normalization for transformer models because it works well with variable-length sequences and small batches.',
 
   getProperties: () => [
     {
@@ -24,8 +25,22 @@ export const layerNormNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {

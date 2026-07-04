@@ -45,7 +45,9 @@ export function VizPanel({ snapshot, onClose }: Props) {
     <div className="viz-panel nodrag">
       <div className="viz-panel-header">
         <span>Visualization</span>
-        <button className="viz-panel-close" onClick={onClose}>&times;</button>
+        <button className="viz-panel-close" onClick={onClose}>
+          &times;
+        </button>
       </div>
 
       <div className="viz-panel-content">
@@ -54,44 +56,74 @@ export function VizPanel({ snapshot, onClose }: Props) {
         ) : (
           <>
             {hasWeights && (
-              <VizSection title="Weights" color="#89b4fa" data={snapshot.weights!} tip="Distribution of all parameter values. Should be centered near 0. Collapse to 0 or explosion means trouble." stats={[
-                { label: 'mean', value: snapshot.weights!.mean },
-                { label: 'std', value: snapshot.weights!.std },
-              ]} />
+              <VizSection
+                title="Weights"
+                color="#89b4fa"
+                data={snapshot.weights!}
+                tip="Distribution of all parameter values. Should be centered near 0. Collapse to 0 or explosion means trouble."
+                stats={[
+                  { label: 'mean', value: snapshot.weights!.mean },
+                  { label: 'std', value: snapshot.weights!.std },
+                ]}
+              />
             )}
 
             {hasGradients && (
-              <VizSection title="Gradients" color="#f9e2af" data={snapshot.gradients!} tip="Gradient magnitudes from backward pass. Tiny = vanishing gradients. Huge = exploding gradients." stats={[
-                { label: 'mean', value: snapshot.gradients!.mean },
-                { label: 'norm', value: snapshot.gradients!.norm },
-              ]} warning={detectGradientIssue(snapshot.gradients!)} />
+              <VizSection
+                title="Gradients"
+                color="#f9e2af"
+                data={snapshot.gradients!}
+                tip="Gradient magnitudes from backward pass. Tiny = vanishing gradients. Huge = exploding gradients."
+                stats={[
+                  { label: 'mean', value: snapshot.gradients!.mean },
+                  { label: 'norm', value: snapshot.gradients!.norm },
+                ]}
+                warning={detectGradientIssue(snapshot.gradients!)}
+              />
             )}
 
             {hasActivations && (
-              <VizSection title="Activations" color="#10b981" data={snapshot.activations!} tip="Distribution of this layer's output values. High sparsity may mean dead neurons." stats={[
-                { label: 'mean', value: snapshot.activations!.mean },
-                { label: 'sparsity', value: snapshot.activations!.sparsity, pct: true },
-              ]} warning={detectActivationIssue(snapshot.activations!)} />
+              <VizSection
+                title="Activations"
+                color="#10b981"
+                data={snapshot.activations!}
+                tip="Distribution of this layer's output values. High sparsity may mean dead neurons."
+                stats={[
+                  { label: 'mean', value: snapshot.activations!.mean },
+                  { label: 'sparsity', value: snapshot.activations!.sparsity, pct: true },
+                ]}
+                warning={detectActivationIssue(snapshot.activations!)}
+              />
             )}
 
             {hasBatchNorm && (
               <>
-                <VizSection title="Running Mean" color="#cba6f7" data={snapshot.batchnorm!.runningMean!} tip="BatchNorm's learned per-channel mean of inputs." stats={[
-                  { label: 'mean', value: snapshot.batchnorm!.runningMean!.mean },
-                  { label: 'std', value: snapshot.batchnorm!.runningMean!.std },
-                ]} />
+                <VizSection
+                  title="Running Mean"
+                  color="#cba6f7"
+                  data={snapshot.batchnorm!.runningMean!}
+                  tip="BatchNorm's learned per-channel mean of inputs."
+                  stats={[
+                    { label: 'mean', value: snapshot.batchnorm!.runningMean!.mean },
+                    { label: 'std', value: snapshot.batchnorm!.runningMean!.std },
+                  ]}
+                />
                 {snapshot.batchnorm!.runningVar?.histBins && (
-                  <VizSection title="Running Var" color="#f5c2e7" data={snapshot.batchnorm!.runningVar!} tip="BatchNorm's learned per-channel variance of inputs." stats={[
-                    { label: 'mean', value: snapshot.batchnorm!.runningVar!.mean },
-                    { label: 'std', value: snapshot.batchnorm!.runningVar!.std },
-                  ]} />
+                  <VizSection
+                    title="Running Var"
+                    color="#f5c2e7"
+                    data={snapshot.batchnorm!.runningVar!}
+                    tip="BatchNorm's learned per-channel variance of inputs."
+                    stats={[
+                      { label: 'mean', value: snapshot.batchnorm!.runningVar!.mean },
+                      { label: 'std', value: snapshot.batchnorm!.runningVar!.std },
+                    ]}
+                  />
                 )}
               </>
             )}
 
-            {hasWeightDelta && (
-              <WeightDeltaSection value={snapshot.weightDelta!} />
-            )}
+            {hasWeightDelta && <WeightDeltaSection value={snapshot.weightDelta!} />}
           </>
         )}
       </div>
@@ -119,7 +151,14 @@ function detectActivationIssue(a: HistogramData): string | null {
 
 // --- Section with stats + histogram ---
 
-function VizSection({ title, color, data, stats, tip, warning }: {
+function VizSection({
+  title,
+  color,
+  data,
+  stats,
+  tip,
+  warning,
+}: {
   title: string;
   color: string;
   data: HistogramData;
@@ -134,14 +173,21 @@ function VizSection({ title, color, data, stats, tip, warning }: {
       <div className="viz-section-title" style={{ color }}>
         {title}
         {warning && <span className="viz-warning">{warning}</span>}
-        {tip && <span className="viz-tip" onClick={() => setShowTip(!showTip)}>?</span>}
+        {tip && (
+          <span className="viz-tip" onClick={() => setShowTip(!showTip)}>
+            ?
+          </span>
+        )}
       </div>
       {showTip && tip && <div className="viz-tip-text">{tip}</div>}
       <div className="viz-stats">
         {stats.map((s) => (
           <span key={s.label}>
-            {s.label}: {s.value != null
-              ? (s.pct ? `${(s.value * 100).toFixed(1)}%` : s.value.toFixed(4))
+            {s.label}:{' '}
+            {s.value != null
+              ? s.pct
+                ? `${(s.value * 100).toFixed(1)}%`
+                : s.value.toFixed(4)
               : '—'}
           </span>
         ))}
@@ -161,9 +207,15 @@ function WeightDeltaSection({ value }: { value: number }) {
       <div className="viz-section-title" style={{ color: '#fab387' }}>
         Weight Delta
         {warning && <span className="viz-warning">{warning}</span>}
-        <span className="viz-tip" onClick={() => setShowTip(!showTip)}>?</span>
+        <span className="viz-tip" onClick={() => setShowTip(!showTip)}>
+          ?
+        </span>
       </div>
-      {showTip && <div className="viz-tip-text">How much weights changed this epoch. Near-zero = converged or not learning.</div>}
+      {showTip && (
+        <div className="viz-tip-text">
+          How much weights changed this epoch. Near-zero = converged or not learning.
+        </div>
+      )}
       <div className="viz-stats">
         <span>norm: {value.toFixed(6)}</span>
       </div>
@@ -183,7 +235,15 @@ function formatAxis(v: number): string {
 
 // --- Canvas-rendered histogram ---
 
-function MiniHistogram({ bins, counts, color }: { bins: number[]; counts: number[]; color: string }) {
+function MiniHistogram({
+  bins,
+  counts,
+  color,
+}: {
+  bins: number[];
+  counts: number[];
+  color: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Track canvas CSS size so the bitmap stays sharp when the panel resizes.
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
@@ -288,10 +348,5 @@ function MiniHistogram({ bins, counts, color }: { bins: number[]; counts: number
     }
   }, [bins, counts, color, size, zoom]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="viz-histogram"
-    />
-  );
+  return <canvas ref={canvasRef} className="viz-histogram" />;
 }

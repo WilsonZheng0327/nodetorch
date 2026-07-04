@@ -91,21 +91,34 @@ function toRFEdges(graph: Graph): RF.Edge[] {
 function friendlyError(msg: string): string {
   if (msg.includes('mat1 and mat2 shapes cannot be multiplied')) {
     const match = msg.match(/(\d+x\d+).*?(\d+x\d+)/);
-    if (match) return `Shape mismatch in Linear layer: input is ${match[1]} but weights expect ${match[2]}. Check upstream layer output size.`;
+    if (match)
+      return `Shape mismatch in Linear layer: input is ${match[1]} but weights expect ${match[2]}. Check upstream layer output size.`;
   }
-  if (msg.includes('Expected 4-dimensional input')) return 'This layer expects a 4D tensor [B,C,H,W]. Add a Reshape node or check connections.';
-  if (msg.includes('Expected 3-dimensional input')) return 'This layer expects a 3D tensor [B,seq,features]. Check input dimensions.';
-  if (msg.includes('Expected 2-dimensional input')) return 'This layer expects a 2D tensor [B,features]. Did you forget a Flatten layer?';
-  if (msg.includes('size mismatch')) return `Tensor size mismatch — shapes don't align. Check that connected layers have compatible dimensions.`;
-  if (msg.includes('CUDA out of memory')) return 'GPU out of memory. Try reducing batch size or using CPU.';
-  if (msg.includes('is not a valid device')) return 'Selected device not available. Switch to CPU in the dashboard System tab.';
-  if (msg.includes('negative dimension')) return 'Layer produced a negative dimension — kernel/stride/padding combination is too large for the input size.';
+  if (msg.includes('Expected 4-dimensional input'))
+    return 'This layer expects a 4D tensor [B,C,H,W]. Add a Reshape node or check connections.';
+  if (msg.includes('Expected 3-dimensional input'))
+    return 'This layer expects a 3D tensor [B,seq,features]. Check input dimensions.';
+  if (msg.includes('Expected 2-dimensional input'))
+    return 'This layer expects a 2D tensor [B,features]. Did you forget a Flatten layer?';
+  if (msg.includes('size mismatch'))
+    return `Tensor size mismatch — shapes don't align. Check that connected layers have compatible dimensions.`;
+  if (msg.includes('CUDA out of memory'))
+    return 'GPU out of memory. Try reducing batch size or using CPU.';
+  if (msg.includes('is not a valid device'))
+    return 'Selected device not available. Switch to CPU in the dashboard System tab.';
+  if (msg.includes('negative dimension'))
+    return 'Layer produced a negative dimension — kernel/stride/padding combination is too large for the input size.';
   return msg;
 }
 
 /** Save a blob to disk: use the File System Access API (lets the user pick a name
  *  and location) when available, otherwise fall back to a plain download. */
-async function downloadBlob(blob: Blob, suggestedName: string, description: string, ext: string): Promise<void> {
+async function downloadBlob(
+  blob: Blob,
+  suggestedName: string,
+  description: string,
+  ext: string,
+): Promise<void> {
   if ('showSaveFilePicker' in window) {
     try {
       const handle = await (window as any).showSaveFilePicker({
@@ -136,8 +149,11 @@ export function useGraph(domain: DomainContext) {
   const graphRef = useRef<Graph>(createGraph('main', 'Main Graph'));
   const [rfNodes, setRFNodes] = useState<RF.Node[]>([]);
   const [rfEdges, setRFEdges] = useState<RF.Edge[]>([]);
-  const [graphVersion, setGraphVersion] = useState(0);  // bumped on every mutation to force re-renders
-  const [status, setStatus] = useState<{ type: 'idle' | 'running' | 'success' | 'error'; message?: string }>({ type: 'idle' });
+  const [graphVersion, setGraphVersion] = useState(0); // bumped on every mutation to force re-renders
+  const [status, setStatus] = useState<{
+    type: 'idle' | 'running' | 'success' | 'error';
+    message?: string;
+  }>({ type: 'idle' });
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [modelTrained, setModelTrained] = useState(false);
   const [modelStale, setModelStale] = useState(false);
@@ -184,11 +200,15 @@ export function useGraph(domain: DomainContext) {
       const res = await fetch(apiUrl('/blocks'));
       const data = await res.json();
       if (data.status === 'ok') setSavedBlocks(data.blocks);
-    } catch { /* backend not running */ }
+    } catch {
+      /* backend not running */
+    }
   }, []);
 
   // Load on mount
-  useEffect(() => { refreshBlocks(); }, [refreshBlocks]);
+  useEffect(() => {
+    refreshBlocks();
+  }, [refreshBlocks]);
 
   // --- Subgraph navigation ---
   // navStack tracks the path from root into nested subgraphs.
@@ -227,25 +247,31 @@ export function useGraph(domain: DomainContext) {
   }, []);
 
   // Enter a subgraph node (double-click)
-  const enterSubgraph = useCallback((nodeId: string) => {
-    const currentGraph = getCurrentGraph();
-    const node = currentGraph.nodes.get(nodeId);
-    if (!node || node.type !== 'subgraph.block' || !node.subgraph) return;
+  const enterSubgraph = useCallback(
+    (nodeId: string) => {
+      const currentGraph = getCurrentGraph();
+      const node = currentGraph.nodes.get(nodeId);
+      if (!node || node.type !== 'subgraph.block' || !node.subgraph) return;
 
-    const newStack: NavEntry[] = [
-      ...navStack,
-      { graphId: node.subgraph.id, label: node.properties.blockName || 'Block', nodeId },
-    ];
-    setNavStack(newStack);
-    syncToGraph(resolveGraph(newStack));
-  }, [getCurrentGraph, navStack, resolveGraph, syncToGraph]);
+      const newStack: NavEntry[] = [
+        ...navStack,
+        { graphId: node.subgraph.id, label: node.properties.blockName || 'Block', nodeId },
+      ];
+      setNavStack(newStack);
+      syncToGraph(resolveGraph(newStack));
+    },
+    [getCurrentGraph, navStack, resolveGraph, syncToGraph],
+  );
 
   // Go back to a specific level in the breadcrumb
-  const navigateTo = useCallback((depth: number) => {
-    const newStack = navStack.slice(0, depth);
-    setNavStack(newStack);
-    syncToGraph(resolveGraph(newStack));
-  }, [navStack, resolveGraph, syncToGraph]);
+  const navigateTo = useCallback(
+    (depth: number) => {
+      const newStack = navStack.slice(0, depth);
+      setNavStack(newStack);
+      syncToGraph(resolveGraph(newStack));
+    },
+    [navStack, resolveGraph, syncToGraph],
+  );
 
   // Pop up one level out of the current subgraph (no-op at the root).
   const exitSubgraph = useCallback(() => {
@@ -275,7 +301,9 @@ export function useGraph(domain: DomainContext) {
       const tgtValid = tgtPorts.some((p) => p.id === e.target.portId);
 
       if (!srcValid || !tgtValid) {
-        console.warn(`[nodetorch] Pruned invalid edge ${e.id}: ${e.source.portId} → ${e.target.portId}`);
+        console.warn(
+          `[nodetorch] Pruned invalid edge ${e.id}: ${e.source.portId} → ${e.target.portId}`,
+        );
       }
       return srcValid && tgtValid;
     });
@@ -299,10 +327,8 @@ export function useGraph(domain: DomainContext) {
   // Run shape inference on the graph, then sync to React Flow
   const runShape = useCallback(async () => {
     try {
-      await domain.engine.execute(
-        graphRef.current,
-        'shape',
-        (nodeType, executorKey) => domain.nodeRegistry.getExecutor(nodeType, executorKey),
+      await domain.engine.execute(graphRef.current, 'shape', (nodeType, executorKey) =>
+        domain.nodeRegistry.getExecutor(nodeType, executorKey),
       );
     } catch (e) {
       console.error('[nodetorch] Shape inference failed:', e);
@@ -322,7 +348,10 @@ export function useGraph(domain: DomainContext) {
     let validDepth = 0;
     for (const entry of navStack) {
       const node = g.nodes.get(entry.nodeId);
-      if (node?.subgraph) { g = node.subgraph; validDepth++; } else break;
+      if (node?.subgraph) {
+        g = node.subgraph;
+        validDepth++;
+      } else break;
     }
     if (validDepth < navStack.length) setNavStack(navStack.slice(0, validDepth));
     await runShape();
@@ -339,7 +368,10 @@ export function useGraph(domain: DomainContext) {
     let validDepth = 0;
     for (const entry of navStack) {
       const node = g.nodes.get(entry.nodeId);
-      if (node?.subgraph) { g = node.subgraph; validDepth++; } else break;
+      if (node?.subgraph) {
+        g = node.subgraph;
+        validDepth++;
+      } else break;
     }
     if (validDepth < navStack.length) setNavStack(navStack.slice(0, validDepth));
     await runShape();
@@ -381,8 +413,10 @@ export function useGraph(domain: DomainContext) {
       const sourceName = domain.nodeRegistry.get(sourceNode.type)?.displayName ?? sourceNode.type;
       const targetName = domain.nodeRegistry.get(targetNode.type)?.displayName ?? targetNode.type;
 
-      if (!sourcePort) return reject(`source port "${connection.sourceHandle}" not found on ${sourceName}`);
-      if (!targetPort) return reject(`target port "${connection.targetHandle}" not found on ${targetName}`);
+      if (!sourcePort)
+        return reject(`source port "${connection.sourceHandle}" not found on ${sourceName}`);
+      if (!targetPort)
+        return reject(`target port "${connection.targetHandle}" not found on ${targetName}`);
 
       // Rule 3: data type compatibility
       if (!domain.typeRegistry.isCompatible(sourcePort.dataType, targetPort.dataType)) {
@@ -393,8 +427,7 @@ export function useGraph(domain: DomainContext) {
       if (!targetPort.allowMultiple) {
         const alreadyConnected = graph.edges.some(
           (e) =>
-            e.target.nodeId === connection.target &&
-            e.target.portId === connection.targetHandle,
+            e.target.nodeId === connection.target && e.target.portId === connection.targetHandle,
         );
         if (alreadyConnected) return reject(`port "${targetPort.name}" already connected`);
       }
@@ -407,7 +440,11 @@ export function useGraph(domain: DomainContext) {
   // --- Actions the UI can trigger ---
 
   const addNodeToGraph = useCallback(
-    async (type: string, position: { x: number; y: number }, requestedId?: string): Promise<string | undefined> => {
+    async (
+      type: string,
+      position: { x: number; y: number },
+      requestedId?: string,
+    ): Promise<string | undefined> => {
       const def = domain.nodeRegistry.get(type);
       if (!def) return undefined;
 
@@ -419,16 +456,27 @@ export function useGraph(domain: DomainContext) {
 
       // Honor a caller-requested id (e.g. an agent naming the node so it can wire
       // it in the same batch), as long as it's free; otherwise generate one.
-      const id = requestedId && !getCurrentGraph().nodes.has(requestedId)
-        ? requestedId
-        : `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const id =
+        requestedId && !getCurrentGraph().nodes.has(requestedId)
+          ? requestedId
+          : `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const node = createNode(id, type, position, properties);
 
       // If this is a subgraph block, create the inner graph with default sentinels
       if (type === 'subgraph.block') {
         const innerGraph = createGraph(`${id}-inner`, 'Inner Graph');
-        const inputNode = createNode('input', 'subgraph.input', { x: 0, y: 100 }, { portCount: 1, portNames: 'in' });
-        const outputNode = createNode('output', 'subgraph.output', { x: 400, y: 100 }, { portCount: 1, portNames: 'out' });
+        const inputNode = createNode(
+          'input',
+          'subgraph.input',
+          { x: 0, y: 100 },
+          { portCount: 1, portNames: 'in' },
+        );
+        const outputNode = createNode(
+          'output',
+          'subgraph.output',
+          { x: 400, y: 100 },
+          { portCount: 1, portNames: 'out' },
+        );
         addNode(innerGraph, inputNode);
         addNode(innerGraph, outputNode);
         node.subgraph = innerGraph;
@@ -448,7 +496,8 @@ export function useGraph(domain: DomainContext) {
       if (type.startsWith('ml.loss.')) tutorialEvent('node-added-loss');
       if (type.startsWith('ml.optimizers.')) tutorialEvent('node-added-optimizer');
       if (type.startsWith('ml.layers.batchnorm')) tutorialEvent('node-added-batchnorm');
-      if (type.startsWith('ml.layers.maxpool') || type.startsWith('ml.layers.avgpool')) tutorialEvent('node-added-pool');
+      if (type.startsWith('ml.layers.maxpool') || type.startsWith('ml.layers.avgpool'))
+        tutorialEvent('node-added-pool');
       return id;
     },
     [domain, runShape, invalidateModel, getCurrentGraph, snapshot],
@@ -490,12 +539,19 @@ export function useGraph(domain: DomainContext) {
   );
 
   const removeEdgeByEndpoints = useCallback(
-    async (sourceId: string, sourcePort: string, targetId: string, targetPort: string): Promise<boolean> => {
+    async (
+      sourceId: string,
+      sourcePort: string,
+      targetId: string,
+      targetPort: string,
+    ): Promise<boolean> => {
       const g = getCurrentGraph();
       const edge = g.edges.find(
         (e) =>
-          e.source.nodeId === sourceId && e.source.portId === sourcePort &&
-          e.target.nodeId === targetId && e.target.portId === targetPort,
+          e.source.nodeId === sourceId &&
+          e.source.portId === sourcePort &&
+          e.target.nodeId === targetId &&
+          e.target.portId === targetPort,
       );
       if (!edge) return false;
       snapshot();
@@ -558,61 +614,72 @@ export function useGraph(domain: DomainContext) {
   );
 
   // Save a subgraph node as a reusable block
-  const saveBlock = useCallback(async (nodeId: string) => {
-    const currentGraph = getCurrentGraph();
-    const node = currentGraph.nodes.get(nodeId);
-    if (!node || !node.subgraph) return;
+  const saveBlock = useCallback(
+    async (nodeId: string) => {
+      const currentGraph = getCurrentGraph();
+      const node = currentGraph.nodes.get(nodeId);
+      if (!node || !node.subgraph) return;
 
-    const blockData = {
-      name: node.properties.blockName || 'Custom Block',
-      description: `Custom block with ${node.subgraph.nodes.size} nodes`,
-      subgraph: serializeGraphData(node.subgraph),
-    };
+      const blockData = {
+        name: node.properties.blockName || 'Custom Block',
+        description: `Custom block with ${node.subgraph.nodes.size} nodes`,
+        subgraph: serializeGraphData(node.subgraph),
+      };
 
-    try {
-      const res = await fetch(apiUrl('/blocks/save'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(blockData),
-      });
-      const data = await res.json();
-      if (data.status === 'ok') {
-        setStatus({ type: 'success', message: `Block "${blockData.name}" saved` });
-        setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
-        await refreshBlocks();
+      try {
+        const res = await fetch(apiUrl('/blocks/save'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(blockData),
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          setStatus({ type: 'success', message: `Block "${blockData.name}" saved` });
+          setTimeout(() => setStatus((s) => (s.type === 'success' ? { type: 'idle' } : s)), 3000);
+          await refreshBlocks();
+        }
+      } catch {
+        setStatus({ type: 'error', message: 'Failed to save block — is the backend running?' });
       }
-    } catch {
-      setStatus({ type: 'error', message: 'Failed to save block — is the backend running?' });
-    }
-  }, [getCurrentGraph, refreshBlocks]);
+    },
+    [getCurrentGraph, refreshBlocks],
+  );
 
   // Delete a saved block
-  const deleteBlock = useCallback(async (filename: string) => {
-    try {
-      await fetch(apiUrl(`/blocks/${filename}`), { method: 'DELETE' });
-      await refreshBlocks();
-    } catch { /* ignore */ }
-  }, [refreshBlocks]);
+  const deleteBlock = useCallback(
+    async (filename: string) => {
+      try {
+        await fetch(apiUrl(`/blocks/${filename}`), { method: 'DELETE' });
+        await refreshBlocks();
+      } catch {
+        /* ignore */
+      }
+    },
+    [refreshBlocks],
+  );
 
   // Add a saved block to the graph as a new subgraph node
-  const addBlockFromTemplate = useCallback(async (filename: string, position: { x: number; y: number }) => {
-    try {
-      const res = await fetch(apiUrl(`/blocks/${filename}`));
-      const data = await res.json();
-      if (data.status !== 'ok') return;
+  const addBlockFromTemplate = useCallback(
+    async (filename: string, position: { x: number; y: number }) => {
+      try {
+        const res = await fetch(apiUrl(`/blocks/${filename}`));
+        const data = await res.json();
+        if (data.status !== 'ok') return;
 
-      const block = data.block;
-      const currentGraph = getCurrentGraph();
-      const id = `subgraph.block-${Date.now()}`;
-      const node = createNode(id, 'subgraph.block', position, { blockName: block.name });
-      node.subgraph = deserializeGraphData(block.subgraph);
-      addNode(currentGraph, node);
-      invalidateModel();
-      await runShape();
-    } catch {
-      setStatus({ type: 'error', message: 'Failed to load block' });
-    }
-  }, [getCurrentGraph, invalidateModel, runShape]);
+        const block = data.block;
+        const currentGraph = getCurrentGraph();
+        const id = `subgraph.block-${Date.now()}`;
+        const node = createNode(id, 'subgraph.block', position, { blockName: block.name });
+        node.subgraph = deserializeGraphData(block.subgraph);
+        addNode(currentGraph, node);
+        invalidateModel();
+        await runShape();
+      } catch {
+        setStatus({ type: 'error', message: 'Failed to load block' });
+      }
+    },
+    [getCurrentGraph, invalidateModel, runShape],
+  );
 
   // --- Backend Communication ---
 
@@ -622,7 +689,10 @@ export function useGraph(domain: DomainContext) {
       return;
     }
     if (modelStale) {
-      setStatus({ type: 'error', message: 'Model outdated — graph changed since last training. Retrain first.' });
+      setStatus({
+        type: 'error',
+        message: 'Model outdated — graph changed since last training. Retrain first.',
+      });
       return;
     }
     setStatus({ type: 'running', message: 'Running inference...' });
@@ -654,7 +724,10 @@ export function useGraph(domain: DomainContext) {
     }
 
     // Apply results to nodes
-    for (const [nodeId, nodeResult] of Object.entries(result.results.nodeResults) as [string, any][]) {
+    for (const [nodeId, nodeResult] of Object.entries(result.results.nodeResults) as [
+      string,
+      any,
+    ][]) {
       const node = graphRef.current.nodes.get(nodeId);
       if (!node) continue;
 
@@ -681,11 +754,13 @@ export function useGraph(domain: DomainContext) {
       setStatus({ type: 'success', message: 'Inference complete' });
     }
     tutorialEvent('infer-run');
-    setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 5000);
+    setTimeout(() => setStatus((s) => (s.type === 'success' ? { type: 'idle' } : s)), 5000);
   }, [syncToRF, modelTrained, modelStale]);
 
   const [testResult, setTestResult] = useState<{
-    testLoss: number; testAccuracy: number; testSamples: number;
+    testLoss: number;
+    testAccuracy: number;
+    testSamples: number;
     perClassAccuracy: { cls: number; name: string; accuracy: number; count: number }[];
   } | null>(null);
   // True while a test evaluation is in flight — drives the dashboard's Test tab.
@@ -697,7 +772,10 @@ export function useGraph(domain: DomainContext) {
       return;
     }
     if (modelStale) {
-      setStatus({ type: 'error', message: 'Model outdated — graph changed since last training. Retrain first.' });
+      setStatus({
+        type: 'error',
+        message: 'Model outdated — graph changed since last training. Retrain first.',
+      });
       return;
     }
     // No toolbar status for test — results are shown in the dashboard test tab.
@@ -710,7 +788,10 @@ export function useGraph(domain: DomainContext) {
       });
       const data = await res.json();
       if (data.status !== 'ok') {
-        setStatus({ type: 'error', message: friendlyError(data.error ?? 'Test evaluation failed') });
+        setStatus({
+          type: 'error',
+          message: friendlyError(data.error ?? 'Test evaluation failed'),
+        });
         return;
       }
       setTestResult(data.result);
@@ -732,9 +813,10 @@ export function useGraph(domain: DomainContext) {
   // Derived: the snapshot for the currently selected (or latest) epoch
   const liveSnapshots = (() => {
     if (snapshotHistory.length === 0) return {};
-    const idx = selectedEpoch != null
-      ? Math.min(selectedEpoch - 1, snapshotHistory.length - 1)
-      : snapshotHistory.length - 1;
+    const idx =
+      selectedEpoch != null
+        ? Math.min(selectedEpoch - 1, snapshotHistory.length - 1)
+        : snapshotHistory.length - 1;
     return snapshotHistory[Math.max(0, idx)] ?? {};
   })();
 
@@ -745,7 +827,10 @@ export function useGraph(domain: DomainContext) {
     setPinnedVizNodes((prev) => {
       const next = new Set(prev);
       if (next.has(nodeId)) next.delete(nodeId);
-      else { next.add(nodeId); tutorialEvent('viz-toggled'); }
+      else {
+        next.add(nodeId);
+        tutorialEvent('viz-toggled');
+      }
       return next;
     });
   }, []);
@@ -760,12 +845,18 @@ export function useGraph(domain: DomainContext) {
   }, []);
 
   // Batch-level progress within current epoch
-  const [batchProgress, setBatchProgress] = useState<{ batch: number; totalBatches: number } | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{
+    batch: number;
+    totalBatches: number;
+  } | null>(null);
   // True from the moment training starts until it finishes/errors/cancels
   const [trainingActive, setTrainingActive] = useState(false);
 
   // Backprop animation: map of nodeId -> { delayMs, intensity }
-  const [backpropAnim, setBackpropAnim] = useState<Record<string, { delayMs: number; intensity: number }> | null>(null);
+  const [backpropAnim, setBackpropAnim] = useState<Record<
+    string,
+    { delayMs: number; intensity: number }
+  > | null>(null);
 
   const simulateBackprop = useCallback(async () => {
     setStatus({ type: 'running', message: 'Simulating backprop...' });
@@ -797,7 +888,7 @@ export function useGraph(domain: DomainContext) {
       const totalDuration = reversed.length * stepMs + 800;
       setTimeout(() => {
         setBackpropAnim(null);
-        setStatus((s) => s.type === 'success' ? { type: 'idle' } : s);
+        setStatus((s) => (s.type === 'success' ? { type: 'idle' } : s));
       }, totalDuration);
     } catch {
       setStatus({ type: 'error', message: 'Cannot connect to backend' });
@@ -817,16 +908,19 @@ export function useGraph(domain: DomainContext) {
         return;
       }
       const blob = await res.blob();
-      const filename = (graphRef.current.name?.replace(/\s+/g, '_').toLowerCase() || 'model') + '.py';
+      const filename =
+        (graphRef.current.name?.replace(/\s+/g, '_').toLowerCase() || 'model') + '.py';
 
       if ('showSaveFilePicker' in window) {
         try {
           const handle = await (window as any).showSaveFilePicker({
             suggestedName: filename,
-            types: [{
-              description: 'Python Script',
-              accept: { 'text/x-python': ['.py'] },
-            }],
+            types: [
+              {
+                description: 'Python Script',
+                accept: { 'text/x-python': ['.py'] },
+              },
+            ],
           });
           const writable = await handle.createWritable();
           await writable.write(blob);
@@ -845,7 +939,7 @@ export function useGraph(domain: DomainContext) {
         URL.revokeObjectURL(url);
         setStatus({ type: 'success', message: 'Python code exported' });
       }
-      setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
+      setTimeout(() => setStatus((s) => (s.type === 'success' ? { type: 'idle' } : s)), 3000);
     } catch {
       setStatus({ type: 'error', message: 'Cannot connect to backend' });
     }
@@ -853,7 +947,7 @@ export function useGraph(domain: DomainContext) {
 
   const flashSuccess = useCallback((message: string) => {
     setStatus({ type: 'success', message });
-    setTimeout(() => setStatus((s) => s.type === 'success' ? { type: 'idle' } : s), 3000);
+    setTimeout(() => setStatus((s) => (s.type === 'success' ? { type: 'idle' } : s)), 3000);
   }, []);
 
   // Save a self-contained model bundle (.ntmodel = graph + weights). Always reloads
@@ -880,25 +974,31 @@ export function useGraph(domain: DomainContext) {
 
   // Load a model bundle (.ntmodel): replaces the canvas graph AND restores weights.
   // The graph is embedded in the file, so the backend returns it for the canvas.
-  const loadModel = useCallback(async (file: File) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch(apiUrl('/upload-model'), { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.status === 'ok' && data.graph) {
-        await loadGraph(JSON.stringify(data.graph));
-        setModelTrained(true);
-        setModelStale(false);
-        flashSuccess(`Model loaded from "${file.name}"`);
-      } else {
-        setStatus({ type: 'error', message: friendlyError(data.error ?? 'Failed to load model') });
-        setTimeout(() => setStatus((s) => s.type === 'error' ? { type: 'idle' } : s), 5000);
+  const loadModel = useCallback(
+    async (file: File) => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(apiUrl('/upload-model'), { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.status === 'ok' && data.graph) {
+          await loadGraph(JSON.stringify(data.graph));
+          setModelTrained(true);
+          setModelStale(false);
+          flashSuccess(`Model loaded from "${file.name}"`);
+        } else {
+          setStatus({
+            type: 'error',
+            message: friendlyError(data.error ?? 'Failed to load model'),
+          });
+          setTimeout(() => setStatus((s) => (s.type === 'error' ? { type: 'idle' } : s)), 5000);
+        }
+      } catch {
+        setStatus({ type: 'error', message: 'Cannot connect to backend' });
       }
-    } catch {
-      setStatus({ type: 'error', message: 'Cannot connect to backend' });
-    }
-  }, [loadGraph, flashSuccess]);
+    },
+    [loadGraph, flashSuccess],
+  );
 
   // Save just the trained weights (.pt). Loads back onto the CURRENT graph via
   // loadWeights — the architecture must match (use Save/Load Model to avoid that).
@@ -919,26 +1019,32 @@ export function useGraph(domain: DomainContext) {
 
   // Load weights (.pt) onto the current graph. Sends the current graph so the
   // backend can rebuild the modules and pour the weights in (architecture must match).
-  const loadWeights = useCallback(async (file: File) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('graph', saveGraph());
-      const res = await fetch(apiUrl('/upload-weights'), { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.status === 'ok') {
-        setModelTrained(true);
-        setModelStale(false);
-        flashSuccess(`Weights loaded from "${file.name}"`);
-      } else {
-        setStatus({ type: 'error', message: friendlyError(data.error ?? 'Failed to load weights') });
-        setTimeout(() => setStatus((s) => s.type === 'error' ? { type: 'idle' } : s), 5000);
-        await runShape();
+  const loadWeights = useCallback(
+    async (file: File) => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('graph', saveGraph());
+        const res = await fetch(apiUrl('/upload-weights'), { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          setModelTrained(true);
+          setModelStale(false);
+          flashSuccess(`Weights loaded from "${file.name}"`);
+        } else {
+          setStatus({
+            type: 'error',
+            message: friendlyError(data.error ?? 'Failed to load weights'),
+          });
+          setTimeout(() => setStatus((s) => (s.type === 'error' ? { type: 'idle' } : s)), 5000);
+          await runShape();
+        }
+      } catch {
+        setStatus({ type: 'error', message: 'Cannot connect to backend' });
       }
-    } catch {
-      setStatus({ type: 'error', message: 'Cannot connect to backend' });
-    }
-  }, [saveGraph, runShape, flashSuccess]);
+    },
+    [saveGraph, runShape, flashSuccess],
+  );
 
   const trainWsRef = useRef<WebSocket | null>(null);
 
@@ -966,7 +1072,7 @@ export function useGraph(domain: DomainContext) {
     setSnapshotHistory([]);
     setSelectedEpoch(null);
     setBatchProgress(null);
-    setTestResult(null);  // retraining invalidates any previous test result
+    setTestResult(null); // retraining invalidates any previous test result
     const graphData = serializeGraph(graphRef.current);
 
     return new Promise<void>((resolve) => {
@@ -1007,28 +1113,31 @@ export function useGraph(domain: DomainContext) {
 
         if (msg.type === 'epoch') {
           setBatchProgress(null); // reset batch progress when epoch completes
-          setTrainingProgress((prev) => [...prev, {
-            epoch: msg.epoch,
-            totalEpochs: msg.totalEpochs,
-            loss: msg.loss,
-            accuracy: msg.accuracy,
-            valLoss: msg.valLoss,
-            valAccuracy: msg.valAccuracy,
-            learningRate: msg.learningRate,
-            time: msg.time,
-            batches: msg.batches,
-            samples: msg.samples,
-            gradientFlow: msg.gradientFlow,
-            perClassAccuracy: msg.perClassAccuracy,
-            trackedSamples: msg.trackedSamples,
-            generatedSamples: msg.generatedSamples,
-            dLoss: msg.dLoss,
-            gLoss: msg.gLoss,
-            trainingMode: msg.trainingMode,
-            perplexity: msg.perplexity,
-            valPerplexity: msg.valPerplexity,
-            generatedText: msg.generatedText,
-          }]);
+          setTrainingProgress((prev) => [
+            ...prev,
+            {
+              epoch: msg.epoch,
+              totalEpochs: msg.totalEpochs,
+              loss: msg.loss,
+              accuracy: msg.accuracy,
+              valLoss: msg.valLoss,
+              valAccuracy: msg.valAccuracy,
+              learningRate: msg.learningRate,
+              time: msg.time,
+              batches: msg.batches,
+              samples: msg.samples,
+              gradientFlow: msg.gradientFlow,
+              perClassAccuracy: msg.perClassAccuracy,
+              trackedSamples: msg.trackedSamples,
+              generatedSamples: msg.generatedSamples,
+              dLoss: msg.dLoss,
+              gLoss: msg.gLoss,
+              trainingMode: msg.trainingMode,
+              perplexity: msg.perplexity,
+              valPerplexity: msg.valPerplexity,
+              generatedText: msg.generatedText,
+            },
+          ]);
           // Accumulate visualization snapshots per epoch
           if (msg.nodeSnapshots) {
             setSnapshotHistory((prev) => [...prev, msg.nodeSnapshots]);
@@ -1066,9 +1175,8 @@ export function useGraph(domain: DomainContext) {
       };
 
       ws.onclose = () => {
-        setStatus((s) => s.type === 'running'
-          ? { type: 'error', message: 'Connection lost during training' }
-          : s,
+        setStatus((s) =>
+          s.type === 'running' ? { type: 'error', message: 'Connection lost during training' } : s,
         );
         cleanup();
       };
@@ -1120,7 +1228,6 @@ export function useGraph(domain: DomainContext) {
     [invalidateModel, getCurrentGraph, snapshot],
   );
 
-
   // --- Auto-organize: space nodes evenly along the topological order ---
   const organizeGraph = useCallback(() => {
     const g = getCurrentGraph();
@@ -1144,11 +1251,17 @@ export function useGraph(domain: DomainContext) {
     const depth = new Map<string, number>();
     const queue: string[] = [];
     for (const [id, deg] of inDegree) {
-      if (deg === 0) { depth.set(id, 0); queue.push(id); }
+      if (deg === 0) {
+        depth.set(id, 0);
+        queue.push(id);
+      }
     }
     // Also handle disconnected nodes
     if (queue.length === 0) {
-      for (const id of g.nodes.keys()) { depth.set(id, 0); queue.push(id); }
+      for (const id of g.nodes.keys()) {
+        depth.set(id, 0);
+        queue.push(id);
+      }
     }
 
     let maxDepth = 0;
@@ -1185,7 +1298,7 @@ export function useGraph(domain: DomainContext) {
     snapshot();
     for (const [col, ids] of columns) {
       // Sort nodes within column by their current Y to preserve relative order
-      ids.sort((a, b) => (g.nodes.get(a)!.position.y - g.nodes.get(b)!.position.y));
+      ids.sort((a, b) => g.nodes.get(a)!.position.y - g.nodes.get(b)!.position.y);
       const totalHeight = (ids.length - 1) * ROW_GAP;
       const startY = -totalHeight / 2;
       for (let i = 0; i < ids.length; i++) {
@@ -1201,9 +1314,7 @@ export function useGraph(domain: DomainContext) {
 
   const copySelected = useCallback(() => {
     const currentGraph = getCurrentGraph();
-    const selectedIds = new Set(
-      rfNodes.filter((n) => n.selected).map((n) => n.id),
-    );
+    const selectedIds = new Set(rfNodes.filter((n) => n.selected).map((n) => n.id));
     if (selectedIds.size === 0) return;
 
     const copiedNodes = Array.from(currentGraph.nodes.values())
@@ -1239,10 +1350,15 @@ export function useGraph(domain: DomainContext) {
     // Create new nodes with offset positions
     for (const copied of clipboard.current.nodes) {
       const id = `${copied.type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const node = createNode(id, copied.type, {
-        x: copied.position.x + OFFSET,
-        y: copied.position.y + OFFSET,
-      }, { ...copied.properties });
+      const node = createNode(
+        id,
+        copied.type,
+        {
+          x: copied.position.x + OFFSET,
+          y: copied.position.y + OFFSET,
+        },
+        { ...copied.properties },
+      );
 
       if (copied.subgraph) {
         node.subgraph = deserializeGraphData(copied.subgraph);
@@ -1254,12 +1370,25 @@ export function useGraph(domain: DomainContext) {
 
     // Recreate edges between pasted nodes
     for (const ce of clipboard.current.edges) {
-      if (ce.sourceIdx >= 0 && ce.targetIdx >= 0 && ce.sourceIdx < newIds.length && ce.targetIdx < newIds.length) {
+      if (
+        ce.sourceIdx >= 0 &&
+        ce.targetIdx >= 0 &&
+        ce.sourceIdx < newIds.length &&
+        ce.targetIdx < newIds.length
+      ) {
         const edgeId = `e-${edgeCounter++}`;
-        const edge = createEdge(edgeId, newIds[ce.sourceIdx], ce.sourcePort, newIds[ce.targetIdx], ce.targetPort);
+        const edge = createEdge(
+          edgeId,
+          newIds[ce.sourceIdx],
+          ce.sourcePort,
+          newIds[ce.targetIdx],
+          ce.targetPort,
+        );
         try {
           addGraphEdge(currentGraph, edge);
-        } catch { /* skip invalid edges */ }
+        } catch {
+          /* skip invalid edges */
+        }
       }
     }
 

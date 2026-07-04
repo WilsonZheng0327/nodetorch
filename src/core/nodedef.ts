@@ -173,9 +173,7 @@ export class NodeRegistry {
     const all = Array.from(this.definitions.values());
     if (!category) return all;
 
-    return all.filter((def) =>
-      category.every((cat, i) => def.category[i] === cat),
-    );
+    return all.filter((def) => category.every((cat, i) => def.category[i] === cat));
   }
 
   /**

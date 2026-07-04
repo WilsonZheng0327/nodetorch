@@ -20,7 +20,7 @@
   --accent: #89b4fa;
 }
 
-[data-theme="light"] {
+[data-theme='light'] {
   --bg-base: #eff1f5;
   --bg-surface: #ffffff;
   --bg-overlay: #e6e9ef;

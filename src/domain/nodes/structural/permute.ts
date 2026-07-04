@@ -9,7 +9,8 @@ export const permuteNode: NodeDefinition = {
   displayName: 'Permute',
   description: 'Reorder tensor dimensions',
   category: ['ML', 'Structural'],
-  learnMore: 'Reorders the dimensions of a tensor. For example, converting [batch, sequence, features] to [batch, features, sequence] for Conv1d layers which expect channels before sequence length.',
+  learnMore:
+    'Reorders the dimensions of a tensor. For example, converting [batch, sequence, features] to [batch, features, sequence] for Conv1d layers which expect channels before sequence length.',
 
   getProperties: () => [
     {
@@ -23,8 +24,22 @@ export const permuteNode: NodeDefinition = {
   ],
 
   getPorts: () => [
-    { id: 'in', name: 'Input', direction: 'input', dataType: 'tensor', allowMultiple: false, optional: false },
-    { id: 'out', name: 'Output', direction: 'output', dataType: 'tensor', allowMultiple: true, optional: false },
+    {
+      id: 'in',
+      name: 'Input',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: false,
+    },
+    {
+      id: 'out',
+      name: 'Output',
+      direction: 'output',
+      dataType: 'tensor',
+      allowMultiple: true,
+      optional: false,
+    },
   ],
 
   executors: {
@@ -33,10 +48,15 @@ export const permuteNode: NodeDefinition = {
         const input = inputs.in;
         if (!input) return { outputs: {} };
 
-        const dims = (properties.dims ?? '0, 2, 1').split(',').map((s: string) => parseInt(s.trim()));
+        const dims = (properties.dims ?? '0, 2, 1')
+          .split(',')
+          .map((s: string) => parseInt(s.trim()));
 
         if (dims.length !== input.length) {
-          return { outputs: {}, metadata: { error: `Permute dims [${dims}] doesn't match input rank ${input.length}` } };
+          return {
+            outputs: {},
+            metadata: { error: `Permute dims [${dims}] doesn't match input rank ${input.length}` },
+          };
         }
 
         const outShape = dims.map((d: number) => {

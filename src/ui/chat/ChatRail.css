@@ -39,7 +39,9 @@
   height: 36px;
   border-radius: 999px;
   background: var(--border, #45475a);
-  transition: background 0.15s, height 0.15s;
+  transition:
+    background 0.15s,
+    height 0.15s;
 }
 
 .chat-rail-resize:hover .chat-rail-resize-grip,
@@ -434,7 +436,10 @@
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   outline: none;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .chat-rail-handle svg:last-child {

@@ -11,13 +11,15 @@ export function CrossEntropyViz({ t }: { t: CrossEntropyTransformation }) {
     <div className="tfm-cross-entropy">
       {/* Result summary */}
       <div className={`tfm-ce-result ${isCorrect ? 'tfm-ce-correct' : 'tfm-ce-wrong'}`}>
-        <div className="tfm-ce-result-label">
-          {isCorrect ? 'Correct' : 'Incorrect'}
-        </div>
+        <div className="tfm-ce-result-label">{isCorrect ? 'Correct' : 'Incorrect'}</div>
         <div className="tfm-ce-result-detail">
           True class: <strong>{t.classNames ? t.classNames[t.trueLabel] : t.trueLabel}</strong>
           {predicted && !isCorrect && (
-            <> &middot; Predicted: <strong>{t.classNames ? t.classNames[predicted.index] : predicted.index}</strong></>
+            <>
+              {' '}
+              &middot; Predicted:{' '}
+              <strong>{t.classNames ? t.classNames[predicted.index] : predicted.index}</strong>
+            </>
           )}
         </div>
       </div>
@@ -63,10 +65,13 @@ export function CrossEntropyViz({ t }: { t: CrossEntropyTransformation }) {
                   {isTrue && <span className="tfm-prob-true-marker"> &#x2713;</span>}
                 </span>
                 <div className="tfm-prob-bar-bg">
-                  <div className="tfm-prob-bar" style={{
-                    width: `${(p.value / (t.topK[0]?.value || 1)) * 100}%`,
-                    background: isTrue ? '#10b981' : '#89b4fa',
-                  }} />
+                  <div
+                    className="tfm-prob-bar"
+                    style={{
+                      width: `${(p.value / (t.topK[0]?.value || 1)) * 100}%`,
+                      background: isTrue ? '#10b981' : '#89b4fa',
+                    }}
+                  />
                 </div>
                 <span className="tfm-prob-val">{(p.value * 100).toFixed(1)}%</span>
               </div>
