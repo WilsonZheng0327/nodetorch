@@ -1,6 +1,5 @@
 // Keyboard shortcuts help modal — opened by the "?" button in the toolbar.
 
-import { useEffect } from 'react';
 import './ShortcutsHelp.css';
 
 interface Props {
@@ -17,9 +16,11 @@ const SHORTCUTS: { category: string; items: Shortcut[] }[] = [
   {
     category: 'Canvas',
     items: [
-      { keys: '1', description: 'Toggle node palette' },
+      { keys: '1', description: 'Toggle left panel' },
       { keys: '2', description: 'Toggle training dashboard' },
       { keys: '3', description: 'Toggle AI assistant' },
+      { keys: 'Tab', description: 'Switch left panel tab (palette / inspector)' },
+      { keys: 'Esc', description: 'Close the topmost open panel' },
       { keys: 'W / A / S / D', description: 'Pan camera (also arrow keys)' },
       { keys: 'Shift + Arrow / WASD', description: 'Pan camera fast' },
       { keys: 'Scroll', description: 'Zoom in / out' },
@@ -57,14 +58,7 @@ const SHORTCUTS: { category: string; items: Shortcut[] }[] = [
 ];
 
 export function ShortcutsHelp({ open, onClose }: Props) {
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && open) onClose();
-    }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
-
+  // Esc-to-close is handled centrally in App (fixed-priority panel closing).
   if (!open) return null;
 
   return (

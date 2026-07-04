@@ -89,6 +89,14 @@ export default function App() {
   }, [graph.rfNodes, domain]);
 
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  // Signals to the LeftRail (bumped per click, so re-clicking the same node still
+  // opens it): open-to-inspector on a node click, collapse on an empty-canvas click.
+  const [inspectSignal, setInspectSignal] = useState(0);
+  const [closeLeftSignal, setCloseLeftSignal] = useState(0);
+  const [closeChatSignal, setCloseChatSignal] = useState(0);
+  // Docked-rail open state, mirrored up from the rails so Esc can include them.
+  const [leftRailOpen, setLeftRailOpen] = useState(false);
+  const [chatRailOpen, setChatRailOpen] = useState(false);
   const [stepThroughOpen, setStepThroughOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
@@ -112,7 +120,40 @@ export default function App() {
       if (prev.length === 1 && prev[0] === node.id) return prev;
       return [node.id];
     });
+    // Always open the inspector, even if the selection didn't change (re-clicking
+    // the same node after the rail was closed should reopen it).
+    setInspectSignal((n) => n + 1);
   }, []);
+
+  // Click on empty canvas — deselect and collapse the left rail.
+  const onPaneClick = useCallback(() => {
+    setSelectedNodeIds([]);
+    setCloseLeftSignal((n) => n + 1);
+  }, []);
+
+  // Esc closes one panel per press, highest-priority first: modal → overlays →
+  // docked rails. Ignored while typing so it doesn't hijack text fields.
+  // Runs in the capture phase and stops propagation when it closes something, so
+  // a panel-closing Esc doesn't also reach React Flow (which would deselect the
+  // node). When nothing is open, Esc falls through to React Flow as usual.
+  useEffect(() => {
+    function onEsc(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
+      if (shortcutsOpen) setShortcutsOpen(false);
+      else if (stepThroughOpen) setStepThroughOpen(false);
+      else if (dashboardOpen) setDashboardOpen(false);
+      else if (chatRailOpen) setCloseChatSignal((n) => n + 1);
+      else if (leftRailOpen) setCloseLeftSignal((n) => n + 1);
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    window.addEventListener('keydown', onEsc, true);
+    return () => window.removeEventListener('keydown', onEsc, true);
+  }, [shortcutsOpen, stepThroughOpen, dashboardOpen, chatRailOpen, leftRailOpen]);
 
   // Right-click an edge to delete it
   const onEdgeContextMenu = useCallback(
@@ -343,6 +384,7 @@ export default function App() {
                   onEdgeContextMenu={onEdgeContextMenu}
                   onNodeClick={onNodeClick}
                   onNodeDoubleClick={onNodeDoubleClick}
+                  onPaneClick={onPaneClick}
                   onSelectionChange={onSelectionChange}
                   onInit={setReactFlowInstance}
                   onDragOver={onDragOver}
@@ -429,6 +471,9 @@ export default function App() {
                   onPropertyChange={graph.updateProperty}
                   onSaveBlock={graph.saveBlock}
                   graphJson={graph.saveGraph()}
+                  inspectSignal={inspectSignal}
+                  closeSignal={closeLeftSignal}
+                  onOpenChange={setLeftRailOpen}
                 />
                 <TutorialPanel />
                 {/* EpochRecord (useGraph) and EpochData describe the same streamed
@@ -453,7 +498,12 @@ export default function App() {
                   onClose={() => setStepThroughOpen(false)}
                 />
                 <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-                <ChatRail getGraphJson={() => graph.saveGraph()} graph={graph} />
+                <ChatRail
+                  getGraphJson={() => graph.saveGraph()}
+                  graph={graph}
+                  closeSignal={closeChatSignal}
+                  onOpenChange={setChatRailOpen}
+                />
               </div>
             </div>
           </BackpropCtx.Provider>

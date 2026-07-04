@@ -31,6 +31,13 @@ interface Props {
   onPropertyChange: (nodeId: string, key: string, value: unknown) => void;
   onSaveBlock: (nodeId: string) => void;
   graphJson: string;
+  // Per-click signals from App (bumped counters): open-to-inspector on node
+  // click, collapse on empty-canvas click. Counters (not booleans) so repeat
+  // clicks re-fire even when the selection is unchanged.
+  inspectSignal: number;
+  closeSignal: number;
+  /** Reports open/closed state up so App can include the rail in Esc handling. */
+  onOpenChange: (open: boolean) => void;
 }
 
 export function LeftRail({
@@ -41,9 +48,17 @@ export function LeftRail({
   onPropertyChange,
   onSaveBlock,
   graphJson,
+  inspectSignal,
+  closeSignal,
+  onOpenChange,
 }: Props) {
   const [collapsed, setCollapsed] = useState(true);
   const [tab, setTab] = useState<Tab>('nodes');
+
+  // Report open state up so App can include the rail in its Esc priority order.
+  useEffect(() => {
+    onOpenChange(!collapsed);
+  }, [collapsed, onOpenChange]);
 
   // Auto-switch tab on selection change: a node selected → Inspector,
   // selection cleared → Nodes. Selecting a node also expands the rail if it's
@@ -57,6 +72,21 @@ export function LeftRail({
     setPrevNodeId(nodeId);
     setTab(nodeId ? 'inspector' : 'nodes');
     if (nodeId) setCollapsed(false);
+  }
+
+  // Explicit per-click signals from App. A node click opens the inspector even
+  // when the selection is unchanged (re-clicking the same node); an empty-canvas
+  // click collapses the rail entirely.
+  const [prevInspect, setPrevInspect] = useState(inspectSignal);
+  if (inspectSignal !== prevInspect) {
+    setPrevInspect(inspectSignal);
+    setTab('inspector');
+    setCollapsed(false);
+  }
+  const [prevClose, setPrevClose] = useState(closeSignal);
+  if (closeSignal !== prevClose) {
+    setPrevClose(closeSignal);
+    setCollapsed(true);
   }
 
   // The rail starts collapsed, so the palette isn't visible on mount. If
@@ -75,7 +105,7 @@ export function LeftRail({
     tutorialEvent('palette-opened');
   }
 
-  // "1" toggles the rail (node palette).
+  // "1" toggles the rail; Tab (while open) switches between Nodes and Inspector.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
@@ -87,11 +117,16 @@ export function LeftRail({
           if (c && tab === 'nodes') tutorialEvent('palette-opened');
           return !c;
         });
+      } else if (e.key === 'Tab' && !collapsed) {
+        e.preventDefault();
+        const next = tab === 'nodes' ? 'inspector' : 'nodes';
+        setTab(next);
+        if (next === 'nodes') tutorialEvent('palette-opened');
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tab]);
+  }, [tab, collapsed]);
 
   if (collapsed) {
     return (

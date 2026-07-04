@@ -39,6 +39,10 @@ interface Props {
     endBatch: () => void;
     savedBlocks: { filename: string; name: string; description: string }[];
   };
+  /** Bumped counter from App to collapse the rail (e.g. via Esc). */
+  closeSignal: number;
+  /** Reports open/closed state up so App can include this rail in Esc handling. */
+  onOpenChange: (open: boolean) => void;
 }
 
 // Resizable width, persisted across reloads. Clamped to a sensible range.
@@ -52,12 +56,22 @@ function loadWidth(): number {
   return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, stored));
 }
 
-export function ChatRail({ getGraphJson, graph }: Props) {
+export function ChatRail({ getGraphJson, graph, closeSignal, onOpenChange }: Props) {
   const domain = useContext(DomainCtx);
   const [collapsed, setCollapsed] = useState(true);
   const [input, setInput] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [width, setWidth] = useState(loadWidth);
+
+  // Collapse when App signals (Esc), and report open state up for Esc ordering.
+  const [prevCloseSig, setPrevCloseSig] = useState(closeSignal);
+  if (closeSignal !== prevCloseSig) {
+    setPrevCloseSig(closeSignal);
+    setCollapsed(true);
+  }
+  useEffect(() => {
+    onOpenChange(!collapsed);
+  }, [collapsed, onOpenChange]);
 
   // Drag the left edge to resize. Panel is anchored right, so dragging left
   // (smaller clientX) widens it: newWidth = startWidth + (startX - clientX).
