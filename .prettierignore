@@ -1,0 +1,17 @@
+# Build output & dependencies
+dist
+node_modules
+coverage
+
+# Python backend (formatted with Black/ruff, not Prettier)
+.venv
+backend
+
+# Data / generated files — not source to reformat
+model-presets
+storage
+package-lock.json
+*_trace*.json
+
+# Markdown left as-authored (avoid reflowing prose/tables)
+*.md
