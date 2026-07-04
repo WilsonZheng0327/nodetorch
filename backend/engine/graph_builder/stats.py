@@ -89,6 +89,10 @@ def gradient_info(module: nn.Module) -> dict | None:
         "mean": _safe_float(float(all_grads.mean())),
         "std": _safe_float(float(all_grads.std())) if all_grads.numel() > 1 else 0.0,
         "norm": _safe_float(float(all_grads.norm())),
+        # Root-mean-square gradient = norm / sqrt(param count). Unlike the raw L2
+        # norm, this is a per-parameter magnitude, so layers of different sizes
+        # are comparable (a big Linear vs a small Conv).
+        "rms": _safe_float(float(all_grads.pow(2).mean().sqrt())),
         "histBins": [_safe_float(float(x)) for x in hist.bin_edges[:-1]],
         "histCounts": [int(x) for x in hist.hist],
     }

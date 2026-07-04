@@ -7,7 +7,14 @@ import { useRef, useEffect, useState, Fragment } from 'react';
 import './TrainingDashboard.css';
 import { apiUrl } from '../../api/base';
 import type { EpochData, SystemInfo, ModelLayerInfo, SavedRun, FullRun, TestResult } from './types';
-import { Chart, GradientFlowChart, PerClassChart } from './charts';
+import {
+  Chart,
+  GradientDepthChart,
+  GradientTrendChart,
+  GradientHeatmap,
+  gradientLogDomain,
+  PerClassChart,
+} from './charts';
 import { SystemInfoPanel, ModelSummaryPanel, RunsPanel, TestResultView } from './panels';
 import { GeneratedTextView, TrackedSamplesView } from './samples';
 
@@ -57,6 +64,8 @@ export function TrainingDashboard({
     | 'runs'
     | 'system'
   >('loss');
+  // Gradients tab shows one chart at a time (the panel isn't tall enough for both).
+  const [gradView, setGradView] = useState<'layers' | 'epochs' | 'heatmap'>('layers');
   const [savedRuns, setSavedRuns] = useState<SavedRun[] | null>(null);
   const [runsLoading, setRunsLoading] = useState(false);
   const [compareRun, setCompareRun] = useState<FullRun | null>(null);
@@ -397,7 +406,46 @@ export function TrainingDashboard({
           </div>
         ) : progress.length > 0 ? (
           activeTab === 'gradients' ? (
-            <GradientFlowChart data={viewed?.gradientFlow ?? []} />
+            <div className="grad-tab">
+              <div className="grad-view-toggle">
+                <button
+                  className={`grad-view-btn ${gradView === 'layers' ? 'grad-view-btn-active' : ''}`}
+                  onClick={() => setGradView('layers')}
+                >
+                  Across layers
+                </button>
+                <button
+                  className={`grad-view-btn ${gradView === 'epochs' ? 'grad-view-btn-active' : ''}`}
+                  onClick={() => setGradView('epochs')}
+                >
+                  Across epochs
+                </button>
+                <button
+                  className={`grad-view-btn ${gradView === 'heatmap' ? 'grad-view-btn-active' : ''}`}
+                  onClick={() => setGradView('heatmap')}
+                >
+                  Heatmap
+                </button>
+              </div>
+              {gradView === 'layers' ? (
+                <GradientDepthChart
+                  data={viewed?.gradientFlow ?? []}
+                  domain={gradientLogDomain(progress)}
+                />
+              ) : gradView === 'epochs' ? (
+                <GradientTrendChart
+                  progress={progress}
+                  domain={gradientLogDomain(progress)}
+                  selectedEpoch={selectedEpoch}
+                />
+              ) : (
+                <GradientHeatmap
+                  progress={progress}
+                  domain={gradientLogDomain(progress)}
+                  selectedEpoch={selectedEpoch}
+                />
+              )}
+            </div>
           ) : activeTab === 'perclass' ? (
             <PerClassChart data={viewed?.perClassAccuracy ?? []} />
           ) : (

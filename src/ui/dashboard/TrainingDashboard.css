@@ -347,6 +347,70 @@
   color: #a6adc8;
 }
 
+/* Gradients tab — one log-scale chart at a time, chosen by the toggle */
+.grad-tab {
+  padding: 4px 4px 14px;
+}
+
+.grad-view-toggle {
+  display: flex;
+  gap: 2px;
+  align-self: flex-start;
+  margin: 8px 12px 2px;
+  padding: 2px;
+  background: #181825;
+  border-radius: 7px;
+}
+
+.grad-view-btn {
+  padding: 5px 14px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: #6c7086;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.grad-view-btn:hover {
+  color: #bac2de;
+}
+
+.grad-view-btn-active {
+  background: #313244;
+  color: #cdd6f4;
+}
+
+.grad-chart {
+  height: 280px;
+  margin-bottom: 4px;
+}
+
+.grad-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 4px 14px 2px;
+}
+
+.grad-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #a6adc8;
+}
+
+.grad-legend-swatch {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
 /* Per-class + gradient flow scrollable containers */
 .dashboard-perclass-scroll,
 .dashboard-gradflow-scroll {

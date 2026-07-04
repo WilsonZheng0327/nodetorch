@@ -501,26 +501,26 @@ def build_gradient_flow(node_snapshots, nodes, order):
             continue
         if "gradients" in snap:
             short = nodes[nid]["type"].split(".")[-1]
-            grad_entries.append((short, snap["gradients"]["norm"]))
+            grad_entries.append((short, snap["gradients"]))
         inner = snap.get("innerSnapshots")
         if inner:
             block_prefix = nodes[nid].get("properties", {}).get("blockName") or nodes[nid]["type"].split(".")[-1]
             for inner_nid, inner_snap in inner.items():
                 if "gradients" in inner_snap:
-                    grad_entries.append((f"{block_prefix}/{inner_nid}", inner_snap["gradients"]["norm"]))
+                    grad_entries.append((f"{block_prefix}/{inner_nid}", inner_snap["gradients"]))
 
     name_counts: dict[str, int] = {}
     for short, _ in grad_entries:
         name_counts[short] = name_counts.get(short, 0) + 1
     name_idx: dict[str, int] = {}
     gradient_flow = []
-    for short, norm in grad_entries:
+    for short, grads in grad_entries:
         if name_counts[short] > 1:
             name_idx[short] = name_idx.get(short, 0) + 1
             label = f"{short}_{name_idx[short]}"
         else:
             label = short
-        gradient_flow.append({"name": label, "norm": norm})
+        gradient_flow.append({"name": label, "norm": grads["norm"], "rms": grads.get("rms")})
     return gradient_flow
 
 
