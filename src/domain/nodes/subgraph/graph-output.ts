@@ -19,14 +19,24 @@ export const graphOutputNode: NodeDefinition = {
       defaultValue: 1,
       affects: 'ports',
     },
+    {
+      id: 'portNames',
+      name: 'Port Names',
+      type: { kind: 'string' },
+      defaultValue: 'out',
+      affects: 'ports',
+      help: 'Comma-separated labels for the ports, e.g. "mean, logvar". Renaming is safe and only changes the label, not connections. Extra ports use default labels.',
+    },
   ],
 
+  // Port id is index-based and stable (never changes with a rename), so editing
+  // the label leaves existing connections intact. The name is display-only.
   getPorts: (properties) => {
     const count = properties.portCount ?? 1;
-    const names = (properties.portNames ?? 'out').split(',').map((s: string) => s.trim());
+    const names = String(properties.portNames ?? '').split(',').map((s: string) => s.trim());
     return Array.from({ length: count }, (_, i) => ({
-      id: names[i] || `port_${i}`,
-      name: names[i] || `Port ${i}`,
+      id: i === 0 ? 'out' : `port_${i}`,
+      name: names[i] || (i === 0 ? 'out' : `out ${i}`),
       direction: 'input' as const,
       dataType: 'tensor',
       allowMultiple: false,
