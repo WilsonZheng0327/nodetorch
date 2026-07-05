@@ -31,3 +31,7 @@ export const BackpropCtx = createContext<Record<
   string,
   { delayMs: number; intensity: number }
 > | null>(null);
+
+// Live forward-validation problems, keyed by nodeId (e.g. "missing input").
+// Lets each node badge its own issues so a student sees which node is broken.
+export const ValidationCtx = createContext<Map<string, string[]> | null>(null);

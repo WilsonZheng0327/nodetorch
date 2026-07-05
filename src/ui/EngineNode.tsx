@@ -7,7 +7,7 @@ import type { NodeInstance } from '../core/graph';
 import { getNodePorts } from '../core/ports';
 import { useContext, useRef, useEffect, type CSSProperties } from 'react';
 import { VizPanel, type VizSnapshot } from './VizPanel';
-import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './contexts';
+import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx, ValidationCtx } from './contexts';
 import './EngineNode.css';
 
 export type EngineNodeData = {
@@ -35,6 +35,8 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
   const actions = useContext(GraphActionsCtx);
   const viz = useContext(VizCtx);
   const backpropAnim = useContext(BackpropCtx);
+  const validationErrors = useContext(ValidationCtx);
+  const nodeWarnings = validationErrors?.get(id);
   const pulse = backpropAnim?.[id];
   if (!domain) return null;
 
@@ -117,6 +119,14 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
 
         {/* Error message */}
         {metadata?.error && <div className="layer-node-error">{metadata.error}</div>}
+
+        {/* Live validation warnings (e.g. "missing input"), badged on the node. */}
+        {!metadata?.error && nodeWarnings && nodeWarnings.length > 0 && (
+          <div className="layer-node-warning" title={nodeWarnings.join('\n')}>
+            ⚠ {nodeWarnings[0]}
+            {nodeWarnings.length > 1 ? ` (+${nodeWarnings.length - 1})` : ''}
+          </div>
+        )}
 
         {/* Labeled shapes — e.g. "Output: [1, 64, 26, 26]", "Labels: [1]" */}
         {metadata?.shapes ? (

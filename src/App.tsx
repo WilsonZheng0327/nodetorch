@@ -6,7 +6,7 @@ import { useMemo, useEffect, useCallback, useState, useRef, type DragEvent } fro
 import { initDomain } from './domain';
 import { useGraph } from './ui/useGraph';
 import { EngineNode } from './ui/EngineNode';
-import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './ui/contexts';
+import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx, ValidationCtx } from './ui/contexts';
 import { LeftRail } from './ui/sidebar/LeftRail';
 import { ChatRail } from './ui/chat/ChatRail';
 import { Toolbar } from './ui/Toolbar';
@@ -365,141 +365,143 @@ export default function App() {
       <GraphActionsCtx.Provider value={graphActions}>
         <VizCtx.Provider value={vizCtx}>
           <BackpropCtx.Provider value={graph.backpropAnim}>
-            <div className="app-shell">
-              <div ref={reactFlowWrapper} className="canvas-area">
-                <RF.ReactFlow
-                  nodes={graph.rfNodes}
-                  edges={graph.rfEdges}
-                  onNodesChange={graph.onNodesChange}
-                  onEdgesChange={graph.onEdgesChange}
-                  onConnect={graph.connect}
-                  isValidConnection={graph.isValidConnection}
-                  onEdgeClick={() => {
-                    /* no-op: right-click only */
-                  }}
-                  onEdgeContextMenu={onEdgeContextMenu}
-                  onNodeClick={onNodeClick}
-                  onNodeDoubleClick={onNodeDoubleClick}
-                  onPaneClick={onPaneClick}
-                  onSelectionChange={onSelectionChange}
-                  onInit={setReactFlowInstance}
-                  onDragOver={onDragOver}
-                  onDrop={onDrop}
-                  nodeTypes={nodeTypes}
-                  edgesFocusable={false}
-                  selectionKeyCode="Control"
-                  multiSelectionKeyCode="Shift"
-                  fitView
-                  defaultEdgeOptions={{ animated: true }}
-                >
-                  <RF.Background />
-                  {/* Minimap + controls, bottom-left of the page (same 300px width as
+            <ValidationCtx.Provider value={graph.validationErrors}>
+              <div className="app-shell">
+                <div ref={reactFlowWrapper} className="canvas-area">
+                  <RF.ReactFlow
+                    nodes={graph.rfNodes}
+                    edges={graph.rfEdges}
+                    onNodesChange={graph.onNodesChange}
+                    onEdgesChange={graph.onEdgesChange}
+                    onConnect={graph.connect}
+                    isValidConnection={graph.isValidConnection}
+                    onEdgeClick={() => {
+                      /* no-op: right-click only */
+                    }}
+                    onEdgeContextMenu={onEdgeContextMenu}
+                    onNodeClick={onNodeClick}
+                    onNodeDoubleClick={onNodeDoubleClick}
+                    onPaneClick={onPaneClick}
+                    onSelectionChange={onSelectionChange}
+                    onInit={setReactFlowInstance}
+                    onDragOver={onDragOver}
+                    onDrop={onDrop}
+                    nodeTypes={nodeTypes}
+                    edgesFocusable={false}
+                    selectionKeyCode="Control"
+                    multiSelectionKeyCode="Shift"
+                    fitView
+                    defaultEdgeOptions={{ animated: true }}
+                  >
+                    <RF.Background />
+                    {/* Minimap + controls, bottom-left of the page (same 300px width as
               the floating left rail above). */}
-                  <RF.Panel position="bottom-left" className="bottom-panel">
-                    <RF.MiniMap
-                      className="minimap-themed"
-                      pannable
-                      zoomable
-                      style={{ width: 180, height: 108, margin: 0 }}
-                      maskColor="rgba(17, 17, 27, 0.7)"
-                      nodeColor={(node) => {
-                        const inst = graph.graph.nodes.get(node.id);
-                        if (!inst) return '#45475a';
-                        const def = domain.nodeRegistry.get(inst.type);
-                        if (!def) return '#45475a';
-                        return def.color ?? getCategoryColor(def.category);
-                      }}
-                    />
-                    <RF.Controls
-                      orientation="vertical"
-                      showInteractive={false}
-                      className="controls-themed"
-                    />
-                  </RF.Panel>
-                </RF.ReactFlow>
-                {graph.connectionError && (
-                  <div className="connection-error-toast">{graph.connectionError}</div>
-                )}
-                <Toolbar
-                  onSave={graph.saveGraph}
-                  onLoad={(json: string) => {
-                    graph.loadGraph(json);
-                    setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200);
-                  }}
-                  onClear={graph.clearGraph}
-                  onOrganize={graph.organizeGraph}
-                  onShowAllViz={graph.showAllViz}
-                  onHideAllViz={graph.hideAllViz}
-                  onStepThrough={() => {
-                    setStepThroughOpen(true);
-                    tutorialEvent('step-through-opened');
-                  }}
-                  onSimulateBackprop={graph.simulateBackprop}
-                  onSaveModel={graph.saveModel}
-                  onLoadModel={graph.loadModel}
-                  onSaveWeights={graph.saveWeights}
-                  onLoadWeights={graph.loadWeights}
-                  onExportPython={graph.exportPython}
-                  onInfer={graph.runInfer}
-                  onTest={() => {
-                    if (graph.modelTrained && !graph.modelStale) {
+                    <RF.Panel position="bottom-left" className="bottom-panel">
+                      <RF.MiniMap
+                        className="minimap-themed"
+                        pannable
+                        zoomable
+                        style={{ width: 180, height: 108, margin: 0 }}
+                        maskColor="rgba(17, 17, 27, 0.7)"
+                        nodeColor={(node) => {
+                          const inst = graph.graph.nodes.get(node.id);
+                          if (!inst) return '#45475a';
+                          const def = domain.nodeRegistry.get(inst.type);
+                          if (!def) return '#45475a';
+                          return def.color ?? getCategoryColor(def.category);
+                        }}
+                      />
+                      <RF.Controls
+                        orientation="vertical"
+                        showInteractive={false}
+                        className="controls-themed"
+                      />
+                    </RF.Panel>
+                  </RF.ReactFlow>
+                  {graph.connectionError && (
+                    <div className="connection-error-toast">{graph.connectionError}</div>
+                  )}
+                  <Toolbar
+                    onSave={graph.saveGraph}
+                    onLoad={(json: string) => {
+                      graph.loadGraph(json);
+                      setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200);
+                    }}
+                    onClear={graph.clearGraph}
+                    onOrganize={graph.organizeGraph}
+                    onShowAllViz={graph.showAllViz}
+                    onHideAllViz={graph.hideAllViz}
+                    onStepThrough={() => {
+                      setStepThroughOpen(true);
+                      tutorialEvent('step-through-opened');
+                    }}
+                    onSimulateBackprop={graph.simulateBackprop}
+                    onSaveModel={graph.saveModel}
+                    onLoadModel={graph.loadModel}
+                    onSaveWeights={graph.saveWeights}
+                    onLoadWeights={graph.loadWeights}
+                    onExportPython={graph.exportPython}
+                    onInfer={graph.runInfer}
+                    onTest={() => {
+                      if (graph.modelTrained && !graph.modelStale) {
+                        setDashboardOpen(true);
+                        setTestFocus((n) => n + 1);
+                      }
+                      return graph.runTest();
+                    }}
+                    onTrain={() => {
                       setDashboardOpen(true);
-                      setTestFocus((n) => n + 1);
-                    }
-                    return graph.runTest();
-                  }}
-                  onTrain={() => {
-                    setDashboardOpen(true);
-                    return graph.runTrain();
-                  }}
-                  onCancel={graph.cancelTrain}
-                  onShowShortcuts={() => setShortcutsOpen(true)}
-                  status={graph.status}
-                  modelTrained={graph.modelTrained}
-                  modelStale={graph.modelStale}
-                />
-                <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
-                <LeftRail
-                  savedBlocks={graph.savedBlocks}
-                  onDeleteBlock={graph.deleteBlock}
-                  node={selectedNode}
-                  selectedCount={selectedNodeIds.length}
-                  onPropertyChange={graph.updateProperty}
-                  onSaveBlock={graph.saveBlock}
-                  graphJson={graph.saveGraph()}
-                  inspectSignal={inspectSignal}
-                  closeSignal={closeLeftSignal}
-                  onOpenChange={setLeftRailOpen}
-                />
-                <TutorialPanel />
-                <TrainingDashboard
-                  progress={graph.trainingProgress}
-                  isTraining={graph.trainingActive}
-                  batchProgress={graph.batchProgress}
-                  selectedEpoch={graph.selectedEpoch}
-                  onSelectEpoch={graph.setSelectedEpoch}
-                  totalSnapshotEpochs={graph.snapshotHistory.length}
-                  modelSummary={modelSummary}
-                  testResult={graph.testResult}
-                  isTesting={graph.testing}
-                  focusTestSignal={testFocus}
-                  open={dashboardOpen}
-                  onOpenChange={setDashboardOpen}
-                />
-                <StepThroughPanel
-                  open={stepThroughOpen}
-                  graphJson={graph.saveGraph()}
-                  onClose={() => setStepThroughOpen(false)}
-                />
-                <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-                <ChatRail
-                  getGraphJson={() => graph.saveGraph()}
-                  graph={graph}
-                  closeSignal={closeChatSignal}
-                  onOpenChange={setChatRailOpen}
-                />
+                      return graph.runTrain();
+                    }}
+                    onCancel={graph.cancelTrain}
+                    onShowShortcuts={() => setShortcutsOpen(true)}
+                    status={graph.status}
+                    modelTrained={graph.modelTrained}
+                    modelStale={graph.modelStale}
+                  />
+                  <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
+                  <LeftRail
+                    savedBlocks={graph.savedBlocks}
+                    onDeleteBlock={graph.deleteBlock}
+                    node={selectedNode}
+                    selectedCount={selectedNodeIds.length}
+                    onPropertyChange={graph.updateProperty}
+                    onSaveBlock={graph.saveBlock}
+                    graphJson={graph.saveGraph()}
+                    inspectSignal={inspectSignal}
+                    closeSignal={closeLeftSignal}
+                    onOpenChange={setLeftRailOpen}
+                  />
+                  <TutorialPanel />
+                  <TrainingDashboard
+                    progress={graph.trainingProgress}
+                    isTraining={graph.trainingActive}
+                    batchProgress={graph.batchProgress}
+                    selectedEpoch={graph.selectedEpoch}
+                    onSelectEpoch={graph.setSelectedEpoch}
+                    totalSnapshotEpochs={graph.snapshotHistory.length}
+                    modelSummary={modelSummary}
+                    testResult={graph.testResult}
+                    isTesting={graph.testing}
+                    focusTestSignal={testFocus}
+                    open={dashboardOpen}
+                    onOpenChange={setDashboardOpen}
+                  />
+                  <StepThroughPanel
+                    open={stepThroughOpen}
+                    graphJson={graph.saveGraph()}
+                    onClose={() => setStepThroughOpen(false)}
+                  />
+                  <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+                  <ChatRail
+                    getGraphJson={() => graph.saveGraph()}
+                    graph={graph}
+                    closeSignal={closeChatSignal}
+                    onOpenChange={setChatRailOpen}
+                  />
+                </div>
               </div>
-            </div>
+            </ValidationCtx.Provider>
           </BackpropCtx.Provider>
         </VizCtx.Provider>
       </GraphActionsCtx.Provider>

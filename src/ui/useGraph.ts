@@ -1,7 +1,7 @@
 // Bridge between our engine (Layers 1-5) and React Flow's state format.
 // Owns the Graph, runs the engine, and converts to/from React Flow nodes/edges.
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import * as RF from '@xyflow/react';
 import { tutorialEvent } from './tutorial/tutorialEvent';
 import {
@@ -16,7 +16,7 @@ import {
   markDirty,
 } from '../core/graph';
 import type { DomainContext } from '../domain';
-import { validateTraining } from '../core/validation';
+import { validateForward, validateTraining } from '../core/validation';
 import { getNodePorts } from '../core/ports';
 import {
   type SerializedGraph,
@@ -1323,10 +1323,25 @@ export function useGraph(domain: DomainContext) {
     return {};
   })();
 
+  // Live forward-validation, keyed by nodeId, for per-node "needs input" badges.
+  // Recomputed on every mutation (graphVersion) or subgraph navigation.
+  const validationErrors = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const err of validateForward(getCurrentGraph(), domain.nodeRegistry)) {
+      if (!err.nodeId) continue;
+      const list = map.get(err.nodeId);
+      if (list) list.push(err.message);
+      else map.set(err.nodeId, [err.message]);
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphVersion, navStack, domain]);
+
   return {
     graph: graphRef.current,
     currentGraph: getCurrentGraph(),
     graphVersion,
+    validationErrors,
     rfNodes,
     rfEdges,
     navStack,
