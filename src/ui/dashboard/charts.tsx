@@ -3,6 +3,7 @@
 // per-class accuracy bars. Styles come from TrainingDashboard.css.
 
 import { useRef, useEffect, useState } from 'react';
+import { type GradEntry, gradMag } from './gradient-utils';
 
 // --- Canvas line chart (loss / accuracy, with optional val + compare series) ---
 
@@ -285,12 +286,6 @@ export function Chart({
 
 // --- Gradient flow horizontal bar chart ---
 
-// Per-layer gradient magnitude (RMS = norm / sqrt(params), so layer sizes are
-// comparable). `norm` is the L2 norm fallback for older data without rms.
-type GradEntry = { name: string; norm: number; rms?: number };
-
-const gradMag = (e: GradEntry) => e.rms ?? e.norm;
-
 // Distinct line colors for the per-layer trend chart (Catppuccin accents).
 const LAYER_COLORS = [
   '#89b4fa',
@@ -304,35 +299,6 @@ const LAYER_COLORS = [
   '#74c7ec',
   '#b4befe',
 ];
-
-/**
- * Shared log10 y-domain across the whole run, so scrubbing the depth chart and
- * reading the trend chart both use one fixed absolute scale (no per-epoch
- * renormalization). Returns [loExp, hiExp] as integer powers of 10, or null.
- */
-export function gradientLogDomain(
-  progress: { gradientFlow?: GradEntry[] }[],
-): [number, number] | null {
-  let lo = Infinity;
-  let hi = -Infinity;
-  for (const ep of progress) {
-    for (const e of ep.gradientFlow ?? []) {
-      const m = gradMag(e);
-      if (m == null || !isFinite(m) || m <= 0) continue;
-      lo = Math.min(lo, m);
-      hi = Math.max(hi, m);
-    }
-  }
-  if (!isFinite(lo) || !isFinite(hi)) return null;
-  let loExp = Math.floor(Math.log10(lo));
-  let hiExp = Math.ceil(Math.log10(hi));
-  // Guarantee at least 3 decades so a tight cluster still reads as absolute.
-  while (hiExp - loExp < 3) {
-    loExp -= 1;
-    hiExp += 1;
-  }
-  return [loExp, hiExp];
-}
 
 function drawLogGrid(
   ctx: CanvasRenderingContext2D,
@@ -411,7 +377,8 @@ export function GradientDepthChart({
     data.forEach((e, i) => {
       const x = xFor(i);
       const y = yFor(gradMag(e));
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     });
     ctx.stroke();
 
@@ -538,7 +505,12 @@ export function GradientTrendChart({
         if (!entry) return;
         const x = xFor(p.epoch);
         const y = yFor(gradMag(entry));
-        started ? ctx.lineTo(x, y) : ((started = true), ctx.moveTo(x, y));
+        if (started) {
+          ctx.lineTo(x, y);
+        } else {
+          started = true;
+          ctx.moveTo(x, y);
+        }
       });
       ctx.stroke();
     });

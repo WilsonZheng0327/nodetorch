@@ -12,9 +12,9 @@ import {
   GradientDepthChart,
   GradientTrendChart,
   GradientHeatmap,
-  gradientLogDomain,
   PerClassChart,
 } from './charts';
+import { gradientLogDomain } from './gradient-utils';
 import { SystemInfoPanel, ModelSummaryPanel, RunsPanel, TestResultView } from './panels';
 import { GeneratedTextView, TrackedSamplesView } from './samples';
 
