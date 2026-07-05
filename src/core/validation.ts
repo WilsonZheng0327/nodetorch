@@ -12,6 +12,9 @@
 import type { Graph } from './graph';
 import type { NodeRegistry } from './nodedef';
 
+/** A single pre-flight validation problem. `nodeId` points at the offending node
+ *  when the problem is node-specific (used to badge the node in the UI); it's
+ *  absent for graph-level problems (e.g. "no data node"). */
 export interface ValidationError {
   nodeId?: string; // which node has the problem, if applicable
   message: string;
@@ -19,6 +22,12 @@ export interface ValidationError {
 
 // --- Forward pass checks ---
 
+/**
+ * Check whether the graph can run a forward pass. Flags an empty graph, a graph
+ * with no connections, unknown node types, and any non-optional input port that
+ * has no incoming edge. Returns one {@link ValidationError} per problem (empty
+ * array = valid). Pure and side-effect free.
+ */
 export function validateForward(graph: Graph, registry: NodeRegistry): ValidationError[] {
   const errors: ValidationError[] = [];
 
@@ -74,6 +83,13 @@ const DATA_TYPES = [
 ];
 const GAN_INPUT_TYPES = ['ml.gan.noise_input'];
 
+/**
+ * Check whether the graph can train. Includes all {@link validateForward} checks,
+ * then requires exactly one data node, a loss node (wired to predictions + labels),
+ * and one optimizer node (wired to the loss), plus paradigm-specific rules (e.g.
+ * a GAN needs a noise-input node). Returns one {@link ValidationError} per problem
+ * (empty array = trainable). Pure and side-effect free.
+ */
 export function validateTraining(graph: Graph, registry: NodeRegistry): ValidationError[] {
   // Start with forward validation
   const errors = validateForward(graph, registry);

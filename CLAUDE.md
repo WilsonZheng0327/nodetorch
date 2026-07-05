@@ -58,8 +58,10 @@ Backend mirrors the engine: `backend/engine/graph_builder/` does the same topolo
 - `src/domain/index.ts` — bootstraps all registrations via `initDomain()`
 - `src/ui/useGraph.ts` — bridge between engine and React Flow (the main state hook)
 - `src/ui/EngineNode.tsx` — generic node renderer (reads NodeDefinition + lastResult.metadata)
-- `src/ui/step-through/` — forward + backward step-through UI (StepThroughPanel, StageDetail, ExtraPanels)
-- `src/ui/dashboard/TrainingDashboard.tsx` — training dashboard with charts, metrics, system info
+- `src/ui/sidebar/LeftRail.tsx` — docked left panel hosting the node palette + property inspector (Tab switches, `1` toggles)
+- `src/ui/chat/` — AI assistant UI (ChatRail, useAgentChat, graphTools, AgentSettings); see `docs/agent.md`
+- `src/ui/step-through/` — forward step-through + generate/denoise UI (StepThroughPanel, StageDetail, ExtraPanels)
+- `src/ui/dashboard/` — training dashboard split into container + `types`/`charts`/`panels`/`samples`
 Backend is organized into packages by concern (all importable with `pythonpath = backend`):
 
 - `backend/engine/` — execution engine (ML-agnostic graph→PyTorch core)

@@ -129,6 +129,19 @@ Frontend opens at http://localhost:5173.
 
 > **Verify GPU is detected:** When the backend starts, it logs the device (e.g. `CUDA: NVIDIA RTX 4090`). If it says `CPU only` but you have a GPU, your PyTorch CUDA version likely doesn't match your driver — reinstall PyTorch with the correct CUDA version.
 
+### AI assistant (optional)
+
+NodeTorch has a built-in, provider-agnostic AI assistant (the `3` panel) that can
+explain and edit your graph. It's off until you configure a provider:
+
+- **Local model (no key):** run e.g. [Ollama](https://ollama.com), then in the
+  app's **Agent settings** set the base URL to `http://localhost:11434/v1` and pick a model.
+- **Hosted API:** set an API key in **Agent settings** (OpenAI, Anthropic,
+  OpenRouter, …). Keys are stored server-side and never sent to the browser.
+
+The loop runs in the backend; `requirements.txt` already installs the `openai` and
+`anthropic` adapters. See [`docs/agent.md`](docs/agent.md) for the architecture.
+
 ## Usage
 
 1. **Add nodes** — drag from the palette (Tab to toggle) onto the canvas
