@@ -7,13 +7,18 @@ import type { NodeDefinition, PortDefinition } from '../../../src/core/nodedef';
 // ---------------------------------------------------------------------------
 // Helper: create a minimal NodeDefinition
 // ---------------------------------------------------------------------------
-function makeDef(type: string, displayName: string, ports: PortDefinition[]): NodeDefinition {
+function makeDef(
+  type: string,
+  displayName: string,
+  ports: PortDefinition[],
+  category: string[] = [],
+): NodeDefinition {
   return {
     type,
     version: 1,
     displayName,
     description: '',
-    category: [],
+    category,
     getProperties: () => [],
     getPorts: () => ports,
     executors: {},
@@ -44,17 +49,21 @@ function buildRegistry(): NodeRegistry {
   const registry = new NodeRegistry();
 
   registry.register(
-    makeDef('data.mnist', 'MNIST', [
-      outputPort('images', 'Images'),
-      outputPort('labels', 'Labels'),
-    ]),
+    makeDef(
+      'data.mnist',
+      'MNIST',
+      [outputPort('images', 'Images'), outputPort('labels', 'Labels')],
+      ['Data', 'Image'],
+    ),
   );
 
   registry.register(
-    makeDef('data.cifar10', 'CIFAR-10', [
-      outputPort('images', 'Images'),
-      outputPort('labels', 'Labels'),
-    ]),
+    makeDef(
+      'data.cifar10',
+      'CIFAR-10',
+      [outputPort('images', 'Images'), outputPort('labels', 'Labels')],
+      ['Data', 'Image'],
+    ),
   );
 
   registry.register(
@@ -70,16 +79,25 @@ function buildRegistry(): NodeRegistry {
   );
 
   registry.register(
-    makeDef('ml.loss.cross_entropy', 'CrossEntropyLoss', [
-      inputPort('predictions', 'Predictions'),
-      inputPort('labels', 'Labels'),
-      outputPort('loss', 'Loss'),
-    ]),
+    makeDef(
+      'ml.loss.cross_entropy',
+      'CrossEntropyLoss',
+      [
+        inputPort('predictions', 'Predictions'),
+        inputPort('labels', 'Labels'),
+        outputPort('loss', 'Loss'),
+      ],
+      ['ML', 'Loss'],
+    ),
   );
 
-  registry.register(makeDef('ml.optimizers.sgd', 'SGD', [inputPort('loss', 'Loss')]));
+  registry.register(
+    makeDef('ml.optimizers.sgd', 'SGD', [inputPort('loss', 'Loss')], ['ML', 'Optimizers']),
+  );
 
-  registry.register(makeDef('ml.optimizers.adam', 'Adam', [inputPort('loss', 'Loss')]));
+  registry.register(
+    makeDef('ml.optimizers.adam', 'Adam', [inputPort('loss', 'Loss')], ['ML', 'Optimizers']),
+  );
 
   return registry;
 }

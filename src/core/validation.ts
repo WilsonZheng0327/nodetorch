@@ -9,7 +9,7 @@
 //
 // Called by useGraph before sending to backend — gives instant feedback.
 
-import type { Graph } from './graph';
+import type { Graph, NodeInstance } from './graph';
 import type { NodeRegistry } from './nodedef';
 
 /** A single pre-flight validation problem. `nodeId` points at the offending node
@@ -70,17 +70,24 @@ export function validateForward(graph: Graph, registry: NodeRegistry): Validatio
 
 // --- Training checks (includes all forward checks + training-specific) ---
 
-const LOSS_TYPES = ['ml.loss.cross_entropy', 'ml.loss.mse', 'ml.loss.vae', 'ml.loss.gan'];
-const OPTIMIZER_TYPES = ['ml.optimizers.sgd', 'ml.optimizers.adam', 'ml.optimizers.adamw'];
-const DATA_TYPES = [
-  'data.mnist',
-  'data.cifar10',
-  'data.cifar100',
-  'data.fashion_mnist',
-  'data.imdb',
-  'data.ag_news',
-  'data.tiny_shakespeare',
-];
+// A node's `category` array is the single source of truth (it also drives the
+// palette), so a new loss / optimizer / dataset is recognized here automatically
+// without editing this file — no hardcoded type lists to keep in sync.
+function hasCategory(
+  node: NodeInstance,
+  registry: NodeRegistry,
+  top: string,
+  sub?: string,
+): boolean {
+  const cat = registry.get(node.type)?.category;
+  if (!cat) return false;
+  return cat[0] === top && (sub === undefined || cat[1] === sub);
+}
+const isLossNode = (n: NodeInstance, r: NodeRegistry) => hasCategory(n, r, 'ML', 'Loss');
+const isOptimizerNode = (n: NodeInstance, r: NodeRegistry) => hasCategory(n, r, 'ML', 'Optimizers');
+const isDataNode = (n: NodeInstance, r: NodeRegistry) => hasCategory(n, r, 'Data');
+
+// The GAN noise-input is a single niche node; keep it an explicit type check.
 const GAN_INPUT_TYPES = ['ml.gan.noise_input'];
 
 /**
@@ -100,7 +107,7 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
   const isGanMode = ganLossNodes.length > 0;
 
   // Must have exactly one data node
-  const dataNodes = [...graph.nodes.values()].filter((n) => DATA_TYPES.includes(n.type));
+  const dataNodes = [...graph.nodes.values()].filter((n) => isDataNode(n, registry));
   if (dataNodes.length === 0) {
     errors.push({ message: 'No data node — add a dataset (e.g. MNIST)' });
   }
@@ -109,13 +116,13 @@ export function validateTraining(graph: Graph, registry: NodeRegistry): Validati
   }
 
   // Must have at least one loss node
-  const lossNodes = [...graph.nodes.values()].filter((n) => LOSS_TYPES.includes(n.type));
+  const lossNodes = [...graph.nodes.values()].filter((n) => isLossNode(n, registry));
   if (lossNodes.length === 0) {
     errors.push({ message: 'No loss node — add a loss function (e.g. CrossEntropyLoss)' });
   }
 
   // Must have optimizer node(s) — GAN requires exactly 2
-  const optimizerNodes = [...graph.nodes.values()].filter((n) => OPTIMIZER_TYPES.includes(n.type));
+  const optimizerNodes = [...graph.nodes.values()].filter((n) => isOptimizerNode(n, registry));
   if (optimizerNodes.length === 0) {
     errors.push({ message: 'No optimizer node — add an optimizer (e.g. SGD)' });
   }
