@@ -7,16 +7,76 @@ and the training loops to summarize weights, activations, and gradients.
 import math
 import torch
 import torch.nn as nn
+from typing import TypedDict
 
 
-def _safe_float(v: float) -> float | None:
+# ---- Statistic payload shapes ----
+# These TypedDicts document the exact dict shapes the stat helpers below emit as
+# visualization metadata (node snapshots, activations, gradients). They are the
+# producer-side contract for that data; the frontend reads the same fields ad-hoc
+# from the unstructured `metadata` bag by design (see "Key Design Decisions").
+
+SafeFloat = float | None  # NaN/Inf collapse to None (see _safe_float)
+
+
+class TensorInfo(TypedDict):
+    shape: list[int]
+    dtype: str
+    mean: SafeFloat
+    std: SafeFloat
+    min: SafeFloat
+    max: SafeFloat
+
+
+class WeightInfo(TypedDict):
+    mean: SafeFloat
+    std: SafeFloat
+    min: SafeFloat
+    max: SafeFloat
+    histBins: list[SafeFloat]
+    histCounts: list[int]
+
+
+class HistStats(TypedDict):
+    """mean/std plus a 30-bin histogram (BatchNorm running mean / running var)."""
+    mean: SafeFloat
+    std: SafeFloat
+    histBins: list[SafeFloat]
+    histCounts: list[int]
+
+
+class BatchNormInfo(TypedDict):
+    runningMean: HistStats
+    runningVar: HistStats
+
+
+class GradientInfo(TypedDict):
+    mean: SafeFloat
+    std: SafeFloat
+    norm: SafeFloat
+    rms: SafeFloat  # per-parameter magnitude = norm / sqrt(param count)
+    histBins: list[SafeFloat]
+    histCounts: list[int]
+
+
+class ActivationInfo(TypedDict):
+    mean: SafeFloat
+    std: SafeFloat
+    min: SafeFloat
+    max: SafeFloat
+    histBins: list[SafeFloat]
+    histCounts: list[int]
+    sparsity: SafeFloat
+
+
+def _safe_float(v: float) -> SafeFloat:
     """Convert to JSON-safe float. NaN and Inf become None."""
     if math.isnan(v) or math.isinf(v):
         return None
     return v
 
 
-def tensor_info(t: torch.Tensor) -> dict:
+def tensor_info(t: torch.Tensor) -> TensorInfo:
     """Extract displayable info from a tensor (not the raw data)."""
     ft = t.detach().float()
     return {
@@ -29,7 +89,7 @@ def tensor_info(t: torch.Tensor) -> dict:
     }
 
 
-def module_weight_info(module: nn.Module) -> dict | None:
+def module_weight_info(module: nn.Module) -> WeightInfo | None:
     """Extract weight statistics and histogram bins for visualization."""
     params = list(module.parameters())
     if not params:
@@ -48,7 +108,7 @@ def module_weight_info(module: nn.Module) -> dict | None:
     }
 
 
-def batchnorm_info(module: nn.Module) -> dict | None:
+def batchnorm_info(module: nn.Module) -> BatchNormInfo | None:
     """Extract running mean/var histograms from BatchNorm layers."""
     rm = getattr(module, 'running_mean', None)
     rv = getattr(module, 'running_var', None)
@@ -76,7 +136,7 @@ def batchnorm_info(module: nn.Module) -> dict | None:
     }
 
 
-def gradient_info(module: nn.Module) -> dict | None:
+def gradient_info(module: nn.Module) -> GradientInfo | None:
     """Extract gradient statistics and histogram from the last backward pass."""
     grads = [p.grad.detach().flatten() for p in module.parameters() if p.grad is not None]
     if not grads:
@@ -98,7 +158,7 @@ def gradient_info(module: nn.Module) -> dict | None:
     }
 
 
-def activation_info(tensor: torch.Tensor) -> dict:
+def activation_info(tensor: torch.Tensor) -> ActivationInfo:
     """Extract activation statistics and histogram bins for visualization."""
     flat = tensor.detach().flatten().float()
     hist = torch.histogram(flat.cpu(), bins=30)
