@@ -27,6 +27,7 @@ import {
   validateSerializedGraph,
 } from '../core/serialization';
 import { apiUrl, wsUrl } from '../api/base';
+import { callBackend } from '../api/client';
 import type { EpochData } from './dashboard/types';
 import { friendlyError } from './friendlyError';
 import { computeLayout } from '../core/layout';
@@ -658,32 +659,12 @@ export function useGraph(domain: DomainContext) {
       return;
     }
     setStatus({ type: 'running', message: 'Running inference...' });
-    const graphData = serializeGraph(graphRef.current);
-
-    let response: Response;
-    try {
-      response = await fetch(apiUrl('/infer'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(graphData),
-      });
-    } catch {
-      setStatus({ type: 'error', message: 'Cannot connect to backend — is the server running?' });
+    const r = await callBackend<{ results: any }>('/infer', serializeGraph(graphRef.current));
+    if (!r.ok) {
+      setStatus({ type: 'error', message: friendlyError(r.error) });
       return;
     }
-
-    let result: any;
-    try {
-      result = await response.json();
-    } catch {
-      setStatus({ type: 'error', message: `Backend error (HTTP ${response.status})` });
-      return;
-    }
-
-    if (result.status !== 'ok') {
-      setStatus({ type: 'error', message: friendlyError(result.error ?? 'Inference failed') });
-      return;
-    }
+    const result = r.data;
 
     // Apply results to nodes
     for (const [nodeId, nodeResult] of Object.entries(result.results.nodeResults) as [
@@ -742,26 +723,15 @@ export function useGraph(domain: DomainContext) {
     }
     // No toolbar status for test — results are shown in the dashboard test tab.
     setTesting(true);
-    try {
-      const res = await fetch(apiUrl('/evaluate-test'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
-      });
-      const data = await res.json();
-      if (data.status !== 'ok') {
-        setStatus({
-          type: 'error',
-          message: friendlyError(data.error ?? 'Test evaluation failed'),
-        });
-        return;
-      }
-      setTestResult(data.result);
-    } catch {
-      setStatus({ type: 'error', message: 'Cannot connect to backend' });
-    } finally {
-      setTesting(false);
+    const r = await callBackend<{ result: any }>('/evaluate-test', {
+      graph: JSON.parse(saveGraph()),
+    });
+    setTesting(false);
+    if (!r.ok) {
+      setStatus({ type: 'error', message: friendlyError(r.error) });
+      return;
     }
+    setTestResult(r.data.result);
   }, [modelTrained, modelStale, saveGraph]);
 
   const [trainingProgress, setTrainingProgress] = useState<EpochData[]>([]);
@@ -822,40 +792,33 @@ export function useGraph(domain: DomainContext) {
 
   const simulateBackprop = useCallback(async () => {
     setStatus({ type: 'running', message: 'Simulating backprop...' });
-    try {
-      const res = await fetch(apiUrl('/simulate-backprop'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ graph: JSON.parse(saveGraph()) }),
-      });
-      const data = await res.json();
-      if (data.status !== 'ok') {
-        setStatus({ type: 'error', message: data.error ?? 'Backprop simulation failed' });
-        return;
-      }
-      const flow: { nodeId: string; norm: number }[] = data.result.flow;
-      // Reverse: animate from last layer backward to first
-      const reversed = [...flow].reverse();
-      const maxNorm = Math.max(...reversed.map((f) => f.norm), 1e-8);
-      const stepMs = 150;
-      const anim: Record<string, { delayMs: number; intensity: number }> = {};
-      reversed.forEach((f, i) => {
-        anim[f.nodeId] = {
-          delayMs: i * stepMs,
-          intensity: Math.min(1, 0.3 + (f.norm / maxNorm) * 0.7),
-        };
-      });
-      setBackpropAnim(anim);
-      setStatus({ type: 'success', message: `Backprop: loss=${data.result.loss?.toFixed(4)}` });
-      const totalDuration = reversed.length * stepMs + 800;
-      setTimeout(() => {
-        setBackpropAnim(null);
-        setStatus((s) => (s.type === 'success' ? { type: 'idle' } : s));
-      }, totalDuration);
-    } catch {
-      setStatus({ type: 'error', message: 'Cannot connect to backend' });
+    const r = await callBackend<{
+      result: { flow: { nodeId: string; norm: number }[]; loss?: number };
+    }>('/simulate-backprop', { graph: JSON.parse(saveGraph()) });
+    if (!r.ok) {
+      setStatus({ type: 'error', message: r.error });
+      return;
     }
-  }, []);
+    const { flow, loss } = r.data.result;
+    // Reverse: animate from last layer backward to first
+    const reversed = [...flow].reverse();
+    const maxNorm = Math.max(...reversed.map((f) => f.norm), 1e-8);
+    const stepMs = 150;
+    const anim: Record<string, { delayMs: number; intensity: number }> = {};
+    reversed.forEach((f, i) => {
+      anim[f.nodeId] = {
+        delayMs: i * stepMs,
+        intensity: Math.min(1, 0.3 + (f.norm / maxNorm) * 0.7),
+      };
+    });
+    setBackpropAnim(anim);
+    setStatus({ type: 'success', message: `Backprop: loss=${loss?.toFixed(4)}` });
+    const totalDuration = reversed.length * stepMs + 800;
+    setTimeout(() => {
+      setBackpropAnim(null);
+      setStatus((s) => (s.type === 'success' ? { type: 'idle' } : s));
+    }, totalDuration);
+  }, [saveGraph]);
 
   const exportPython = useCallback(async () => {
     try {
