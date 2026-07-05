@@ -7,14 +7,14 @@ import type * as RF from '@xyflow/react';
 import type { Graph, NodeInstance } from '../../core/graph';
 import type { NodeRegistry } from '../../core/nodedef';
 import { validateForward, validateTraining } from '../../core/validation';
-import type { EpochRecord } from '../useGraph';
+import type { EpochData } from '../dashboard/types';
 
 /** The subset of useGraph the tool executor needs. */
 export interface GraphToolApi {
   /** Live current graph (root or active subgraph) — read fresh each call. */
   getCurrentGraph: () => Graph;
   /** Per-epoch training metrics from the most recent run this session. */
-  trainingProgress: EpochRecord[];
+  trainingProgress: EpochData[];
   /** Whether a trained model is in memory, and whether the graph has since changed. */
   modelTrained: boolean;
   modelStale: boolean;
@@ -109,15 +109,17 @@ function getTrainingResults(graph: GraphToolApi): string {
   }
 
   // Pick columns from what the run actually produced (classification vs LM differ).
-  const has = (k: string) => epochs.some((e) => typeof e[k] === 'number');
-  const cols: { key: string; label: string; pct?: boolean }[] = [{ key: 'loss', label: 'loss' }];
+  const has = (k: keyof EpochData) => epochs.some((e) => typeof e[k] === 'number');
+  const cols: { key: keyof EpochData; label: string; pct?: boolean }[] = [
+    { key: 'loss', label: 'loss' },
+  ];
   if (has('accuracy')) cols.push({ key: 'accuracy', label: 'acc', pct: true });
   if (has('valLoss')) cols.push({ key: 'valLoss', label: 'valLoss' });
   if (has('valAccuracy')) cols.push({ key: 'valAccuracy', label: 'valAcc', pct: true });
   if (has('perplexity')) cols.push({ key: 'perplexity', label: 'ppl' });
   if (has('valPerplexity')) cols.push({ key: 'valPerplexity', label: 'valPpl' });
 
-  const row = (e: EpochRecord) =>
+  const row = (e: EpochData) =>
     `epoch ${e.epoch}: ` + cols.map((c) => `${c.label}=${fmtMetric(e[c.key], c.pct)}`).join(', ');
 
   // Cap output so a long run can't flood the context: show all if small, else

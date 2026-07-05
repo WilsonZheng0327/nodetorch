@@ -23,6 +23,7 @@ from engine.forward_utils import run_forward_pass
 from .base import (
     TrainingContext,
     TrainingResult,
+    EpochMessage,
     build_optimizer,
     build_scheduler,
     init_weight_norms,
@@ -247,7 +248,7 @@ def autoregressive_train(ctx: TrainingContext) -> TrainingResult:
                 generated_text = None
 
         # Build epoch result
-        epoch_result = {
+        epoch_result: EpochMessage = {
             "epoch": epoch + 1,
             "totalEpochs": ctx.epochs,
             "loss": _safe_float(avg_loss),

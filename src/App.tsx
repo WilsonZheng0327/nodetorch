@@ -10,11 +10,7 @@ import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx } from './ui/contexts';
 import { LeftRail } from './ui/sidebar/LeftRail';
 import { ChatRail } from './ui/chat/ChatRail';
 import { Toolbar } from './ui/Toolbar';
-import {
-  TrainingDashboard,
-  type ModelLayerInfo,
-  type EpochData,
-} from './ui/dashboard/TrainingDashboard';
+import { TrainingDashboard, type ModelLayerInfo } from './ui/dashboard/TrainingDashboard';
 import { StepThroughPanel } from './ui/step-through/StepThroughPanel';
 import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
@@ -476,10 +472,8 @@ export default function App() {
                   onOpenChange={setLeftRailOpen}
                 />
                 <TutorialPanel />
-                {/* EpochRecord (useGraph) and EpochData describe the same streamed
-            per-epoch data; they should be unified into one shared type. */}
                 <TrainingDashboard
-                  progress={graph.trainingProgress as EpochData[]}
+                  progress={graph.trainingProgress}
                   isTraining={graph.trainingActive}
                   batchProgress={graph.batchProgress}
                   selectedEpoch={graph.selectedEpoch}

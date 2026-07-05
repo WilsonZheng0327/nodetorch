@@ -6,6 +6,7 @@ All training loop plugins use these building blocks. Adding a new paradigm
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+from typing import Any, NotRequired, TypedDict
 import logging
 import threading
 import time
@@ -44,6 +45,44 @@ from engine.forward_utils import run_forward_pass
 # ============================================================================
 # Data structures
 # ============================================================================
+
+class EpochMessage(TypedDict):
+    """One epoch's streamed metrics — the wire format for the WebSocket ``epoch``
+    message, emitted by every training paradigm (standard / gan / diffusion /
+    autoregressive). Mirrored on the frontend by ``EpochData`` in
+    ``src/ui/dashboard/types.ts``; keep the two in sync.
+
+    Only ``epoch`` and ``loss`` are always present; every other field is optional
+    and simply omitted when a paradigm doesn't produce it (e.g. ``perplexity`` for
+    language models, ``dLoss``/``gLoss`` for GANs). Heavy nested payloads are
+    typed loosely here — their exact shapes live with their producers (stats.py,
+    build_gradient_flow) and the matching TS types.
+    """
+    epoch: int
+    loss: float
+    totalEpochs: NotRequired[int]
+    accuracy: NotRequired[float]
+    valLoss: NotRequired[float | None]
+    valAccuracy: NotRequired[float | None]
+    learningRate: NotRequired[float | None]
+    time: NotRequired[float]
+    batches: NotRequired[int]
+    samples: NotRequired[int]
+    trainingMode: NotRequired[str]
+    # Paradigm-specific scalars
+    dLoss: NotRequired[float]          # gan
+    gLoss: NotRequired[float]          # gan
+    noiseLoss: NotRequired[float]      # diffusion
+    perplexity: NotRequired[float]     # autoregressive
+    valPerplexity: NotRequired[float | None]  # autoregressive
+    generatedText: NotRequired[str | None]    # autoregressive
+    # Heavy payloads (see the TS types / producers for exact shape)
+    gradientFlow: NotRequired[list[dict[str, Any]]]
+    perClassAccuracy: NotRequired[list[dict[str, Any]]]
+    trackedSamples: NotRequired[list[dict[str, Any]]]
+    generatedSamples: NotRequired[list]
+    nodeSnapshots: NotRequired[dict[str, Any]]  # stored separately on the frontend
+
 
 @dataclass
 class TrainingContext:
@@ -526,8 +565,8 @@ def build_gradient_flow(node_snapshots, nodes, order):
 
 def build_epoch_result(epoch, ctx, avg_loss, accuracy, val_loss, val_accuracy,
                        current_lr, epoch_time, total_batches, total,
-                       gradient_flow, per_class_accuracy, node_snapshots, tracked_probes):
-    """Assemble the epoch result dict for streaming to frontend."""
+                       gradient_flow, per_class_accuracy, node_snapshots, tracked_probes) -> EpochMessage:
+    """Assemble the epoch result dict for streaming to frontend (see EpochMessage)."""
     return {
         "epoch": epoch + 1,
         "totalEpochs": ctx.epochs,

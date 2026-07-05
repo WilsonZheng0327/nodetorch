@@ -14,6 +14,12 @@ export interface TrackedSampleProbe {
   loss?: number;
 }
 
+// One epoch's streamed training metrics — the single shared per-epoch record,
+// used by useGraph (trainingProgress), the dashboard, and the chat tool. Mirrors
+// the backend `EpochMessage` TypedDict (backend/training/base.py), which is the
+// wire format for the WebSocket `epoch` message. The message additionally
+// carries `nodeSnapshots` (stored separately as snapshotHistory) and `noiseLoss`
+// (diffusion), which aren't part of this stored record. Keep the two in sync.
 export interface EpochData {
   epoch: number;
   perplexity?: number;
