@@ -72,9 +72,6 @@
   background: #313244;
   color: #89b4fa;
 }
-.step-through-mode-tab-backward.step-through-mode-tab-active {
-  color: #f9e2af;
-}
 .step-through-mode-tab-denoise.step-through-mode-tab-active {
   color: #c4b5fd;
 }
@@ -1124,15 +1121,6 @@
 
 .stage-detail-body {
   margin-top: 8px;
-}
-
-/* --- Backward placeholder --- */
-
-.step-through-backward-placeholder {
-  padding: 40px;
-  text-align: center;
-  color: #6c7086;
-  font-size: 14px;
 }
 
 /* ============================================================================

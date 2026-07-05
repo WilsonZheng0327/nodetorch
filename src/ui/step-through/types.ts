@@ -392,18 +392,7 @@ export interface StepThroughResult {
   modelState?: ModelState;
 }
 
-// --- Backward (placeholder) ---
-export interface BackwardStage extends Stage {
-  gradientShape?: number[];
-}
-export interface BackwardStepThroughResult {
-  stages: BackwardStage[];
-  loss: number;
-  sample: SampleInfo;
-  modelState?: ModelState;
-}
-
-export type StepThroughMode = 'forward' | 'backward' | 'denoise' | 'generate';
+export type StepThroughMode = 'forward' | 'denoise' | 'generate';
 
 // --- Text generation ---
 export interface TextGenerationResult {

@@ -4,7 +4,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import type {
   StepThroughResult,
-  BackwardStepThroughResult,
   StepThroughMode,
   DenoiseStepThroughResult,
   TextGenerationResult,
@@ -24,13 +23,10 @@ interface Props {
 export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const [mode, setMode] = useState<StepThroughMode>('forward');
 
-  // Sample state — shared across forward/backward
-  const [sampleIdx, setSampleIdx] = useState<number | null>(null);
   const [sample, setSample] = useState<SampleInfo | null>(null);
 
   // Per-mode results
   const [forwardResult, setForwardResult] = useState<StepThroughResult | null>(null);
-  const [backwardResult, setBackwardResult] = useState<BackwardStepThroughResult | null>(null);
   const [denoiseResult, setDenoiseResult] = useState<DenoiseStepThroughResult | null>(null);
   const [genResult, setGenResult] = useState<TextGenerationResult | null>(null);
   const [genPrompt, setGenPrompt] = useState('');
@@ -42,12 +38,11 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load a new sample (runs forward pass). Invalidates backward.
+  // Load a new sample (runs forward pass).
   const loadSample = useCallback(
     (filterLabel?: number) => {
       setLoading(true);
       setError(null);
-      setBackwardResult(null); // invalidate backward for new sample
       const body: Record<string, unknown> = { graph: JSON.parse(graphJson) };
       if (filterLabel != null) body.filterLabel = filterLabel;
       fetch(apiUrl('/step-through'), {
@@ -60,7 +55,6 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
           if (data.status === 'ok') {
             setForwardResult(data.result);
             setSample(data.result.sample);
-            setSampleIdx(data.result.sampleIdx ?? null);
             setCurrentIdx(0);
             setMode('forward');
           } else {
@@ -72,30 +66,6 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
     },
     [graphJson],
   );
-
-  // Load backward for the SAME sample (uses sampleIdx)
-  const loadBackward = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    const body: Record<string, unknown> = { graph: JSON.parse(graphJson) };
-    if (sampleIdx != null) body.sampleIdx = sampleIdx;
-    fetch(apiUrl('/backward-step-through'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.status === 'ok') {
-          setBackwardResult(data.result);
-          setCurrentIdx(0);
-        } else {
-          setError(data.error ?? 'Failed to run backward step-through');
-        }
-      })
-      .catch(() => setError('Cannot connect to backend'))
-      .finally(() => setLoading(false));
-  }, [graphJson, sampleIdx]);
 
   const loadDenoise = useCallback(() => {
     setLoading(true);
@@ -219,12 +189,7 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const isGenerativeGraph = isDiffusionGraph || isGANGraph;
 
   // Active stages depend on mode
-  const activeStages =
-    mode === 'forward'
-      ? (forwardResult?.stages ?? [])
-      : mode === 'backward'
-        ? (backwardResult?.stages ?? [])
-        : [];
+  const activeStages = mode === 'forward' ? (forwardResult?.stages ?? []) : [];
   const denoiseSteps = denoiseResult?.steps ?? [];
   const totalSteps = mode === 'denoise' ? denoiseSteps.length : activeStages.length;
 
@@ -248,8 +213,6 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
   const switchMode = (m: StepThroughMode) => {
     setMode(m);
     setCurrentIdx(0);
-    // Auto-load backward on first switch (uses same sample)
-    if (m === 'backward' && !backwardResult && !loading) loadBackward();
     if (m === 'denoise' && !denoiseResult && !loading) loadDenoise();
   };
 
@@ -283,8 +246,9 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
       )}
       {error && <div className="step-through-error">{error}</div>}
 
-      {/* Mode tabs — below sample. Stay visible during loading so the user can switch modes. */}
-      {(forwardResult || backwardResult) && (
+      {/* Mode tabs — below sample. Stay visible during loading so the user can switch modes.
+          Only rendered when there's more than one mode to switch between. */}
+      {forwardResult && (isGenerativeGraph || isAutoregGraph) && (
         <div className="step-through-mode-bar">
           <div className="step-through-mode-tabs">
             <button
@@ -292,12 +256,6 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
               onClick={() => switchMode('forward')}
             >
               Forward
-            </button>
-            <button
-              className={`step-through-mode-tab ${mode === 'backward' ? 'step-through-mode-tab-active step-through-mode-tab-backward' : ''}`}
-              onClick={() => switchMode('backward')}
-            >
-              Backward
             </button>
             {isGenerativeGraph && (
               <button
@@ -383,41 +341,10 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
             </>
           )}
 
-          {/* Backward */}
-          {mode === 'backward' && (
-            <>
-              <StageTimeline
-                stages={activeStages}
-                currentIdx={currentIdx}
-                onSelect={setCurrentIdx}
-                direction="backward"
-              />
-              {stage && (
-                <div className="stage-detail">
-                  <div className="stage-detail-header">
-                    <span className="stage-detail-name">{stage.displayName}</span>
-                    <span className="stage-detail-shape">
-                      {stage.inputShape ? `[${stage.inputShape.join(', ')}]` : '—'} &rarr;{' '}
-                      {stage.outputShape ? `[${stage.outputShape.join(', ')}]` : '—'}
-                    </span>
-                  </div>
-                  <div className="step-through-backward-placeholder">
-                    Backward visualization coming soon
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
           {mode === 'denoise' && denoiseResult && denoiseSteps[currentIdx] && (
             <DenoiseView step={denoiseSteps[currentIdx]} channels={denoiseResult.channels} />
           )}
         </>
-      )}
-
-      {/* Backward loading state */}
-      {mode === 'backward' && !backwardResult && loading && (
-        <div className="step-through-empty">Running backward pass on same sample...</div>
       )}
     </div>
   );
