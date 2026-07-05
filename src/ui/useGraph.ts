@@ -28,6 +28,8 @@ import {
 } from '../core/serialization';
 import { apiUrl, wsUrl } from '../api/base';
 import type { EpochData } from './dashboard/types';
+import { friendlyError } from './friendlyError';
+import { computeLayout } from '../core/layout';
 
 // `trainingProgress` below is `EpochData[]` — the single shared per-epoch type
 // (defined in ./dashboard/types, imported above), mirrored on the backend by the
@@ -69,32 +71,6 @@ function toRFEdges(graph: Graph): RF.Edge[] {
     targetHandle: e.target.portId,
     animated: true,
   }));
-}
-
-// --- Friendly error translation ---
-
-/** Translate common PyTorch errors into student-friendly messages. */
-function friendlyError(msg: string): string {
-  if (msg.includes('mat1 and mat2 shapes cannot be multiplied')) {
-    const match = msg.match(/(\d+x\d+).*?(\d+x\d+)/);
-    if (match)
-      return `Shape mismatch in Linear layer: input is ${match[1]} but weights expect ${match[2]}. Check upstream layer output size.`;
-  }
-  if (msg.includes('Expected 4-dimensional input'))
-    return 'This layer expects a 4D tensor [B,C,H,W]. Add a Reshape node or check connections.';
-  if (msg.includes('Expected 3-dimensional input'))
-    return 'This layer expects a 3D tensor [B,seq,features]. Check input dimensions.';
-  if (msg.includes('Expected 2-dimensional input'))
-    return 'This layer expects a 2D tensor [B,features]. Did you forget a Flatten layer?';
-  if (msg.includes('size mismatch'))
-    return `Tensor size mismatch — shapes don't align. Check that connected layers have compatible dimensions.`;
-  if (msg.includes('CUDA out of memory'))
-    return 'GPU out of memory. Try reducing batch size or using CPU.';
-  if (msg.includes('is not a valid device'))
-    return 'Selected device not available. Switch to CPU in the dashboard System tab.';
-  if (msg.includes('negative dimension'))
-    return 'Layer produced a negative dimension — kernel/stride/padding combination is too large for the input size.';
-  return msg;
 }
 
 /** Save a blob to disk: use the File System Access API (lets the user pick a name
@@ -1218,79 +1194,11 @@ export function useGraph(domain: DomainContext) {
   const organizeGraph = useCallback(() => {
     const g = getCurrentGraph();
     if (g.nodes.size === 0) return;
-
-    // Build adjacency for a simple left-to-right layout
-    // Assign each node a "column" based on longest path from a root
-    const inDegree = new Map<string, number>();
-    const adj = new Map<string, string[]>();
-    for (const node of g.nodes.values()) {
-      inDegree.set(node.id, 0);
-      adj.set(node.id, []);
-    }
-    for (const edge of g.edges) {
-      const prev = inDegree.get(edge.target.nodeId) ?? 0;
-      inDegree.set(edge.target.nodeId, prev + 1);
-      adj.get(edge.source.nodeId)?.push(edge.target.nodeId);
-    }
-
-    // Longest-path layering (ensures connected nodes are in adjacent columns)
-    const depth = new Map<string, number>();
-    const queue: string[] = [];
-    for (const [id, deg] of inDegree) {
-      if (deg === 0) {
-        depth.set(id, 0);
-        queue.push(id);
-      }
-    }
-    // Also handle disconnected nodes
-    if (queue.length === 0) {
-      for (const id of g.nodes.keys()) {
-        depth.set(id, 0);
-        queue.push(id);
-      }
-    }
-
-    let maxDepth = 0;
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      const d = depth.get(id) ?? 0;
-      for (const tgt of adj.get(id) ?? []) {
-        const newD = d + 1;
-        if (newD > (depth.get(tgt) ?? 0)) {
-          depth.set(tgt, newD);
-          if (newD > maxDepth) maxDepth = newD;
-        }
-        const remaining = (inDegree.get(tgt) ?? 1) - 1;
-        inDegree.set(tgt, remaining);
-        if (remaining === 0) queue.push(tgt);
-      }
-    }
-
-    // Assign unvisited nodes (disconnected) to column 0
-    for (const id of g.nodes.keys()) {
-      if (!depth.has(id)) depth.set(id, 0);
-    }
-
-    // Group by column
-    const columns = new Map<number, string[]>();
-    for (const [id, d] of depth) {
-      if (!columns.has(d)) columns.set(d, []);
-      columns.get(d)!.push(id);
-    }
-
-    // Layout with spacing
-    const COL_GAP = 250;
-    const ROW_GAP = 120;
+    const positions = computeLayout(g);
     snapshot();
-    for (const [col, ids] of columns) {
-      // Sort nodes within column by their current Y to preserve relative order
-      ids.sort((a, b) => g.nodes.get(a)!.position.y - g.nodes.get(b)!.position.y);
-      const totalHeight = (ids.length - 1) * ROW_GAP;
-      const startY = -totalHeight / 2;
-      for (let i = 0; i < ids.length; i++) {
-        const node = g.nodes.get(ids[i])!;
-        node.position = { x: col * COL_GAP, y: startY + i * ROW_GAP };
-      }
+    for (const [id, pos] of positions) {
+      const node = g.nodes.get(id);
+      if (node) node.position = pos;
     }
     syncToRF();
   }, [getCurrentGraph, syncToRF, snapshot]);
