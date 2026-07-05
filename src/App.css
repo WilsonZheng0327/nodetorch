@@ -123,6 +123,23 @@
 }
 
 /* Connection rejection toast */
+/* Persistent banner shown while the Python backend is unreachable. */
+.backend-offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  padding: 7px 16px;
+  text-align: center;
+  background: rgba(239, 68, 68, 0.95);
+  color: #fff;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
 .connection-error-toast {
   position: fixed;
   bottom: 80px;

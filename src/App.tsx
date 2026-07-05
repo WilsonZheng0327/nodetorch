@@ -16,6 +16,7 @@ import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
 import { TutorialPanel } from './ui/tutorial/TutorialPanel';
 import { tutorialEvent } from './ui/tutorial/tutorialEvent';
+import { useBackendHealth } from './ui/useBackendHealth';
 import { apiUrl } from './api/base';
 
 const categoryColors: Record<string, string> = {
@@ -50,6 +51,7 @@ export default function App() {
   const domain = useMemo(() => initDomain(), []);
   const nodeTypes = useNodeTypes(domain);
   const graph = useGraph(domain);
+  const backendOnline = useBackendHealth();
 
   const graphActions = useMemo(
     () => ({
@@ -367,6 +369,12 @@ export default function App() {
           <BackpropCtx.Provider value={graph.backpropAnim}>
             <ValidationCtx.Provider value={graph.validationErrors}>
               <div className="app-shell">
+                {!backendOnline && (
+                  <div className="backend-offline-banner">
+                    ⚠ Backend offline — training, inference, and previews need the Python server
+                    running. See the README to start it.
+                  </div>
+                )}
                 <div ref={reactFlowWrapper} className="canvas-area">
                   <RF.ReactFlow
                     nodes={graph.rfNodes}
