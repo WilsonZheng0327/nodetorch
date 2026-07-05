@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '../../../core/nodedef';
+import { convOutputSize } from '../../shape-math';
 
 export const maxPool2dNode: NodeDefinition = {
   type: 'ml.layers.maxpool2d',
@@ -63,8 +64,8 @@ export const maxPool2dNode: NodeDefinition = {
 
         const [B, C, H, W] = input;
         const { kernelSize: K, stride: S, padding: P } = properties;
-        const outH = Math.floor((H + 2 * P - K) / S) + 1;
-        const outW = Math.floor((W + 2 * P - K) / S) + 1;
+        const outH = convOutputSize(H, K, P, S);
+        const outW = convOutputSize(W, K, P, S);
 
         if (outH <= 0 || outW <= 0) {
           return {

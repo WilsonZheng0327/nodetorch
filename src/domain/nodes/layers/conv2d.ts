@@ -2,6 +2,7 @@
 // Shape executor does the math: output = floor((input + 2*padding - kernel) / stride) + 1
 
 import type { NodeDefinition } from '../../../core/nodedef';
+import { convOutputSize } from '../../shape-math';
 
 export const conv2dNode: NodeDefinition = {
   type: 'ml.layers.conv2d',
@@ -76,8 +77,8 @@ export const conv2dNode: NodeDefinition = {
 
         const [B, C, H, W] = input;
         const { outChannels: OC, kernelSize: K, stride: S, padding: P } = properties;
-        const outH = Math.floor((H + 2 * P - K) / S) + 1;
-        const outW = Math.floor((W + 2 * P - K) / S) + 1;
+        const outH = convOutputSize(H, K, P, S);
+        const outW = convOutputSize(W, K, P, S);
 
         // Validate output dimensions
         if (outH <= 0 || outW <= 0) {

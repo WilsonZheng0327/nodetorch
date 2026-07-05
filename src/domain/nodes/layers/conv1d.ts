@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '../../../core/nodedef';
+import { convOutputSize } from '../../shape-math';
 
 export const conv1dNode: NodeDefinition = {
   type: 'ml.layers.conv1d',
@@ -67,7 +68,7 @@ export const conv1dNode: NodeDefinition = {
 
         const [B, C, L] = input;
         const { outChannels: OC, kernelSize: K, stride: S, padding: P } = properties;
-        const outL = Math.floor((L + 2 * P - K) / S) + 1;
+        const outL = convOutputSize(L, K, P, S);
 
         if (outL <= 0) {
           return {

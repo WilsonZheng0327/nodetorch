@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '../../../core/nodedef';
+import { convTransposeOutputSize } from '../../shape-math';
 
 export const convTranspose2dNode: NodeDefinition = {
   type: 'ml.layers.conv_transpose2d',
@@ -85,8 +86,8 @@ export const convTranspose2dNode: NodeDefinition = {
           padding: P,
           outputPadding: OP,
         } = properties;
-        const outH = (H - 1) * S - 2 * P + K + OP;
-        const outW = (W - 1) * S - 2 * P + K + OP;
+        const outH = convTransposeOutputSize(H, K, P, S, OP);
+        const outW = convTransposeOutputSize(W, K, P, S, OP);
 
         if (outH <= 0 || outW <= 0) {
           return { outputs: {}, metadata: { error: `Invalid output: ${outH}x${outW}` } };
