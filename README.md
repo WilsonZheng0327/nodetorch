@@ -140,7 +140,7 @@ explain and edit your graph. It's off until you configure a provider:
   OpenRouter, …). Keys are stored server-side and never sent to the browser.
 
 The loop runs in the backend; `requirements.txt` already installs the `openai` and
-`anthropic` adapters. See [`docs/agent.md`](docs/agent.md) for the architecture.
+`anthropic` adapters. See [`docs/explanation/agent.md`](docs/explanation/agent.md) for the architecture.
 
 ## Usage
 

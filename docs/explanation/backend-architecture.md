@@ -453,12 +453,12 @@ The frontend's execution modes map directly to endpoints (all in `main.py`):
   `TRAIN_DATASETS`/`TEST_DATASETS` + optional `DENORMALIZERS`/`CLASS_NAMES`).
 - **New training paradigm** → add a file in `training/`, implement
   `(ctx) -> TrainingResult`, register it in `TRAINING_LOOPS`, and add detection
-  to `detect_training_mode`. See `docs/training-plugins.md`.
+  to `detect_training_mode`. See `docs/explanation/training-plugins.md`.
 
 ## Related docs
 
-- `docs/training-flow.md` — the frontend half of the train flow (validation,
+- `docs/explanation/training-flow.md` — the frontend half of the train flow (validation,
   WebSocket, dashboard).
-- `docs/training-plugins.md` — the training-paradigm plugin system in depth.
-- `docs/shape-inference.md`, `docs/visualization.md`, `docs/multi-output-nodes.md`,
-  `docs/custom-blocks.md`.
+- `docs/explanation/training-plugins.md` — the training-paradigm plugin system in depth.
+- `docs/explanation/shape-inference.md`, `docs/explanation/visualization.md`,
+  `docs/features/multi-output-nodes.md`, `docs/features/custom-blocks.md`.

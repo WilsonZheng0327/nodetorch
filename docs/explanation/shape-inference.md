@@ -66,7 +66,7 @@ For each incoming edge, the engine reads the upstream node's `lastResult.outputs
 
 ### 5. Handle subgraph nodes (recursive)
 
-If `node.subgraph` exists, the engine injects inputs into the inner graph's input sentinels, recursively calls `execute()` on the inner graph, then reads outputs from the output sentinels. See [custom-blocks.md](./custom-blocks.md) for the full details.
+If `node.subgraph` exists, the engine injects inputs into the inner graph's input sentinels, recursively calls `execute()` on the inner graph, then reads outputs from the output sentinels. See [custom-blocks.md](../features/custom-blocks.md) for the full details.
 
 ### 6. Look up and run the executor
 

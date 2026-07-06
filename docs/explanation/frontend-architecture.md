@@ -217,8 +217,8 @@ WebSocket (training) or REST (everything else). The backend has its **own** engi
 (`backend/engine/graph_builder/`) that does the *same topological walk* but builds
 real `nn.Module`s and pushes tensors through them. The two halves are connected
 only by the `SerializedGraph` JSON contract — which is why
-`validateSerializedGraph` guards that seam. See `docs/backend-architecture.md` for
-the other side of the wire.
+`validateSerializedGraph` guards that seam. See `docs/explanation/backend-architecture.md`
+for the other side of the wire.
 
 ## Key design decisions
 
@@ -238,8 +238,8 @@ the other side of the wire.
 
 ## Related docs
 
-- `docs/backend-architecture.md` — the other side of the wire (graph → PyTorch).
-- `docs/shape-inference.md` — how the shape executors compute dimensions.
-- `docs/training-flow.md` — the frontend half of the train flow.
-- `docs/custom-blocks.md` — subgraph blocks (Layer 3 recursion in depth).
-- `docs/undo-redo.md`, `docs/copy-paste.md` — the `useGraph` subsystems.
+- `docs/explanation/backend-architecture.md` — the other side of the wire (graph → PyTorch).
+- `docs/explanation/shape-inference.md` — how the shape executors compute dimensions.
+- `docs/explanation/training-flow.md` — the frontend half of the train flow.
+- `docs/features/custom-blocks.md` — subgraph blocks (Layer 3 recursion in depth).
+- `docs/features/undo-redo.md`, `docs/features/copy-paste.md` — the `useGraph` subsystems.

@@ -36,7 +36,7 @@ Set `NODETORCH_DEV=1` to enable uvicorn auto-reload during development
 
 ## Architecture
 
-6-layer design. Each layer only depends on layers below it. **Layers 1-4 know nothing about ML.**
+6-layer design. Each layer only depends on layers below it. **Layers 1-4 know nothing about ML.** (Rationale: [ADR-0003](docs/adr/0003-six-layer-ml-agnostic-architecture.md).)
 
 ```
 Layer 6: UI          → src/ui/           (React + React Flow)
@@ -59,7 +59,7 @@ Backend mirrors the engine: `backend/engine/graph_builder/` does the same topolo
 - `src/ui/useGraph.ts` — bridge between engine and React Flow (the main state hook)
 - `src/ui/EngineNode.tsx` — generic node renderer (reads NodeDefinition + lastResult.metadata)
 - `src/ui/sidebar/LeftRail.tsx` — docked left panel hosting the node palette + property inspector (Tab switches, `1` toggles)
-- `src/ui/chat/` — AI assistant UI (ChatRail, useAgentChat, graphTools, AgentSettings); see `docs/agent.md`
+- `src/ui/chat/` — AI assistant UI (ChatRail, useAgentChat, graphTools, AgentSettings); see `docs/explanation/agent.md`
 - `src/ui/step-through/` — forward step-through + generate/denoise UI (StepThroughPanel, StageDetail, ExtraPanels)
 - `src/ui/dashboard/` — training dashboard split into container + `types`/`charts`/`panels`/`samples`
 Backend is organized into packages by concern (all importable with `pythonpath = backend`):
@@ -104,7 +104,7 @@ The training loop is a plugin system. `train_graph()` auto-detects which paradig
 - **diffusion** — noise-conditioned denoising with timestep injection.
 - **autoregressive** — next-token prediction with 3D logit reshaping, perplexity metrics, text generation.
 
-See `docs/training-plugins.md` for the full architecture documentation.
+See `docs/explanation/training-plugins.md` for the full architecture documentation.
 
 ### Text preprocessing pipeline
 
@@ -121,7 +121,12 @@ During training, `build_training_context()` detects the tokenizer node's mode. I
 2. **Backend builder**: add builder function to `backend/engine/node_builders.py` (layers) or `backend/dataprep/data_loaders.py` (datasets). Loss nodes also need `LOSS_NODES` in `backend/engine/graph_builder/constants.py`.
 3. **Backend viz**: create or edit a file in `backend/visualize/layers/` with the forward/backward viz function, then register it in `backend/visualize/node_viz.py`'s `FORWARD_VIZ` / `BACKWARD_VIZ` registries. Optional — default fallback provides basic shape-based viz.
 
-Additional design docs live in `docs/`: `frontend-architecture.md` (the 6-layer frontend stack — what each layer does, why, and a "what happens when you edit a node" walkthrough), `backend-architecture.md` (backend overview + "what happens when you press Train" walkthrough), `shape-inference.md`, `training-flow.md`, `training-plugins.md`, `visualization.md`, `multi-output-nodes.md`, `custom-blocks.md`, `copy-paste.md`, `undo-redo.md`.
+Additional design docs live in `docs/`, grouped into subfolders and indexed by [`docs/README.md`](docs/README.md):
+- `docs/explanation/` — how the system works & why: `frontend-architecture.md` (the 6-layer frontend stack — what each layer does, why, and a "what happens when you edit a node" walkthrough), `backend-architecture.md` (backend overview + "what happens when you press Train" walkthrough), `shape-inference.md`, `training-flow.md`, `training-plugins.md`, `visualization.md`, `agent.md`.
+- `docs/features/` — cross-cutting feature deep dives: `custom-blocks.md`, `multi-output-nodes.md`, `undo-redo.md`, `copy-paste.md`.
+- `docs/reference/` — lookup facts: `core-abstractions.md` (flat glossary of the load-bearing frontend + backend types and registries, each with a one-liner and where it lives).
+- `docs/adr/` — Architecture Decision Records (dated, immutable rationale for significant choices).
+- `docs/surveys/` — dated point-in-time codebase audits.
 
 ### Node metadata convention
 
@@ -145,9 +150,11 @@ Nodes communicate display data through `metadata` on `ExecutionResult`:
 
 ## Key Design Decisions
 
-- Data types are strings, not enums. Registered via `DataTypeRegistry`.
+The bigger, costly-to-reverse choices have full write-ups in [`docs/adr/`](docs/adr/) (Architecture Decision Records). This is the condensed list.
+
+- Data types are strings, not enums. Registered via `DataTypeRegistry`. ([ADR-0001](docs/adr/0001-data-types-as-strings.md))
 - `getPorts()` is a function of properties — enables dynamic ports (e.g., Concat with N inputs).
-- Execution modes are registered, not hardcoded. Adding new modes doesn't touch engine code.
+- Execution modes are registered, not hardcoded. Adding new modes doesn't touch engine code. ([ADR-0002](docs/adr/0002-registered-execution-modes.md))
 - `metadata` on ExecutionResult is unstructured — each node emits whatever makes sense for visualization.
 - All React Flow imports use `import * as RF from '@xyflow/react'` namespace style for clarity.
 - Frontend uses JSDoc (`/** */`) on all core interfaces and functions for hover documentation.
