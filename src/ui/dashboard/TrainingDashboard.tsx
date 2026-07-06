@@ -147,6 +147,10 @@ export function TrainingDashboard({
 
   const latest = progress.length > 0 ? progress[progress.length - 1] : null;
   const isAutoregressive = latest?.trainingMode === 'autoregressive';
+  // GAN / diffusion produce generated images. The classification/reconstruction
+  // "tracked samples" view lives in the Backprop → Over training panel now, so we
+  // only keep the Samples tab for the generative paradigms.
+  const isGenerative = progress.some((ep) => !!ep.generatedSamples?.length);
   const finished = !isTraining && progress.length > 0;
   // The epoch data currently being viewed (selected via slider, or latest)
   const viewed =
@@ -271,6 +275,9 @@ export function TrainingDashboard({
         {(['loss', 'accuracy', 'gradients', 'perclass', 'samples', 'test', 'epochs'] as const)
           .filter((tab) => {
             if (isAutoregressive && (tab === 'perclass' || tab === 'test')) return false;
+            // Tracked-samples now live in the Backprop panel; keep Samples only
+            // for the generative paradigms (generated images / text).
+            if (tab === 'samples' && !isAutoregressive && !isGenerative) return false;
             return true;
           })
           .map((tab) => (
@@ -352,9 +359,9 @@ export function TrainingDashboard({
         ) : activeTab === 'samples' ? (
           isAutoregressive ? (
             <GeneratedTextView progress={progress} />
-          ) : (
+          ) : isGenerative ? (
             <TrackedSamplesView progress={progress} selectedEpoch={selectedEpoch} />
-          )
+          ) : null
         ) : activeTab === 'test' ? (
           <TestResultView result={testResult} isTesting={isTesting} />
         ) : activeTab === 'epochs' ? (

@@ -46,16 +46,18 @@
 }
 
 /* Right-align the layer timeline so the output end (where backprop starts) hugs
-   the right edge and the reading order is right → left. */
-.stage-timeline-right {
-  justify-content: flex-end;
+   the right edge. A leading auto-margin (instead of justify-content: flex-end)
+   keeps it right-aligned when it fits but stays horizontally scrollable when the
+   layers overflow — flex-end would clip the left/input end unreachably. */
+.stage-timeline-right > :first-child {
+  margin-left: auto;
 }
 
 /* --- The per-layer backward cell (BackpropDetail) --- */
 
 .bp-cell {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 0;
 }
 
@@ -77,7 +79,7 @@
 }
 
 .bp-panel-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -155,9 +157,9 @@
 }
 
 .bp-note {
-  font-size: 13px;
-  color: #7f849c;
-  line-height: 1.5;
+  font-size: 14px;
+  color: #9399b2;
+  line-height: 1.55;
 }
 
 .bp-note strong {
@@ -296,4 +298,896 @@
   flex-direction: column;
   gap: 2px;
   margin-bottom: 8px;
+}
+
+/* ======================================================================
+   Frame-fix: sample preview, 3-panel cell, before/after toggle, loss seed
+   ====================================================================== */
+
+/* --- Sample preview (top of panel) --- */
+.bp-sample-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #313244;
+}
+
+.bp-sample-img {
+  width: 52px;
+  height: 52px;
+  image-rendering: pixelated;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  background: #11111b;
+}
+
+.bp-sample-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bp-sample-truth {
+  font-size: 13px;
+  color: #a6adc8;
+}
+.bp-sample-truth strong {
+  color: #a6e3a1;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bp-sample-dataset {
+  font-size: 11px;
+  color: #6c7086;
+}
+
+.bp-sample-text {
+  font-size: 12px;
+  color: #7f849c;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60vw;
+}
+
+/* --- Before / After toggle (replaces the take-step button once stepped) --- */
+.bp-ba-toggle {
+  display: inline-flex;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.bp-ba-toggle button {
+  padding: 5px 14px;
+  background: #1e1e2e;
+  border: none;
+  color: #a6adc8;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+.bp-ba-toggle button + button {
+  border-left: 1px solid #45475a;
+}
+.bp-ba-toggle .bp-ba-active {
+  background: #89b4fa;
+  color: #11111b;
+  font-weight: 600;
+}
+
+/* --- 3-panel cell: slim sides vs the big middle --- */
+.bp-panel-side {
+  flex: 0.8;
+}
+.bp-panel-mid {
+  flex: 2;
+  background: #1a1a2e;
+  border-color: #45475a;
+}
+
+.bp-norm-sm {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: #a6adc8;
+  margin: 8px 0 6px;
+}
+
+.bp-shape-line {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #6c7086;
+  margin-bottom: 8px;
+}
+
+/* --- The update (middle) hero --- */
+.bp-update-hero {
+  padding: 12px;
+  background: #11111b;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+.bp-update-hero-label {
+  font-size: 11px;
+  color: #6c7086;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+.bp-update-hero-val {
+  font-size: 19px;
+  font-weight: 700;
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bp-update-delta {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #a6adc8;
+}
+.bp-update-delta strong {
+  color: #f9e2af;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bp-passthrough {
+  font-size: 15px;
+  color: #6c7086;
+  font-style: italic;
+  padding: 10px 0;
+}
+
+/* --- Distribution / details expander (de-emphasized stats) --- */
+.bp-dist {
+  margin-top: 10px;
+}
+.bp-dist summary {
+  font-size: 11px;
+  color: #6c7086;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  list-style: revert;
+}
+.bp-dist summary:hover {
+  color: #89b4fa;
+}
+.bp-dist .bp-stat-grid {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+/* --- Loss seed (the loss node's cell) --- */
+.bp-loss-big {
+  color: #f9e2af;
+  font-size: 18px;
+}
+
+.bp-seed-note {
+  padding: 10px 12px;
+  background: rgba(249, 226, 175, 0.07);
+  border-left: 3px solid #f9e2af;
+  border-radius: 3px;
+  font-size: 13px;
+  color: #a6adc8;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+.bp-seed-note strong {
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bp-seed-cols {
+  display: flex;
+  gap: 16px;
+}
+.bp-seed-cols .bp-panel {
+  flex: 1;
+}
+
+.bp-seed-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.bp-seed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.bp-seed-label {
+  width: 74px;
+  flex-shrink: 0;
+  color: #a6adc8;
+  font-family: 'JetBrains Mono', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-seed-row-true .bp-seed-label {
+  color: #a6e3a1;
+  font-weight: 600;
+}
+.bp-seed-bar-bg {
+  flex: 1;
+  height: 12px;
+  background: #11111b;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bp-seed-bar {
+  height: 100%;
+  border-radius: 3px;
+}
+.bp-seed-pct {
+  width: 56px;
+  flex-shrink: 0;
+  text-align: right;
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', monospace;
+}
+.bp-seed-pct.bp-correct {
+  color: #a6e3a1;
+}
+
+/* Error-signal diverging bars (centered at 0) */
+.bp-err-track {
+  flex: 1;
+  height: 12px;
+  position: relative;
+  background: #11111b;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+}
+.bp-err-mid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #45475a;
+}
+.bp-err-bar {
+  position: absolute;
+  height: 100%;
+  border-radius: 2px;
+}
+.bp-err-up {
+  right: 50%;
+  background: #89b4fa;
+}
+.bp-err-down {
+  left: 50%;
+  background: #f38ba8;
+}
+
+/* --- Bottom-anchored step footer (before/after lives here, so toggling
+       never displaces the timeline or the layer cell above) --- */
+.backprop-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid #313244;
+  background: #181825;
+  min-height: 56px;
+}
+
+.backprop-footer-controls {
+  flex-shrink: 0;
+}
+
+.backprop-footer-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.backprop-footer-hint {
+  color: #7f849c;
+  font-size: 13px;
+}
+.backprop-footer-hint strong {
+  color: #f9e2af;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* The before/after banner sits inline in the footer — drop its own chrome. */
+.backprop-footer .bp-step-banner {
+  border-bottom: none;
+  background: transparent;
+  padding: 0;
+  width: 100%;
+}
+
+/* ======================================================================
+   Loss-cell heavy narration (question + bridge to the previous layer)
+   ====================================================================== */
+.bp-seed-question {
+  font-size: 15px;
+  color: #cdd6f4;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.bp-seed-question strong {
+  color: #f9e2af;
+}
+
+.bp-seed-bridge {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: rgba(137, 180, 250, 0.08);
+  border: 1px solid #313244;
+  border-left: 3px solid #89b4fa;
+  border-radius: 6px;
+}
+.bp-seed-bridge-q {
+  font-size: 15px;
+  font-weight: 700;
+  color: #89b4fa;
+  margin-bottom: 6px;
+}
+
+/* ======================================================================
+   Mechanism viz — ∂L/∂input = ∂L/∂output · Wᵀ (Linear layers)
+   ====================================================================== */
+.bp-mech {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #313244;
+}
+
+.bp-mech-q {
+  font-size: 17px;
+  font-weight: 700;
+  color: #cdd6f4;
+  margin-bottom: 4px;
+}
+.bp-mech-q strong {
+  color: #f9e2af;
+}
+
+.bp-mech-eq {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: #89b4fa;
+  margin-bottom: 16px;
+}
+
+.bp-mech-strip {
+  margin: 6px 0;
+}
+.bp-mech-strip-label {
+  font-size: 13px;
+  color: #9399b2;
+  margin-bottom: 4px;
+}
+.bp-mech-bars {
+  position: relative;
+  height: 44px;
+  display: flex;
+  gap: 1px;
+  background: linear-gradient(#45475a, #45475a) left center / 100% 1px no-repeat;
+}
+.bp-mech-bar-slot {
+  flex: 1;
+  min-width: 2px;
+  position: relative;
+}
+.bp-mech-bar {
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  border-radius: 1px;
+}
+.bp-mech-bar.up {
+  background: #89b4fa;
+}
+.bp-mech-bar.down {
+  background: #f38ba8;
+}
+.bp-mech-ellipsis {
+  align-self: center;
+  color: #6c7086;
+  padding-left: 6px;
+}
+
+.bp-mech-op {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: #7f849c;
+  text-align: center;
+  margin: 4px 0;
+}
+
+/* trace of one input neuron */
+.bp-mech-trace {
+  margin-top: 16px;
+  padding: 14px;
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 8px;
+}
+.bp-mech-trace-title {
+  font-size: 14px;
+  color: #cdd6f4;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.bp-mech-trace-title strong {
+  color: #f9e2af;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bp-mech-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+.bp-mech-term {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+.bp-mech-term-src {
+  width: 64px;
+  flex-shrink: 0;
+  color: #6c7086;
+}
+.bp-mech-term-calc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bp-mech-num {
+  color: #a6adc8;
+  min-width: 68px;
+  text-align: right;
+}
+.bp-mech-x,
+.bp-mech-eqs {
+  color: #6c7086;
+}
+.bp-mech-prod {
+  min-width: 78px;
+  text-align: right;
+  font-weight: 600;
+}
+.bp-mech-prod.pos {
+  color: #89b4fa;
+}
+.bp-mech-prod.neg {
+  color: #f38ba8;
+}
+
+.bp-mech-sum {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #313244;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+.bp-mech-more {
+  color: #6c7086;
+  font-size: 12px;
+}
+.bp-mech-sum-label {
+  margin-left: auto;
+  color: #9399b2;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+}
+
+/* ======================================================================
+   Wiggle a weight — the loss-vs-weight curve (hero interaction)
+   ====================================================================== */
+.bp-wiggle {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #313244;
+}
+
+.bp-wiggle-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.bp-wiggle-sub {
+  font-size: 13px;
+  color: #7f849c;
+  margin: 2px 0 12px;
+}
+.bp-wiggle-sub strong {
+  color: #a6adc8;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bp-wiggle-svg {
+  width: 100%;
+  max-width: 680px;
+  height: auto;
+  display: block;
+  background: #11111b;
+  border: 1px solid #313244;
+  border-radius: 8px;
+}
+
+.bp-wiggle-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 10px 0 6px;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.bp-wiggle-key-cur {
+  color: #f9e2af;
+}
+.bp-wiggle-key-tan {
+  color: #f9e2af;
+}
+.bp-wiggle-key-down {
+  color: #a6e3a1;
+}
+
+.bp-wiggle-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 680px;
+  margin: 8px 0 12px;
+}
+.bp-wiggle-readout {
+  font-size: 14px;
+  color: #a6adc8;
+  font-family: 'JetBrains Mono', monospace;
+}
+.bp-wiggle-readout strong {
+  color: #cdd6f4;
+}
+
+.bp-wiggle .bp-note {
+  max-width: 680px;
+  margin-bottom: 12px;
+}
+.bp-wiggle .bp-note strong {
+  color: #a6adc8;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bp-data-note {
+  margin-top: 14px;
+}
+
+/* ======================================================================
+   Page shell: tabs + page container
+   ====================================================================== */
+.backprop-page-tabs {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  gap: 4px;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+  padding: 3px;
+  background: #181825;
+}
+.backprop-page-tab {
+  padding: 5px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #a6adc8;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+.backprop-page-tab:hover {
+  color: #cdd6f4;
+}
+.backprop-page-tab-active {
+  background: #89b4fa;
+  color: #11111b;
+  font-weight: 600;
+}
+
+.backprop-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ======================================================================
+   Epoch playback (main backprop view)
+   ====================================================================== */
+.bp-play-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px 6px;
+  flex-shrink: 0;
+}
+.bp-play-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #cdd6f4;
+}
+.bp-play-metrics {
+  display: flex;
+  gap: 18px;
+  font-size: 13px;
+  color: #7f849c;
+  font-family: 'JetBrains Mono', monospace;
+}
+.bp-play-metrics strong {
+  color: #cdd6f4;
+}
+
+.bp-play-samples {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* exactly 4 per row */
+  gap: 16px;
+  padding: 12px 18px;
+  align-content: start;
+}
+/* Custom scrollbar to match the rest of the app. */
+.bp-play-samples::-webkit-scrollbar {
+  width: 8px;
+}
+.bp-play-samples::-webkit-scrollbar-track {
+  background: transparent;
+}
+.bp-play-samples::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 4px;
+}
+.bp-play-samples::-webkit-scrollbar-thumb:hover {
+  background: #89b4fa;
+}
+
+.bp-play-card {
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 10px;
+  padding: 14px;
+}
+.bp-play-card-top {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.bp-play-img {
+  width: 104px;
+  height: 104px;
+  image-rendering: pixelated;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  background: #11111b;
+  flex-shrink: 0;
+}
+.bp-play-noimg {
+  width: 104px;
+  height: 104px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c7086;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+}
+.bp-play-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bp-play-truth {
+  font-size: 14px;
+  color: #a6adc8;
+}
+.bp-play-truth strong {
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', monospace;
+}
+.bp-play-pred {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+.bp-play-pred.ok {
+  color: #a6e3a1;
+}
+.bp-play-pred.wrong {
+  color: #f38ba8;
+}
+
+.bp-play-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.bp-play-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.bp-play-bar-lab {
+  width: 18px;
+  text-align: right;
+  color: #7f849c;
+  flex-shrink: 0;
+}
+.bp-play-bar-lab.true {
+  color: #a6e3a1;
+  font-weight: 700;
+}
+.bp-play-bar-track {
+  flex: 1;
+  height: 10px;
+  background: #11111b;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bp-play-bar-fill {
+  height: 100%;
+  background: #585b70;
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+.bp-play-bar-fill.true {
+  background: #a6e3a1;
+}
+.bp-play-bar-fill.pred {
+  background: #f38ba8;
+}
+.bp-play-bar-pct {
+  width: 34px;
+  text-align: right;
+  color: #9399b2;
+  flex-shrink: 0;
+}
+
+.bp-play-curve-wrap {
+  flex-shrink: 0;
+  padding: 4px 18px 8px;
+  border-top: 1px solid #313244;
+}
+.bp-play-curve {
+  display: block;
+  width: 100%;
+  max-width: 860px;
+  height: auto;
+  margin: 0 auto;
+  cursor: pointer;
+}
+
+.bp-play-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px 14px;
+  border-top: 1px solid #313244;
+  flex-shrink: 0;
+}
+.bp-play-btn {
+  font-size: 15px;
+  min-width: 40px;
+}
+
+.bp-play-empty {
+  align-items: center;
+  justify-content: center;
+}
+.bp-play-empty-inner {
+  max-width: 460px;
+  text-align: center;
+  padding: 40px;
+}
+.bp-play-empty-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #cdd6f4;
+  margin-bottom: 10px;
+}
+.bp-play-empty-text {
+  font-size: 14px;
+  color: #7f849c;
+  line-height: 1.6;
+}
+.bp-play-empty-text strong {
+  color: #a6adc8;
+}
+
+/* --- Mechanism + wiggle side by side (half / half) --- */
+.bp-lower {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #313244;
+}
+.bp-lower > * {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+/* they share the .bp-lower top border, so drop their own chrome */
+.bp-lower .bp-mech,
+.bp-lower .bp-wiggle {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+/* let the wiggle chart fill its half instead of capping at a fixed width */
+.bp-lower .bp-wiggle-svg,
+.bp-lower .bp-wiggle-slider,
+.bp-lower .bp-wiggle .bp-note {
+  max-width: 100%;
+}
+
+.bp-mech-explain {
+  margin: 8px 0 14px;
+}
+.bp-mech-explain strong {
+  color: #cdd6f4;
+}
+
+/* --- Wiggle: live prediction that moves with the slider --- */
+.bp-wiggle-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+.bp-wiggle-pred {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.bp-wiggle-ptrue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #9399b2;
+}
+.bp-wiggle-ptrue-bar {
+  display: inline-block;
+  width: 72px;
+  height: 9px;
+  background: #11111b;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bp-wiggle-ptrue-bar > span {
+  display: block;
+  height: 100%;
+  background: #a6e3a1;
+  transition: width 0.08s linear;
 }

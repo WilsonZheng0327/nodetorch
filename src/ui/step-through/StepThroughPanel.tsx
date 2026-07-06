@@ -231,16 +231,6 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
         </div>
       </div>
 
-      {/* Sample section — always visible, top-level */}
-      {sample && (
-        <SampleHeader
-          sample={sample}
-          onPickLabel={(label) => loadSample(label)}
-          onRandom={() => loadSample()}
-          loading={loading}
-        />
-      )}
-
       {loading && mode !== 'generate' && (
         <div className="step-through-empty">Running forward pass...</div>
       )}
@@ -336,6 +326,13 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
                 currentIdx={currentIdx}
                 onSelect={setCurrentIdx}
                 direction="forward"
+                dataControls={{
+                  onNewSample: () => loadSample(),
+                  onPickLabel: (l) => loadSample(l),
+                  classNames: sample?.classNames ?? null,
+                  currentLabel: sample?.actualLabel ?? null,
+                  loading,
+                }}
               />
               {stage && <StageDetail stage={stage} />}
             </>
@@ -348,141 +345,6 @@ export function StepThroughPanel({ open, graphJson, onClose }: Props) {
       )}
     </div>
   );
-}
-
-// --- Sample header (top-level, above mode tabs) ---
-
-function SampleHeader({
-  sample,
-  onPickLabel,
-  onRandom,
-  loading,
-}: {
-  sample: SampleInfo;
-  onPickLabel: (label: number) => void;
-  onRandom: () => void;
-  loading: boolean;
-}) {
-  const classNames = sample.classNames;
-  const hasText =
-    !!sample.sampleText ||
-    (!!sample.tokens && sample.tokens.length > 0) ||
-    (!!sample.tokenIds && sample.tokenIds.length > 0);
-  return (
-    <div className="step-through-sample">
-      {sample.imagePixels && (
-        <SampleImage pixels={sample.imagePixels} channels={sample.imageChannels ?? 1} />
-      )}
-      <div className="step-through-sample-info">
-        {sample.actualLabel != null && (
-          <div>
-            <span className="step-through-sample-label">Label: </span>
-            <span className="step-through-sample-value">
-              {classNames
-                ? `${classNames[sample.actualLabel]} (${sample.actualLabel})`
-                : sample.actualLabel}
-            </span>
-          </div>
-        )}
-        {sample.datasetType && (
-          <div className="step-through-sample-dataset">{sample.datasetType}</div>
-        )}
-        {hasText && <TextSamplePreview sample={sample} />}
-      </div>
-      <div className="step-through-sample-actions">
-        <button className="step-through-btn" onClick={onRandom} disabled={loading}>
-          {loading && <span className="step-through-spinner" aria-hidden="true" />}
-          New sample
-        </button>
-        {classNames && classNames.length <= 20 && (
-          <div className="step-through-label-picker">
-            <div className="step-through-label-picker-title">By class</div>
-            <div className="step-through-label-picker-btns">
-              {classNames.map((name, i) => (
-                <button
-                  key={i}
-                  className={`step-through-label-btn ${sample.actualLabel === i ? 'step-through-label-btn-active' : ''}`}
-                  onClick={() => onPickLabel(i)}
-                  disabled={loading}
-                  title={name}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Renders text input as collapsible "raw text" + "tokenized" views.
-function TextSamplePreview({ sample }: { sample: SampleInfo }) {
-  const [view, setView] = useState<'text' | 'tokens'>('text');
-  const [expanded, setExpanded] = useState(false);
-
-  const text = sample.sampleText ?? '';
-  const tokens = sample.tokens ?? [];
-  const tokenIds = sample.tokenIds ?? [];
-
-  const tokenCount = tokens.length || tokenIds.length;
-  const hasText = text.length > 0;
-
-  return (
-    <div className="step-through-text-preview">
-      <div className="step-through-text-tabs">
-        {hasText && (
-          <button
-            className={`step-through-text-tab ${view === 'text' ? 'step-through-text-tab-active' : ''}`}
-            onClick={() => setView('text')}
-          >
-            Text · {text.length} chars
-          </button>
-        )}
-        <button
-          className={`step-through-text-tab ${view === 'tokens' ? 'step-through-text-tab-active' : ''}`}
-          onClick={() => setView('tokens')}
-        >
-          Tokens · {tokenCount}
-        </button>
-        <button
-          className="step-through-text-expand"
-          onClick={() => setExpanded((e) => !e)}
-          title={expanded ? 'Collapse' : 'Show full sample'}
-        >
-          {expanded ? 'Collapse' : 'Show all'}
-        </button>
-      </div>
-
-      <div
-        className={`step-through-text-body ${expanded ? 'step-through-text-body-expanded' : ''}`}
-      >
-        {view === 'text' && hasText && <div className="step-through-text-content">{text}</div>}
-        {view === 'tokens' && (
-          <div className="step-through-token-strip">
-            {(tokens.length > 0 ? tokens : tokenIds.map((id) => String(id))).map((tok, i) => (
-              <span
-                key={i}
-                className="step-through-token"
-                title={tokenIds[i] != null ? `id=${tokenIds[i]}` : undefined}
-              >
-                {displayToken(tok)}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Make whitespace visible so users can see token boundaries.
-function displayToken(t: string): string {
-  if (t === '\n') return '↵';
-  if (t === ' ') return '␣';
-  if (t === '\t') return '⇥';
-  return t;
 }
 
 // --- Generate view ---
@@ -692,47 +554,4 @@ function DenoiseImage({
     ctx.putImageData(data, 0, 0);
   }, [pixels, channels]);
   return <canvas ref={canvasRef} className="denoise-sample-img" />;
-}
-
-function SampleImage({
-  pixels,
-  channels,
-}: {
-  pixels: number[][] | number[][][];
-  channels: number;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || pixels.length === 0) return;
-    const h = pixels.length;
-    const firstRow = pixels[0] as number[] | number[][];
-    const w = Array.isArray((firstRow as number[][])[0])
-      ? (firstRow as number[][]).length
-      : (firstRow as number[]).length;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const data = ctx.createImageData(w, h);
-    const isRGB = channels >= 3;
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        if (isRGB) {
-          const px = (pixels as number[][][])[y][x];
-          data.data[idx] = px[0];
-          data.data[idx + 1] = px[1];
-          data.data[idx + 2] = px[2];
-        } else {
-          const v = (pixels as number[][])[y][x];
-          data.data[idx] = v;
-          data.data[idx + 1] = v;
-          data.data[idx + 2] = v;
-        }
-        data.data[idx + 3] = 255;
-      }
-    ctx.putImageData(data, 0, 0);
-  }, [pixels, channels]);
-  return <canvas ref={canvasRef} className="step-through-sample-img" />;
 }

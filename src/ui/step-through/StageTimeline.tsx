@@ -3,6 +3,7 @@
 import { useRef, useEffect } from 'react';
 import type { Stage } from './types';
 import { StageCard } from './StageCard';
+import { SampleMenu, type DataControls } from './SampleMenu';
 
 interface Props {
   stages: Stage[];
@@ -11,7 +12,12 @@ interface Props {
   direction?: 'forward' | 'backward';
   /** Horizontal alignment. 'right' hugs the output end (used by the backward view). */
   align?: 'left' | 'right';
+  /** When set, the data-node card gets a "change" button to pick a new sample. */
+  dataControls?: DataControls;
 }
+
+/** The data/input node — its card hosts the sample-change control. */
+const isDataStage = (stage: Stage): boolean => !!stage.nodeType?.startsWith('data');
 
 export function StageTimeline({
   stages,
@@ -19,6 +25,7 @@ export function StageTimeline({
   onSelect,
   direction = 'forward',
   align = 'left',
+  dataControls,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -58,9 +65,13 @@ export function StageTimeline({
       prevBlock = currentBlock;
     }
 
+    const withMenu = dataControls && isDataStage(stage);
     items.push(
       <div key={stage.stageId} className="stage-timeline-item">
-        <StageCard stage={stage} active={i === currentIdx} onClick={() => onSelect(i)} />
+        <div className={`stage-card-wrap ${withMenu ? 'stage-card-wrap-data' : ''}`}>
+          {withMenu && <SampleMenu {...dataControls} />}
+          <StageCard stage={stage} active={i === currentIdx} onClick={() => onSelect(i)} />
+        </div>
         {i < stages.length - 1 && (
           <div className="stage-timeline-arrow">{direction === 'backward' ? '←' : '→'}</div>
         )}

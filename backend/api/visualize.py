@@ -4,7 +4,12 @@ from fastapi import APIRouter
 from engine.graph_builder import get_layer_detail
 from visualize.step_through import run_step_through
 from visualize.activation_max import activation_maximization
-from visualize.backprop_sim import simulate_backprop, run_backward_step_through, run_one_step
+from visualize.backprop_sim import (
+    simulate_backprop,
+    run_backward_step_through,
+    run_one_step,
+    run_weight_wiggle,
+)
 from visualize.loss_landscape import compute_loss_landscape
 
 logger = logging.getLogger("nodetorch")
@@ -37,7 +42,11 @@ async def backward_step_through(request: dict):
     """Run a forward+backward pass and return rich per-node backward stages."""
     logger.info("Backward step-through requested")
     try:
-        result = run_backward_step_through(request["graph"], sample_idx=request.get("sampleIdx"))
+        result = run_backward_step_through(
+            request["graph"],
+            sample_idx=request.get("sampleIdx"),
+            filter_label=request.get("filterLabel"),
+        )
         if "error" in result:
             return {"status": "error", "error": result["error"]}
         return {"status": "ok", "result": result}
@@ -61,6 +70,29 @@ async def one_step(request: dict):
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"One-step failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@router.post("/wiggle-weight")
+async def wiggle_weight(request: dict):
+    """Sweep one weight of a Linear layer; return the loss-vs-weight curve.
+
+    Request: { graph, nodeId, sampleIdx?, weightIndex? }
+    Response: { status: "ok", result: { curve, current, step, lr, coord, ... } } or error
+    """
+    logger.info("Weight wiggle requested")
+    try:
+        result = run_weight_wiggle(
+            request["graph"],
+            request["nodeId"],
+            sample_idx=request.get("sampleIdx"),
+            weight_index=request.get("weightIndex"),
+        )
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"Weight wiggle failed: {e}")
         return {"status": "error", "error": str(e)}
 
 

@@ -34,6 +34,11 @@ Backend has no hot reload by default — restart it manually after Python change
 Set `NODETORCH_DEV=1` to enable uvicorn auto-reload during development
 (`NODETORCH_DEV=1 .venv/bin/python backend/main.py`).
 
+**Always free port 8000 when done.** If you start the backend yourself (e.g. for
+verification or screenshots), stop it and release port 8000 before finishing your
+turn — the user runs their own backend there and a leftover process blocks it.
+Kill it with `kill $(lsof -ti tcp:8000)` and confirm the port is free.
+
 ## Architecture
 
 6-layer design. Each layer only depends on layers below it. **Layers 1-4 know nothing about ML.** (Rationale: [ADR-0003](docs/adr/0003-six-layer-ml-agnostic-architecture.md).)
@@ -159,3 +164,35 @@ The bigger, costly-to-reverse choices have full write-ups in [`docs/adr/`](docs/
 - All React Flow imports use `import * as RF from '@xyflow/react'` namespace style for clarity.
 - Frontend uses JSDoc (`/** */`) on all core interfaces and functions for hover documentation.
 - Backend registry/callback contracts use a documented `typing.Protocol` with a `__call__`, not a bare `Callable`/`callable`. Where a registry maps keys to functions (e.g. `NODE_BUILDERS: dict[str, TorchModuleBuilder]`, dataset loaders, the viz/runner registries), type its values as a Protocol whose docstring + named `__call__` params show on hover at every call site, and whose annotation makes the type checker verify each registered function matches the contract. Reserve this for these `type → behavior` boundaries — a one-off lambda doesn't need it.
+
+## Implementation conventions & gotchas
+
+Read this before adding a visualization/panel or backprop-style feature — it's where past work drifted or broke.
+
+### Reuse before duplicating (real, current duplication — consolidate, don't add a 6th copy)
+
+- **Pixel-array → `<canvas>`.** ~12 components hand-roll the same `createImageData` grayscale/RGB loop (`EngineNode`, `StageCard`, `step-through/*`, `backprop/*`, `dashboard/samples`, `inspector/*`). Prefer/extract a single `PixelCanvas({ pixels, channels })` instead of pasting the loop again.
+- **Number formatting.** `fmt`/`signed` (scientific notation for tiny gradients, `—` for null) is copy-pasted across `src/ui/backprop/*` and `MseLossViz`. Put it in one shared util and import it.
+- **Backend logits → prediction.** `softmax(dim=1) → argmax → {predictedClass, confidence, probabilities}` is re-implemented in `engine/graph_builder/inference.py`, `runners.py`, and `visualize/backprop_sim.py`. Reuse one helper; don't re-derive per-sample loss/prediction inline.
+- **Node discovery.** Finding the data / loss / prediction (`"predictions"` port) nodes is a recurring pattern — reuse a `_find_key_nodes`-style helper rather than re-walking `nodes`/`edges`.
+
+### Backend gotchas
+
+- **Shared model store.** Trained modules live in one global (`_model_store`, `get_trained_modules()`). Any code that *mutates* weights (one-step, wiggle) must snapshot the affected params (`.detach().clone()`) and restore them in a `finally`, or you corrupt the stored model for everyone.
+- **Eval mode + cuDNN + RNNs.** Build/forward in **eval** mode for deterministic, dropout-free gradients — but cuDNN's RNN (LSTM/GRU) backward *only runs in train mode*, so eval-mode backward crashes on those. Wrap such paths to disable cuDNN (see `@_no_cudnn` in `backprop_sim.py`). CNN/MLP don't need it; RNN models silently worked only because nobody ran backprop on them.
+- **Don't assume feedforward classification.** Classification-only bits (loss seed, predicted class, p-of-true) gate on `logits.dim() == 2`. GAN has no single-scalar loss (dual-path) → a single forward can't produce it. Degrade gracefully (return empty/None), never crash. Test a non-CNN preset (text/LSTM, autoencoder, VAE, diffusion, GAN) before assuming it works.
+- **JSON safety.** Run `_safe_float` (NaN/Inf → `null`) on every float sent to the frontend.
+- **Endpoint envelope.** REST handlers return `{status: "ok", result}` or `{status: "error", error}`; the frontend expects exactly that.
+
+### Frontend gotchas
+
+- **Never `setState` synchronously in a `useEffect` body** — eslint `react-hooks/set-state-in-effect` is an *error* here. Derive the value during render, remount via `key` to reset, or defer the set to a timeout/event callback.
+- **Right-aligned but horizontally scrollable flex:** use a leading `margin-left: auto` on the first child, NOT `justify-content: flex-end` (which clips the overflow start unreachably). See `.stage-timeline-right`.
+- **Popovers inside a scrolling/overflow container get clipped** — render them `position: fixed`, positioned from the trigger's `getBoundingClientRect()` (see `SampleMenu`).
+- **Lazy per-item panels:** `key` them by identity (e.g. `` `${nodeId}-${sampleIdx}` ``) so they remount + refetch on navigation instead of showing stale data.
+
+### Style / organization
+
+- One feature = one dir under `src/ui/<feature>/` with **colocated plain CSS**; reuse existing frame classes (`step-through-*`, `stage-timeline`, `bp-*`) instead of restyling. Palette vars in `src/index.css`.
+- Compose big panels from small self-contained view/page components listed in a **plain array** (see `BackpropPanel`'s `PAGES`) so a page is trivial to add or remove.
+- Keep the frontend `EpochData`/wire types in sync with the backend `EpochMessage` TypedDict — they're the same record on both sides.

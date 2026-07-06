@@ -28,6 +28,7 @@ EXPECTED_PATHS = {
     "/step-through",
     "/backward-step-through",
     "/one-step",
+    "/wiggle-weight",
     "/simulate-backprop",
     "/loss-landscape",
     "/activation-max",
@@ -98,7 +99,7 @@ def test_route_count():
             http_endpoints += len(methods - {"HEAD", "OPTIONS"})
         else:
             ws_endpoints += 1
-    assert http_endpoints + ws_endpoints == 43
+    assert http_endpoints + ws_endpoints == 44
 
 
 def test_health():

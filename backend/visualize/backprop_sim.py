@@ -14,7 +14,26 @@ backward counterpart of step_through.run_step_through().
 
 from __future__ import annotations
 import copy
+import functools
 import torch
+
+
+def _no_cudnn(fn):
+    """Run a function with cuDNN disabled. cuDNN's RNN (LSTM/GRU) backward can only
+    run in training mode, but we build+backward in EVAL mode (for deterministic,
+    dropout-free gradients). The native RNN kernels support eval-mode backward, so
+    we drop to them for the whole build+backward+sweep. No-op on CPU."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        prev = torch.backends.cudnn.enabled
+        torch.backends.cudnn.enabled = False
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            torch.backends.cudnn.enabled = prev
+
+    return wrapper
 
 from engine.graph_builder import (
     build_and_run_graph,
@@ -284,11 +303,80 @@ def _loss_seed(logits, true_label: int | None, loss_val, class_names: list | Non
     }
 
 
-def run_backward_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
+def _linear_mechanism(module, out_grad, in_grad) -> dict | None:
+    """The concrete chain-rule mechanism for a Linear layer: how the error at the
+    output (∂L/∂output) becomes the error handed to the previous layer (∂L/∂input),
+    routed back through the same weights — ∂L/∂input = ∂L/∂output · Wᵀ, i.e.
+    in_grad[j] = Σ_i out_grad[i] · W[i, j].
+
+    Returns the two error vectors plus a full trace of the most-blamed input neuron
+    (its weighted sum of output errors), so the frontend can show the actual math.
+    """
+    if not isinstance(module, torch.nn.Linear) or out_grad is None or in_grad is None:
+        return None
+    W = module.weight.detach().float()  # [out, in]
+    og = out_grad.detach().flatten().float()  # [out]
+    ig = in_grad.detach().flatten().float()  # [in]
+    if og.numel() != W.shape[0] or ig.numel() != W.shape[1]:
+        return None  # not a plain [out]×[in] linear map (e.g. flattened batch) — skip
+
+    out_dim, in_dim = int(W.shape[0]), int(W.shape[1])
+    OUT_CAP, IN_CAP = 16, 32
+
+    # Trace the most-blamed input neuron: its error = Σ_i out_grad[i] · W[i, j].
+    j = int(ig.abs().argmax())
+    col = W[:, j]  # [out] — the weights connecting every output back to input j
+    products = og * col  # [out] — per-output contributions; they sum to ig[j]
+    k = min(6, out_dim)
+    top_idx = torch.topk(products.abs(), k).indices.tolist()
+
+    return {
+        "kind": "linear",
+        "outDim": out_dim,
+        "inDim": in_dim,
+        "outGrad": [_safe_float(float(x)) for x in og[:OUT_CAP].tolist()],
+        "inGrad": [_safe_float(float(x)) for x in ig[:IN_CAP].tolist()],
+        "trace": {
+            "inputIndex": j,
+            "inputError": _safe_float(float(ig[j])),
+            "shownTerms": k,
+            "totalTerms": out_dim,
+            "terms": [
+                {
+                    "out": int(i),
+                    "outGrad": _safe_float(float(og[i])),
+                    "weight": _safe_float(float(col[i])),
+                    "product": _safe_float(float(products[i])),
+                }
+                for i in top_idx
+            ],
+        },
+    }
+
+
+def _sample_of_class(graph_data: dict, filter_label: int) -> int | None:
+    """Resolve a random sample index belonging to the given class."""
+    from dataprep.data_loaders import load_sample_by_label
+
+    for n in graph_data["graph"]["nodes"]:
+        if n["type"] in DATA_LOADERS:
+            props = {**n.get("properties", {}), "batchSize": 1}
+            try:
+                _, idx = load_sample_by_label(n["type"], props, filter_label=filter_label)
+                return idx if idx is not None and idx >= 0 else None
+            except Exception:
+                return None
+    return None
+
+
+@_no_cudnn
+def run_backward_step_through(
+    graph_data: dict, sample_idx: int | None = None, filter_label: int | None = None
+) -> dict:
     """Run a forward+backward pass and return rich per-node backward stages.
 
-    Requires trained weights. Accepts sample_idx to reproduce the same sample
-    used in forward step-through.
+    Requires trained weights. Accepts sample_idx to reproduce the same sample used
+    in forward step-through, or filter_label to draw a sample of a specific class.
 
     Returns: { stages: [...], loss: float, sample: {...} }
     """
@@ -306,7 +394,11 @@ def run_backward_step_through(graph_data: dict, sample_idx: int | None = None) -
     # learning. When the caller doesn't pin a sample, pick the hardest of a few
     # random candidates (highest loss) so the gradients are actually meaningful.
     if sample_idx is None:
-        sample_idx = _pick_hard_sample(graph_data)
+        sample_idx = (
+            _sample_of_class(graph_data, filter_label)
+            if filter_label is not None
+            else _pick_hard_sample(graph_data)
+        )
 
     # Eval mode: deterministic forward (no dropout noise) so the gradients are
     # reproducible and the loss shown here matches /one-step's "before" loss.
@@ -421,14 +513,33 @@ def run_backward_step_through(graph_data: dict, sample_idx: int | None = None) -
             "gradientShape": list(gradient.shape) if gradient is not None else None,
         }
 
-        # Gradient stats
+        # Gradient stats — grad IN (∂L/∂output), arrives from the downstream layer
         if gradient is not None:
             stage["stats"] = compact_stats_with_norm(gradient)
+
+        # Grad OUT (∂L/∂input) — what this layer passes back to the previous one
+        grad_out = _input_grad(node_id, edges, results)
+        if grad_out is not None:
+            stage["gradOut"] = {
+                "stats": compact_stats_with_norm(grad_out),
+                "shape": list(grad_out.shape),
+            }
+
+        # Loss node: attach the backprop seed (loss + emitted error signal p − y)
+        if node_type in ALL_LOSS_NODES and pred_nid:
+            seed = _loss_seed(results.get(pred_nid, {}).get("out"), true_label, loss_val, class_names)
+            if seed:
+                stage["lossSeed"] = seed
 
         # Param grad stats (gradient-to-weight ratio)
         pgs = param_grad_stats(module)
         if pgs:
             stage["paramGradStats"] = pgs
+
+        # The concrete chain-rule mechanism (Linear): out-error → in-error via Wᵀ
+        mech = _linear_mechanism(module, gradient, grad_out)
+        if mech:
+            stage["mechanism"] = mech
 
         # Viz, extras, insight from registry
         if viz_result.get("viz"):
@@ -721,6 +832,7 @@ def _prediction_from_logits(logits, true_label: int | None, class_names: list | 
     }
 
 
+@_no_cudnn
 def run_one_step(graph_data: dict, sample_idx: int | None = None) -> dict:
     """Apply ONE gradient-descent step (W ← W − lr·∂L/∂W) on a single sample and
     report the before/after effect: loss, prediction, and per-layer weight change.
@@ -834,4 +946,146 @@ def run_one_step(graph_data: dict, sample_idx: int | None = None) -> dict:
         "loss": {"before": loss_before, "after": loss_after},
         "prediction": {"before": pred_before, "after": pred_after},
         "layers": layers,
+    }
+
+
+# --- Wiggle a weight: loss as a function of one weight ---
+
+def _eval_point(
+    modules: dict, nodes: dict, edges: list, data_out: dict, data_nid, loss_nid,
+    pred_nid=None, true_label: int | None = None,
+) -> dict:
+    """Forward the existing (possibly weight-modified) modules on the cached sample.
+    Returns the loss and, for classification, the predicted class + the probability
+    the model gives the TRUE class. Runs under no_grad — just a measurement."""
+    order = topological_sort(nodes, edges)
+    res: dict[str, dict] = {data_nid: data_out}
+    with torch.no_grad():
+        for nid in order:
+            if nid == data_nid:
+                continue
+            ntype = nodes[nid]["type"]
+            if ntype in OPTIMIZER_NODES:
+                continue
+            mod = modules.get(nid)
+            if mod is None:
+                continue
+            inputs = gather_inputs(nid, edges, res)
+            try:
+                out = execute_node(ntype, mod, inputs)
+            except Exception:
+                continue
+            if out is not None:
+                res[nid] = out
+
+    lt = res.get(loss_nid, {}).get("out")
+    loss = _safe_float(float(lt.detach().item())) if isinstance(lt, torch.Tensor) else None
+
+    p_true, pred = None, None
+    if pred_nid:
+        logits = res.get(pred_nid, {}).get("out")
+        if isinstance(logits, torch.Tensor) and logits.dim() == 2:
+            probs = torch.softmax(logits.detach(), dim=1)[0]
+            pred = int(probs.argmax())
+            if true_label is not None and 0 <= true_label < probs.numel():
+                p_true = _safe_float(float(probs[true_label]))
+    return {"loss": loss, "pTrue": p_true, "pred": pred}
+
+
+@_no_cudnn
+def run_weight_wiggle(
+    graph_data: dict,
+    node_id: str,
+    sample_idx: int | None = None,
+    weight_index: int | None = None,
+    num_points: int = 41,
+) -> dict:
+    """Sweep ONE weight of a Linear layer and report the loss at each value — the
+    loss-vs-weight curve. The gradient ∂L/∂w is the slope of this curve at the
+    current value, and a gradient step (w − lr·∂L/∂w) walks downhill along it.
+
+    All other weights are frozen; only the chosen weight varies. The stored model
+    is left untouched (the weight is restored afterwards).
+    """
+    if not has_trained_model():
+        raise RuntimeError("Train the model first — wiggle requires trained weights")
+
+    graph_data = copy.deepcopy(graph_data)
+    for n in graph_data["graph"]["nodes"]:
+        if n["type"] in DATA_LOADERS:
+            n["properties"] = {**n.get("properties", {}), "batchSize": 1}
+
+    if sample_idx is None:
+        sample_idx = _pick_hard_sample(graph_data)
+
+    modules, nodes, edges, results = _build_with_trained(
+        graph_data, sample_idx=sample_idx, train_mode=False
+    )
+    data_nid, loss_nid, pred_nid = _find_key_nodes(nodes, edges)
+    if node_id not in modules or not isinstance(modules[node_id], torch.nn.Linear):
+        return {"error": "Wiggle currently supports Linear layers only"}
+
+    # True label + class names — so we can show the prediction change as the weight
+    # slides (the model's confidence in the correct answer moves with the loss).
+    labels = results.get(data_nid, {}).get("labels")
+    true_label = int(labels[0]) if isinstance(labels, torch.Tensor) and labels.dim() == 1 else None
+    class_names = CLASS_NAMES.get(nodes[data_nid]["type"]) if data_nid else None
+
+    loss_tensor = results.get(loss_nid, {}).get("out") if loss_nid else None
+    if loss_tensor is None:
+        return {"error": "No loss value — check the predictions/labels connections"}
+    loss0 = _safe_float(float(loss_tensor.detach().item()))
+
+    # Gradients (to read ∂L/∂w and to auto-pick the most impactful weight)
+    for m in modules.values():
+        if isinstance(m, torch.nn.Module):
+            m.zero_grad(set_to_none=False)
+    loss_tensor.backward()
+
+    module = modules[node_id]
+    W = module.weight
+    G = W.grad
+    if G is None:
+        return {"error": "This layer received no gradient on this sample"}
+
+    in_dim = int(W.shape[1])
+    if weight_index is None:
+        weight_index = int(G.detach().abs().flatten().argmax())
+    i, j = divmod(int(weight_index), in_dim)
+
+    w0 = float(W[i, j].detach())
+    g = float(G[i, j].detach())
+    lr, opt_type = _optimizer_lr(nodes)
+
+    data_out = results.get(data_nid, {})
+    orig = W.detach()[i, j].item()
+    R = max(0.5, 2.0 * abs(w0))
+
+    curve = []
+    with torch.no_grad():
+        for t in range(num_points):
+            wv = w0 - R + (2.0 * R) * t / (num_points - 1)
+            W[i, j] = wv
+            pt = _eval_point(modules, nodes, edges, data_out, data_nid, loss_nid, pred_nid, true_label)
+            curve.append({"w": _safe_float(wv), "loss": pt["loss"], "pTrue": pt["pTrue"], "pred": pt["pred"]})
+        # One gradient step along this weight: w − lr·∂L/∂w
+        w_step = w0 - lr * g
+        W[i, j] = w_step
+        loss_step = _eval_point(modules, nodes, edges, data_out, data_nid, loss_nid)["loss"]
+        W[i, j] = orig  # restore — leave the stored model unchanged
+
+    return {
+        "nodeId": node_id,
+        "displayName": _friendly_name(nodes[node_id]["type"]),
+        "coord": [i, j],
+        "outDim": int(W.shape[0]),
+        "inDim": in_dim,
+        "lr": lr,
+        "optimizerType": opt_type,
+        "sampleIdx": sample_idx,
+        "current": {"w": _safe_float(w0), "loss": loss0, "grad": _safe_float(g)},
+        "step": {"w": _safe_float(w_step), "loss": loss_step},
+        "trueLabel": true_label,
+        "classNames": class_names,
+        "curve": curve,
     }

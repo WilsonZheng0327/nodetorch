@@ -232,8 +232,9 @@ def build_training_context(
     if isinstance(train_dataset, dict):
         return train_dataset  # error dict
 
-    # Pick tracked samples
-    tracked_samples = pick_tracked_samples(train_dataset, dataset_type, n=4)
+    # Pick tracked samples (probed each epoch — shown in the dashboard + the
+    # backprop "over training" playback).
+    tracked_samples = pick_tracked_samples(train_dataset, dataset_type, n=12)
 
     return TrainingContext(
         graph_data=graph_data,

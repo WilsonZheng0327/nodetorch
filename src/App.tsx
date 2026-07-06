@@ -505,6 +505,7 @@ export default function App() {
                 <BackpropPanel
                   open={backpropOpen}
                   graphJson={graph.saveGraph()}
+                  trainingProgress={graph.trainingProgress}
                   onClose={() => setBackpropOpen(false)}
                 />
                 <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
