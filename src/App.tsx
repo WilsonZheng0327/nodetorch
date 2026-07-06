@@ -6,12 +6,13 @@ import { useMemo, useEffect, useCallback, useState, useRef, type DragEvent } fro
 import { initDomain } from './domain';
 import { useGraph } from './ui/useGraph';
 import { EngineNode } from './ui/EngineNode';
-import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx, ValidationCtx } from './ui/contexts';
+import { DomainCtx, GraphActionsCtx, VizCtx, ValidationCtx } from './ui/contexts';
 import { LeftRail } from './ui/sidebar/LeftRail';
 import { ChatRail } from './ui/chat/ChatRail';
 import { Toolbar } from './ui/Toolbar';
 import { TrainingDashboard, type ModelLayerInfo } from './ui/dashboard/TrainingDashboard';
 import { StepThroughPanel } from './ui/step-through/StepThroughPanel';
+import { BackpropPanel } from './ui/backprop/BackpropPanel';
 import { ShortcutsHelp } from './ui/ShortcutsHelp';
 import { Breadcrumb } from './ui/Breadcrumb';
 import { TutorialPanel } from './ui/tutorial/TutorialPanel';
@@ -96,6 +97,7 @@ export default function App() {
   const [leftRailOpen, setLeftRailOpen] = useState(false);
   const [chatRailOpen, setChatRailOpen] = useState(false);
   const [stepThroughOpen, setStepThroughOpen] = useState(false);
+  const [backpropOpen, setBackpropOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   // Bumped on Test press to focus the dashboard's Test tab.
@@ -142,6 +144,7 @@ export default function App() {
       if ((e.target as HTMLElement)?.isContentEditable) return;
       if (shortcutsOpen) setShortcutsOpen(false);
       else if (stepThroughOpen) setStepThroughOpen(false);
+      else if (backpropOpen) setBackpropOpen(false);
       else if (dashboardOpen) setDashboardOpen(false);
       else if (chatRailOpen) setCloseChatSignal((n) => n + 1);
       else if (leftRailOpen) setCloseLeftSignal((n) => n + 1);
@@ -151,7 +154,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onEsc, true);
     return () => window.removeEventListener('keydown', onEsc, true);
-  }, [shortcutsOpen, stepThroughOpen, dashboardOpen, chatRailOpen, leftRailOpen]);
+  }, [shortcutsOpen, stepThroughOpen, backpropOpen, dashboardOpen, chatRailOpen, leftRailOpen]);
 
   // Right-click an edge to delete it
   const onEdgeContextMenu = useCallback(
@@ -366,151 +369,154 @@ export default function App() {
     <DomainCtx.Provider value={domain}>
       <GraphActionsCtx.Provider value={graphActions}>
         <VizCtx.Provider value={vizCtx}>
-          <BackpropCtx.Provider value={graph.backpropAnim}>
-            <ValidationCtx.Provider value={graph.validationErrors}>
-              <div className="app-shell">
-                {!backendOnline && (
-                  <div className="backend-offline-banner">
-                    ⚠ Backend offline — training, inference, and previews need the Python server
-                    running. See the README to start it.
-                  </div>
-                )}
-                <div ref={reactFlowWrapper} className="canvas-area">
-                  <RF.ReactFlow
-                    nodes={graph.rfNodes}
-                    edges={graph.rfEdges}
-                    onNodesChange={graph.onNodesChange}
-                    onEdgesChange={graph.onEdgesChange}
-                    onConnect={graph.connect}
-                    isValidConnection={graph.isValidConnection}
-                    onEdgeClick={() => {
-                      /* no-op: right-click only */
-                    }}
-                    onEdgeContextMenu={onEdgeContextMenu}
-                    onNodeClick={onNodeClick}
-                    onNodeDoubleClick={onNodeDoubleClick}
-                    onPaneClick={onPaneClick}
-                    onSelectionChange={onSelectionChange}
-                    onInit={setReactFlowInstance}
-                    onDragOver={onDragOver}
-                    onDrop={onDrop}
-                    nodeTypes={nodeTypes}
-                    edgesFocusable={false}
-                    selectionKeyCode="Control"
-                    multiSelectionKeyCode="Shift"
-                    fitView
-                    defaultEdgeOptions={{ animated: true }}
-                  >
-                    <RF.Background />
-                    {/* Minimap + controls, bottom-left of the page (same 300px width as
-              the floating left rail above). */}
-                    <RF.Panel position="bottom-left" className="bottom-panel">
-                      <RF.MiniMap
-                        className="minimap-themed"
-                        pannable
-                        zoomable
-                        style={{ width: 180, height: 108, margin: 0 }}
-                        maskColor="rgba(17, 17, 27, 0.7)"
-                        nodeColor={(node) => {
-                          const inst = graph.graph.nodes.get(node.id);
-                          if (!inst) return '#45475a';
-                          const def = domain.nodeRegistry.get(inst.type);
-                          if (!def) return '#45475a';
-                          return def.color ?? getCategoryColor(def.category);
-                        }}
-                      />
-                      <RF.Controls
-                        orientation="vertical"
-                        showInteractive={false}
-                        className="controls-themed"
-                      />
-                    </RF.Panel>
-                  </RF.ReactFlow>
-                  {graph.connectionError && (
-                    <div className="connection-error-toast">{graph.connectionError}</div>
-                  )}
-                  <Toolbar
-                    onSave={graph.saveGraph}
-                    onLoad={(json: string) => {
-                      graph.loadGraph(json);
-                      setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200);
-                    }}
-                    onClear={graph.clearGraph}
-                    onOrganize={graph.organizeGraph}
-                    onShowAllViz={graph.showAllViz}
-                    onHideAllViz={graph.hideAllViz}
-                    onStepThrough={() => {
-                      setStepThroughOpen(true);
-                      tutorialEvent('step-through-opened');
-                    }}
-                    onSimulateBackprop={graph.simulateBackprop}
-                    onSaveModel={graph.saveModel}
-                    onLoadModel={graph.loadModel}
-                    onSaveWeights={graph.saveWeights}
-                    onLoadWeights={graph.loadWeights}
-                    onExportPython={graph.exportPython}
-                    onInfer={graph.runInfer}
-                    onTest={() => {
-                      if (graph.modelTrained && !graph.modelStale) {
-                        setDashboardOpen(true);
-                        setTestFocus((n) => n + 1);
-                      }
-                      return graph.runTest();
-                    }}
-                    onTrain={() => {
-                      setDashboardOpen(true);
-                      return graph.runTrain();
-                    }}
-                    onCancel={graph.cancelTrain}
-                    onShowShortcuts={() => setShortcutsOpen(true)}
-                    status={graph.status}
-                    modelTrained={graph.modelTrained}
-                    modelStale={graph.modelStale}
-                  />
-                  <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
-                  <LeftRail
-                    savedBlocks={graph.savedBlocks}
-                    onDeleteBlock={graph.deleteBlock}
-                    node={selectedNode}
-                    selectedCount={selectedNodeIds.length}
-                    onPropertyChange={graph.updateProperty}
-                    onSaveBlock={graph.saveBlock}
-                    graphJson={graph.saveGraph()}
-                    inspectSignal={inspectSignal}
-                    closeSignal={closeLeftSignal}
-                    onOpenChange={setLeftRailOpen}
-                  />
-                  <TutorialPanel />
-                  <TrainingDashboard
-                    progress={graph.trainingProgress}
-                    isTraining={graph.trainingActive}
-                    batchProgress={graph.batchProgress}
-                    selectedEpoch={graph.selectedEpoch}
-                    onSelectEpoch={graph.setSelectedEpoch}
-                    totalSnapshotEpochs={graph.snapshotHistory.length}
-                    modelSummary={modelSummary}
-                    testResult={graph.testResult}
-                    isTesting={graph.testing}
-                    focusTestSignal={testFocus}
-                    open={dashboardOpen}
-                    onOpenChange={setDashboardOpen}
-                  />
-                  <StepThroughPanel
-                    open={stepThroughOpen}
-                    graphJson={graph.saveGraph()}
-                    onClose={() => setStepThroughOpen(false)}
-                  />
-                  <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-                  <ChatRail
-                    getGraphJson={() => graph.saveGraph()}
-                    graph={graph}
-                    closeSignal={closeChatSignal}
-                    onOpenChange={setChatRailOpen}
-                  />
+          <ValidationCtx.Provider value={graph.validationErrors}>
+            <div className="app-shell">
+              {!backendOnline && (
+                <div className="backend-offline-banner">
+                  ⚠ Backend offline — training, inference, and previews need the Python server
+                  running. See the README to start it.
                 </div>
+              )}
+              <div ref={reactFlowWrapper} className="canvas-area">
+                <RF.ReactFlow
+                  nodes={graph.rfNodes}
+                  edges={graph.rfEdges}
+                  onNodesChange={graph.onNodesChange}
+                  onEdgesChange={graph.onEdgesChange}
+                  onConnect={graph.connect}
+                  isValidConnection={graph.isValidConnection}
+                  onEdgeClick={() => {
+                    /* no-op: right-click only */
+                  }}
+                  onEdgeContextMenu={onEdgeContextMenu}
+                  onNodeClick={onNodeClick}
+                  onNodeDoubleClick={onNodeDoubleClick}
+                  onPaneClick={onPaneClick}
+                  onSelectionChange={onSelectionChange}
+                  onInit={setReactFlowInstance}
+                  onDragOver={onDragOver}
+                  onDrop={onDrop}
+                  nodeTypes={nodeTypes}
+                  edgesFocusable={false}
+                  selectionKeyCode="Control"
+                  multiSelectionKeyCode="Shift"
+                  fitView
+                  defaultEdgeOptions={{ animated: true }}
+                >
+                  <RF.Background />
+                  {/* Minimap + controls, bottom-left of the page (same 300px width as
+              the floating left rail above). */}
+                  <RF.Panel position="bottom-left" className="bottom-panel">
+                    <RF.MiniMap
+                      className="minimap-themed"
+                      pannable
+                      zoomable
+                      style={{ width: 180, height: 108, margin: 0 }}
+                      maskColor="rgba(17, 17, 27, 0.7)"
+                      nodeColor={(node) => {
+                        const inst = graph.graph.nodes.get(node.id);
+                        if (!inst) return '#45475a';
+                        const def = domain.nodeRegistry.get(inst.type);
+                        if (!def) return '#45475a';
+                        return def.color ?? getCategoryColor(def.category);
+                      }}
+                    />
+                    <RF.Controls
+                      orientation="vertical"
+                      showInteractive={false}
+                      className="controls-themed"
+                    />
+                  </RF.Panel>
+                </RF.ReactFlow>
+                {graph.connectionError && (
+                  <div className="connection-error-toast">{graph.connectionError}</div>
+                )}
+                <Toolbar
+                  onSave={graph.saveGraph}
+                  onLoad={(json: string) => {
+                    graph.loadGraph(json);
+                    setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2 }), 200);
+                  }}
+                  onClear={graph.clearGraph}
+                  onOrganize={graph.organizeGraph}
+                  onShowAllViz={graph.showAllViz}
+                  onHideAllViz={graph.hideAllViz}
+                  onStepThrough={() => {
+                    setStepThroughOpen(true);
+                    tutorialEvent('step-through-opened');
+                  }}
+                  onBackprop={() => setBackpropOpen(true)}
+                  onSaveModel={graph.saveModel}
+                  onLoadModel={graph.loadModel}
+                  onSaveWeights={graph.saveWeights}
+                  onLoadWeights={graph.loadWeights}
+                  onExportPython={graph.exportPython}
+                  onInfer={graph.runInfer}
+                  onTest={() => {
+                    if (graph.modelTrained && !graph.modelStale) {
+                      setDashboardOpen(true);
+                      setTestFocus((n) => n + 1);
+                    }
+                    return graph.runTest();
+                  }}
+                  onTrain={() => {
+                    setDashboardOpen(true);
+                    return graph.runTrain();
+                  }}
+                  onCancel={graph.cancelTrain}
+                  onShowShortcuts={() => setShortcutsOpen(true)}
+                  status={graph.status}
+                  modelTrained={graph.modelTrained}
+                  modelStale={graph.modelStale}
+                />
+                <Breadcrumb navStack={graph.navStack} onNavigate={graph.navigateTo} />
+                <LeftRail
+                  savedBlocks={graph.savedBlocks}
+                  onDeleteBlock={graph.deleteBlock}
+                  node={selectedNode}
+                  selectedCount={selectedNodeIds.length}
+                  onPropertyChange={graph.updateProperty}
+                  onSaveBlock={graph.saveBlock}
+                  graphJson={graph.saveGraph()}
+                  inspectSignal={inspectSignal}
+                  closeSignal={closeLeftSignal}
+                  onOpenChange={setLeftRailOpen}
+                />
+                <TutorialPanel />
+                <TrainingDashboard
+                  progress={graph.trainingProgress}
+                  isTraining={graph.trainingActive}
+                  batchProgress={graph.batchProgress}
+                  selectedEpoch={graph.selectedEpoch}
+                  onSelectEpoch={graph.setSelectedEpoch}
+                  totalSnapshotEpochs={graph.snapshotHistory.length}
+                  modelSummary={modelSummary}
+                  testResult={graph.testResult}
+                  isTesting={graph.testing}
+                  focusTestSignal={testFocus}
+                  open={dashboardOpen}
+                  onOpenChange={setDashboardOpen}
+                />
+                <StepThroughPanel
+                  open={stepThroughOpen}
+                  graphJson={graph.saveGraph()}
+                  onClose={() => setStepThroughOpen(false)}
+                />
+                <BackpropPanel
+                  open={backpropOpen}
+                  graphJson={graph.saveGraph()}
+                  onClose={() => setBackpropOpen(false)}
+                />
+                <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+                <ChatRail
+                  getGraphJson={() => graph.saveGraph()}
+                  graph={graph}
+                  closeSignal={closeChatSignal}
+                  onOpenChange={setChatRailOpen}
+                />
               </div>
-            </ValidationCtx.Provider>
-          </BackpropCtx.Provider>
+            </div>
+          </ValidationCtx.Provider>
         </VizCtx.Provider>
       </GraphActionsCtx.Provider>
     </DomainCtx.Provider>

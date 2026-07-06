@@ -1,0 +1,299 @@
+/* Backprop panel — reuses the step-through frame (StepThroughPanel.css) plus
+   these backward-specific bits. */
+
+.backprop-sample-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #313244;
+}
+
+.backprop-sample-btn {
+  padding: 5px 12px;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  color: #cdd6f4;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.backprop-sample-btn:hover:not(:disabled) {
+  border-color: #89b4fa;
+}
+
+.backprop-sample-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.backprop-sample-hint {
+  color: #6c7086;
+  font-size: 12px;
+}
+
+.backprop-loss {
+  margin-left: auto;
+  color: #a6adc8;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.backprop-loss strong {
+  color: #f9e2af;
+}
+
+/* Right-align the layer timeline so the output end (where backprop starts) hugs
+   the right edge and the reading order is right → left. */
+.stage-timeline-right {
+  justify-content: flex-end;
+}
+
+/* --- The per-layer backward cell (BackpropDetail) --- */
+
+.bp-cell {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.bp-arrow {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  color: #6c7086;
+  font-size: 22px;
+}
+
+.bp-panel {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 8px;
+}
+
+.bp-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #89b4fa;
+  margin-bottom: 10px;
+}
+
+.bp-norm {
+  font-size: 15px;
+  color: #a6adc8;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 10px;
+}
+
+.bp-norm strong {
+  color: #cdd6f4;
+  font-size: 17px;
+}
+
+.bp-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bp-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  background: #11111b;
+  border-radius: 5px;
+}
+
+.bp-stat-label {
+  font-size: 11px;
+  color: #6c7086;
+}
+
+.bp-stat-value {
+  font-size: 13px;
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bp-health {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  margin-bottom: 12px;
+}
+
+.bp-health-ok {
+  background: rgba(166, 227, 161, 0.15);
+  color: #a6e3a1;
+}
+
+.bp-health-low {
+  background: rgba(249, 226, 175, 0.15);
+  color: #f9e2af;
+}
+
+.bp-health-high {
+  background: rgba(243, 139, 168, 0.15);
+  color: #f38ba8;
+}
+
+.bp-health-neutral {
+  background: rgba(108, 112, 134, 0.2);
+  color: #a6adc8;
+}
+
+.bp-note {
+  font-size: 13px;
+  color: #7f849c;
+  line-height: 1.5;
+}
+
+.bp-note strong {
+  color: #a6adc8;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* --- One-step: button, banner, per-layer weight before/after --- */
+
+.backprop-step-btn {
+  padding: 5px 12px;
+  background: rgba(137, 180, 250, 0.14);
+  border: 1px solid #89b4fa;
+  border-radius: 6px;
+  color: #89b4fa;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.backprop-step-btn:hover:not(:disabled) {
+  background: rgba(137, 180, 250, 0.24);
+}
+
+.backprop-step-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.backprop-step-error {
+  padding: 8px 14px;
+  color: #f38ba8;
+  font-size: 13px;
+  border-bottom: 1px solid #313244;
+}
+
+.bp-step-banner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 16px;
+  background: rgba(137, 180, 250, 0.06);
+  border-bottom: 1px solid #313244;
+  flex-wrap: wrap;
+}
+
+.bp-step-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bp-step-title-main {
+  font-size: 13px;
+  font-weight: 700;
+  color: #cdd6f4;
+}
+
+.bp-step-lr {
+  font-size: 11px;
+  color: #6c7086;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.bp-step-metrics {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.bp-step-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bp-step-metric-label {
+  font-size: 11px;
+  color: #6c7086;
+}
+
+.bp-step-metric-val {
+  font-size: 14px;
+  color: #cdd6f4;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bp-arrow-sm {
+  color: #6c7086;
+}
+
+.bp-delta {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.bp-delta-good {
+  background: rgba(166, 227, 161, 0.15);
+  color: #a6e3a1;
+}
+
+.bp-delta-bad {
+  background: rgba(243, 139, 168, 0.15);
+  color: #f38ba8;
+}
+
+.bp-correct {
+  color: #a6e3a1;
+}
+
+.bp-wrong {
+  color: #f38ba8;
+}
+
+.bp-hint-sm {
+  font-size: 11px;
+  color: #6c7086;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.bp-step-weight {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid #313244;
+}
+
+.bp-step-weight-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}

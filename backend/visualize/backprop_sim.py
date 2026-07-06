@@ -33,7 +33,7 @@ from engine.graph_builder import (
     DIFFUSION_SCHEDULER_TYPE,
     SubGraphModule,
 )
-from dataprep.data_loaders import DATA_LOADERS, DENORMALIZERS
+from dataprep.data_loaders import DATA_LOADERS, DENORMALIZERS, CLASS_NAMES
 from engine.forward_utils import execute_node
 from visualize.node_viz import get_backward_viz, compact_stats_with_norm, param_grad_stats
 
@@ -171,6 +171,119 @@ def _retain_grad_recursive(modules: dict) -> None:
             _retain_grad_recursive(dict(mod.inner_modules))
 
 
+def _loss_for_sample(graph_data: dict, sample_idx: int) -> float | None:
+    """Forward-only pass on one sample with trained weights; return its loss."""
+    try:
+        _, nodes, _, results = _build_with_trained(graph_data, sample_idx=sample_idx, train_mode=False)
+    except Exception:
+        return None
+    loss_nid = next((nid for nid, n in nodes.items() if n["type"] in ALL_LOSS_NODES), None)
+    if loss_nid is None:
+        return None
+    loss_tensor = results.get(loss_nid, {}).get("out")
+    if loss_tensor is None or not isinstance(loss_tensor, torch.Tensor):
+        return None
+    try:
+        return float(loss_tensor.detach().item())
+    except Exception:
+        return None
+
+
+def _pick_hard_sample(graph_data: dict, k: int = 40, hard_enough: float = 1.0) -> int | None:
+    """Scan up to k random candidates and return the highest-loss sample index.
+
+    A well-trained classifier gets most random samples right (near-0 loss), so its
+    backward view would be all-zeros — useless for learning. Scanning a batch of
+    candidates finds a sample the model actually struggles on, where the gradients
+    are meaningful. Stops early once a clearly-hard sample (loss > hard_enough) is
+    found so the common case stays fast.
+
+    Falls back to a single random sample (None) if the dataset can't be sized or
+    nothing produced a loss — the caller then behaves exactly as before.
+    """
+    import random as _random
+    from dataprep.data_loaders import TRAIN_DATASETS
+
+    data_type = next(
+        (n["type"] for n in graph_data["graph"]["nodes"] if n["type"] in DATA_LOADERS),
+        None,
+    )
+    dataset_fn = TRAIN_DATASETS.get(data_type) if data_type else None
+    if dataset_fn is None:
+        return None
+    try:
+        n_samples = len(dataset_fn())
+    except Exception:
+        return None
+    if n_samples <= 0:
+        return None
+
+    best_idx, best_loss = None, float("-inf")
+    for _ in range(k):
+        idx = _random.randint(0, n_samples - 1)
+        loss = _loss_for_sample(graph_data, idx)
+        if loss is not None and loss > best_loss:
+            best_idx, best_loss = idx, loss
+        if best_loss > hard_enough:  # clearly a sample the model gets wrong — good enough
+            break
+    return best_idx
+
+
+def _input_grad(node_id: str, edges: list, results: dict):
+    """∂L/∂input for a node — the gradient it passes back to the previous layer.
+
+    Read from the (retained) grad of the node's input tensor, which is the upstream
+    layer's output. So this layer's grad-out is literally the previous layer's
+    grad-in. Returns the primary float input's gradient, or None.
+    """
+    try:
+        inputs = gather_inputs(node_id, edges, results)
+    except Exception:
+        return None
+    for t in inputs.values():
+        if isinstance(t, torch.Tensor) and t.is_floating_point() and t.grad is not None:
+            return t.grad.detach()
+    return None
+
+
+def _loss_seed(logits, true_label: int | None, loss_val, class_names: list | None) -> dict | None:
+    """The seed of backprop at the loss node: prediction vs truth, the loss value,
+    and the error signal ∂L/∂logits it emits (for softmax + cross-entropy this is
+    exactly predicted − target). This is where every gradient is born — far more
+    useful than the loss node's own grad-in, which is a trivial ∂L/∂L = 1.
+    """
+    if not isinstance(logits, torch.Tensor) or logits.dim() != 2:
+        return None
+    probs = torch.softmax(logits.detach(), dim=1)[0]
+    n = probs.numel()
+    # Emitted gradient: prefer the real grad, fall back to p − onehot.
+    if logits.grad is not None:
+        err = logits.grad.detach()[0]
+    else:
+        err = probs.clone()
+        if true_label is not None and 0 <= true_label < n:
+            err[true_label] = err[true_label] - 1.0
+    k = min(6, n)
+    top = torch.topk(probs, k)
+    return {
+        "logits": [_safe_float(float(x)) for x in logits.detach()[0].tolist()],
+        "probabilities": [_safe_float(float(p)) for p in probs.tolist()],
+        "errorSignal": [_safe_float(float(e)) for e in err.tolist()],
+        "trueLabel": true_label,
+        "trueLabelProb": (
+            _safe_float(float(probs[true_label]))
+            if true_label is not None and 0 <= true_label < n
+            else None
+        ),
+        "loss": loss_val,
+        "classNames": class_names,
+        "topK": [
+            {"index": int(i), "value": _safe_float(float(v))}
+            for v, i in zip(top.values.tolist(), top.indices.tolist())
+        ],
+    }
+
+
 def run_backward_step_through(graph_data: dict, sample_idx: int | None = None) -> dict:
     """Run a forward+backward pass and return rich per-node backward stages.
 
@@ -188,8 +301,17 @@ def run_backward_step_through(graph_data: dict, sample_idx: int | None = None) -
         if n["type"] in DATA_LOADERS:
             n["properties"] = {**n.get("properties", {}), "batchSize": 1}
 
+    # A well-trained model classifies most random samples with ~0 loss, so the
+    # whole backward view would show ~0 gradients everywhere — useless for
+    # learning. When the caller doesn't pin a sample, pick the hardest of a few
+    # random candidates (highest loss) so the gradients are actually meaningful.
+    if sample_idx is None:
+        sample_idx = _pick_hard_sample(graph_data)
+
+    # Eval mode: deterministic forward (no dropout noise) so the gradients are
+    # reproducible and the loss shown here matches /one-step's "before" loss.
     try:
-        modules, nodes, edges, results = _build_with_trained(graph_data, sample_idx=sample_idx)
+        modules, nodes, edges, results = _build_with_trained(graph_data, sample_idx=sample_idx, train_mode=False)
     except Exception as e:
         raise RuntimeError(f"Backward step-through failed: {e}")
 
@@ -198,26 +320,26 @@ def run_backward_step_through(graph_data: dict, sample_idx: int | None = None) -
 
     order = topological_sort(nodes, edges)
 
-    # Find data and loss nodes
-    data_nid = None
-    loss_nid = None
-    for nid, n in nodes.items():
-        if n["type"] in DATA_LOADERS:
-            data_nid = nid
-        if n["type"] in ALL_LOSS_NODES:
-            loss_nid = nid
+    # Find data, loss, and the logits node feeding the loss ("predictions" port)
+    data_nid, loss_nid, pred_nid = _find_key_nodes(nodes, edges)
     if not data_nid or not loss_nid:
         return {"error": "Graph must have a data node and a loss node"}
 
+    class_names = CLASS_NAMES.get(nodes[data_nid]["type"]) if data_nid else None
+
     # Extract sample info for the header
     sample_info = {}
+    true_label = None
     data_tensors = results.get(data_nid, {})
     if data_tensors:
         out = data_tensors.get("out")
         labels = data_tensors.get("labels")
+        if labels is not None and isinstance(labels, torch.Tensor) and labels.dim() == 1:
+            true_label = int(labels[0])
         sample_info = {
             "datasetType": nodes[data_nid]["type"],
-            "actualLabel": int(labels[0]) if labels is not None and isinstance(labels, torch.Tensor) and labels.dim() == 1 else None,
+            "actualLabel": true_label,
+            "classNames": class_names,
         }
         if out is not None and isinstance(out, torch.Tensor) and out.dim() == 4:
             sample_info.update(_tensor_to_preview_image(out[0].detach(), nodes[data_nid]["type"]))
@@ -322,6 +444,7 @@ def run_backward_step_through(graph_data: dict, sample_idx: int | None = None) -
         "stages": stages,
         "loss": loss_val,
         "sample": sample_info,
+        "sampleIdx": sample_idx,  # so /one-step can reproduce this exact sample
     }
 
 
@@ -392,8 +515,13 @@ def _forward_pass(modules: dict, nodes: dict, edges: list) -> dict:
     return results
 
 
-def _build_with_trained(graph_data: dict, sample_idx: int | None = None) -> tuple:
-    """Build modules using trained weights and run forward pass."""
+def _build_with_trained(graph_data: dict, sample_idx: int | None = None, train_mode: bool = True) -> tuple:
+    """Build modules using trained weights and run forward pass.
+
+    train_mode=False runs the modules in eval() mode (dropout off, BN frozen) so a
+    forward pass is deterministic — needed for a clean before/after comparison.
+    Gradients still flow in eval mode, so backward works either way.
+    """
     from dataprep.data_loaders import load_sample_by_label
     trained = get_trained_modules()
     graph = graph_data["graph"]
@@ -442,7 +570,7 @@ def _build_with_trained(graph_data: dict, sample_idx: int | None = None) -> tupl
         if module is None:
             raise RuntimeError(f"Trained model missing module for node {node_id}")
 
-        module.train()
+        module.train() if train_mode else module.eval()
         module.zero_grad(set_to_none=False)
         modules[node_id] = module
 
@@ -538,3 +666,172 @@ def _build_backward_subgraph_stages(
         stages.append(stage)
 
     return stages
+
+
+# --- One gradient step: before/after ---
+
+def _find_key_nodes(nodes: dict, edges: list) -> tuple:
+    """Return (data_nid, loss_nid, pred_nid) — pred_nid is the node whose output
+    feeds the loss node's 'predictions' port (the logits)."""
+    data_nid = next((nid for nid, n in nodes.items() if n["type"] in DATA_LOADERS), None)
+    loss_nid = next((nid for nid, n in nodes.items() if n["type"] in ALL_LOSS_NODES), None)
+    pred_nid = None
+    if loss_nid is not None:
+        for e in edges:
+            if e["target"]["nodeId"] == loss_nid and e["target"]["portId"] == "predictions":
+                pred_nid = e["source"]["nodeId"]
+                break
+    return data_nid, loss_nid, pred_nid
+
+
+def _optimizer_lr(nodes: dict) -> tuple[float, str | None]:
+    """Read the learning rate (and optimizer type) from the graph's optimizer node."""
+    for n in nodes.values():
+        if n["type"] in OPTIMIZER_NODES:
+            lr = n.get("properties", {}).get("lr")
+            if isinstance(lr, (int, float)):
+                return float(lr), n["type"]
+            default = 0.001 if n["type"] in ("ml.optimizers.adam", "ml.optimizers.adamw") else 0.01
+            return default, n["type"]
+    return 0.01, None
+
+
+def _prediction_from_logits(logits, true_label: int | None, class_names: list | None) -> dict | None:
+    """Turn classifier logits [1, C] into a prediction summary. None for non-2D outputs."""
+    if not isinstance(logits, torch.Tensor) or logits.dim() != 2:
+        return None
+    probs = torch.softmax(logits.detach(), dim=1)[0]
+    n_classes = probs.numel()
+    pred_class = int(probs.argmax())
+    k = min(5, n_classes)
+    top = torch.topk(probs, k)
+    return {
+        "predictedClass": pred_class,
+        "confidence": _safe_float(float(probs[pred_class])),
+        "trueLabelProb": (
+            _safe_float(float(probs[true_label]))
+            if true_label is not None and 0 <= true_label < n_classes
+            else None
+        ),
+        "probabilities": [_safe_float(float(p)) for p in probs.tolist()],
+        "topK": [
+            {"index": int(i), "value": _safe_float(float(v))}
+            for v, i in zip(top.values.tolist(), top.indices.tolist())
+        ],
+    }
+
+
+def run_one_step(graph_data: dict, sample_idx: int | None = None) -> dict:
+    """Apply ONE gradient-descent step (W ← W − lr·∂L/∂W) on a single sample and
+    report the before/after effect: loss, prediction, and per-layer weight change.
+
+    The shared trained weights are snapshotted and restored, so the stored model is
+    left untouched. Runs in eval mode so the only thing that changes between the
+    before and after forward passes is the weight update itself.
+    """
+    if not has_trained_model():
+        raise RuntimeError("Train the model first — one-step requires trained weights")
+
+    from dataprep.data_loaders import CLASS_NAMES
+
+    graph_data = copy.deepcopy(graph_data)
+    for n in graph_data["graph"]["nodes"]:
+        if n["type"] in DATA_LOADERS:
+            n["properties"] = {**n.get("properties", {}), "batchSize": 1}
+
+    if sample_idx is None:
+        sample_idx = _pick_hard_sample(graph_data)
+
+    try:
+        modules, nodes, edges, results = _build_with_trained(
+            graph_data, sample_idx=sample_idx, train_mode=False
+        )
+    except Exception as e:
+        raise RuntimeError(f"One-step failed: {e}")
+
+    data_nid, loss_nid, pred_nid = _find_key_nodes(nodes, edges)
+    loss_tensor = results.get(loss_nid, {}).get("out") if loss_nid else None
+    if loss_tensor is None:
+        return {"error": "No loss value — check the predictions/labels connections"}
+
+    # True label + class names for the prediction summary
+    true_label = None
+    labels = results.get(data_nid, {}).get("labels") if data_nid else None
+    if isinstance(labels, torch.Tensor) and labels.dim() == 1 and labels.numel() > 0:
+        true_label = int(labels[0])
+    class_names = CLASS_NAMES.get(nodes[data_nid]["type"]) if data_nid else None
+
+    loss_before = _safe_float(float(loss_tensor.detach().item()))
+    pred_before = _prediction_from_logits(
+        results.get(pred_nid, {}).get("out") if pred_nid else None, true_label, class_names
+    )
+
+    # Snapshot every learnable parameter (clone — these tensors are the live weights)
+    saved_params = {
+        nid: [p.detach().clone() for p in m.parameters()]
+        for nid, m in modules.items()
+        if isinstance(m, torch.nn.Module) and any(True for _ in m.parameters())
+    }
+
+    # Backward + one SGD-style step
+    for m in modules.values():
+        if isinstance(m, torch.nn.Module):
+            m.zero_grad(set_to_none=False)
+    try:
+        loss_tensor.backward()
+    except Exception as e:
+        return {"error": f"Backward failed: {e}"}
+
+    lr, opt_type = _optimizer_lr(nodes)
+    with torch.no_grad():
+        for m in modules.values():
+            if isinstance(m, torch.nn.Module):
+                for p in m.parameters():
+                    if p.grad is not None:
+                        p.add_(p.grad, alpha=-lr)
+
+    # Per-layer weight change (compare the snapshot to the stepped weights)
+    layers = []
+    for nid, before_list in saved_params.items():
+        m = modules[nid]
+        after_list = [p.detach() for p in m.parameters()]
+        before = torch.cat([b.flatten() for b in before_list]).float()
+        after = torch.cat([a.flatten() for a in after_list]).float()
+        delta = (after - before).abs()
+        layers.append({
+            "nodeId": nid,
+            "displayName": _friendly_name(nodes[nid]["type"]),
+            "weightNormBefore": _safe_float(float(before.norm())),
+            "weightNormAfter": _safe_float(float(after.norm())),
+            "meanAbsDelta": _safe_float(float(delta.mean())),
+            "maxAbsDelta": _safe_float(float(delta.max())),
+        })
+
+    # Re-forward with the stepped weights to measure the after-state
+    try:
+        _, nodes2, edges2, results_after = _build_with_trained(
+            graph_data, sample_idx=sample_idx, train_mode=False
+        )
+        _, loss_nid2, pred_nid2 = _find_key_nodes(nodes2, edges2)
+        loss_after_tensor = results_after.get(loss_nid2, {}).get("out") if loss_nid2 else None
+        loss_after = _safe_float(float(loss_after_tensor.detach().item())) if loss_after_tensor is not None else None
+        pred_after = _prediction_from_logits(
+            results_after.get(pred_nid2, {}).get("out") if pred_nid2 else None, true_label, class_names
+        )
+    finally:
+        # Restore the original weights so the stored model is unchanged
+        with torch.no_grad():
+            for nid, before_list in saved_params.items():
+                for p, b in zip(modules[nid].parameters(), before_list):
+                    p.copy_(b)
+
+    return {
+        "lr": lr,
+        "optimizerType": opt_type,
+        "sampleIdx": sample_idx,
+        "trueLabel": true_label,
+        "classNames": class_names,
+        "loss": {"before": loss_before, "after": loss_after},
+        "prediction": {"before": pred_before, "after": pred_after},
+        "layers": layers,
+    }

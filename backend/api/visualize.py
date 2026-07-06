@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from engine.graph_builder import get_layer_detail
 from visualize.step_through import run_step_through
 from visualize.activation_max import activation_maximization
-from visualize.backprop_sim import simulate_backprop, run_backward_step_through
+from visualize.backprop_sim import simulate_backprop, run_backward_step_through, run_one_step
 from visualize.loss_landscape import compute_loss_landscape
 
 logger = logging.getLogger("nodetorch")
@@ -43,6 +43,24 @@ async def backward_step_through(request: dict):
         return {"status": "ok", "result": result}
     except Exception as e:
         logger.error(f"Backward step-through failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@router.post("/one-step")
+async def one_step(request: dict):
+    """Apply one gradient-descent step on a single sample; return before/after.
+
+    Request: { graph, sampleIdx? }
+    Response: { status: "ok", result: { lr, loss, prediction, layers, ... } } or error
+    """
+    logger.info("One-step requested")
+    try:
+        result = run_one_step(request["graph"], sample_idx=request.get("sampleIdx"))
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        logger.error(f"One-step failed: {e}")
         return {"status": "error", "error": str(e)}
 
 

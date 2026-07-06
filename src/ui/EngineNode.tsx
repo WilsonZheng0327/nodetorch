@@ -5,9 +5,9 @@
 import * as RF from '@xyflow/react';
 import type { NodeInstance } from '../core/graph';
 import { getNodePorts } from '../core/ports';
-import { useContext, useRef, useEffect, type CSSProperties } from 'react';
+import { useContext, useRef, useEffect } from 'react';
 import { VizPanel, type VizSnapshot } from './VizPanel';
-import { DomainCtx, GraphActionsCtx, VizCtx, BackpropCtx, ValidationCtx } from './contexts';
+import { DomainCtx, GraphActionsCtx, VizCtx, ValidationCtx } from './contexts';
 import './EngineNode.css';
 
 export type EngineNodeData = {
@@ -34,10 +34,8 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
   const domain = useContext(DomainCtx);
   const actions = useContext(GraphActionsCtx);
   const viz = useContext(VizCtx);
-  const backpropAnim = useContext(BackpropCtx);
   const validationErrors = useContext(ValidationCtx);
   const nodeWarnings = validationErrors?.get(id);
-  const pulse = backpropAnim?.[id];
   if (!domain) return null;
 
   const { instance } = data;
@@ -68,17 +66,7 @@ export function EngineNode({ data, id }: RF.NodeProps<RF.Node<EngineNodeData>>) 
       : null);
 
   return (
-    <div
-      className={`layer-node ${pulse ? 'layer-node-backprop-pulse' : ''}`}
-      style={
-        pulse
-          ? ({
-              '--backprop-delay': `${pulse.delayMs}ms`,
-              '--backprop-intensity': `${pulse.intensity}`,
-            } as CSSProperties)
-          : undefined
-      }
-    >
+    <div className="layer-node">
       <div className="layer-node-header" style={{ backgroundColor: color }}>
         {viz && (
           <button

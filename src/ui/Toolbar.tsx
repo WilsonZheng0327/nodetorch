@@ -32,7 +32,7 @@ interface Props {
   onShowAllViz: () => void;
   onHideAllViz: () => void;
   onStepThrough: () => void;
-  onSimulateBackprop: () => void;
+  onBackprop: () => void;
   onSaveModel: () => Promise<void>; // bundle: graph + weights (.ntmodel)
   onLoadModel: (file: File) => Promise<void>; // bundle: replaces graph + weights
   onSaveWeights: () => Promise<void>; // weights only (.pt)
@@ -56,7 +56,7 @@ export function Toolbar({
   onShowAllViz,
   onHideAllViz,
   onStepThrough,
-  onSimulateBackprop,
+  onBackprop,
   onSaveModel,
   onLoadModel,
   onSaveWeights,
@@ -408,8 +408,8 @@ export function Toolbar({
         </button>
         <button
           className="toolbar-btn toolbar-btn-icon"
-          onClick={onSimulateBackprop}
-          title="Animate one backward pass through the graph"
+          onClick={onBackprop}
+          title="Step through backprop"
         >
           <Undo2 size={15} />
         </button>

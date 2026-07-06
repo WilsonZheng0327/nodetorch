@@ -784,42 +784,6 @@ export function useGraph(domain: DomainContext) {
   // True from the moment training starts until it finishes/errors/cancels
   const [trainingActive, setTrainingActive] = useState(false);
 
-  // Backprop animation: map of nodeId -> { delayMs, intensity }
-  const [backpropAnim, setBackpropAnim] = useState<Record<
-    string,
-    { delayMs: number; intensity: number }
-  > | null>(null);
-
-  const simulateBackprop = useCallback(async () => {
-    setStatus({ type: 'running', message: 'Simulating backprop...' });
-    const r = await callBackend<{
-      result: { flow: { nodeId: string; norm: number }[]; loss?: number };
-    }>('/simulate-backprop', { graph: JSON.parse(saveGraph()) });
-    if (!r.ok) {
-      setStatus({ type: 'error', message: r.error });
-      return;
-    }
-    const { flow, loss } = r.data.result;
-    // Reverse: animate from last layer backward to first
-    const reversed = [...flow].reverse();
-    const maxNorm = Math.max(...reversed.map((f) => f.norm), 1e-8);
-    const stepMs = 150;
-    const anim: Record<string, { delayMs: number; intensity: number }> = {};
-    reversed.forEach((f, i) => {
-      anim[f.nodeId] = {
-        delayMs: i * stepMs,
-        intensity: Math.min(1, 0.3 + (f.norm / maxNorm) * 0.7),
-      };
-    });
-    setBackpropAnim(anim);
-    setStatus({ type: 'success', message: `Backprop: loss=${loss?.toFixed(4)}` });
-    const totalDuration = reversed.length * stepMs + 800;
-    setTimeout(() => {
-      setBackpropAnim(null);
-      setStatus((s) => (s.type === 'success' ? { type: 'idle' } : s));
-    }, totalDuration);
-  }, [saveGraph]);
-
   const exportPython = useCallback(async () => {
     try {
       const res = await fetch(apiUrl('/export-python'), {
@@ -1356,8 +1320,6 @@ export function useGraph(domain: DomainContext) {
     snapshotHistory,
     selectedEpoch,
     setSelectedEpoch,
-    backpropAnim,
-    simulateBackprop,
     exportPython,
     pinnedVizNodes,
     toggleVizPin,

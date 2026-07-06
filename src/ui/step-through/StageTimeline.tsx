@@ -9,9 +9,17 @@ interface Props {
   currentIdx: number;
   onSelect: (idx: number) => void;
   direction?: 'forward' | 'backward';
+  /** Horizontal alignment. 'right' hugs the output end (used by the backward view). */
+  align?: 'left' | 'right';
 }
 
-export function StageTimeline({ stages, currentIdx, onSelect, direction = 'forward' }: Props) {
+export function StageTimeline({
+  stages,
+  currentIdx,
+  onSelect,
+  direction = 'forward',
+  align = 'left',
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to current stage
@@ -70,7 +78,10 @@ export function StageTimeline({ stages, currentIdx, onSelect, direction = 'forwa
   }
 
   return (
-    <div className="stage-timeline" ref={containerRef}>
+    <div
+      className={`stage-timeline ${align === 'right' ? 'stage-timeline-right' : ''}`}
+      ref={containerRef}
+    >
       {items}
     </div>
   );

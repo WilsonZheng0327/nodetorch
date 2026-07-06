@@ -26,12 +26,6 @@ export const VizCtx = createContext<{
   liveSnapshots: Record<string, VizSnapshot>;
 } | null>(null);
 
-// Backprop animation context — map of nodeId to { delayMs, intensity }
-export const BackpropCtx = createContext<Record<
-  string,
-  { delayMs: number; intensity: number }
-> | null>(null);
-
 // Live forward-validation problems, keyed by nodeId (e.g. "missing input").
 // Lets each node badge its own issues so a student sees which node is broken.
 export const ValidationCtx = createContext<Map<string, string[]> | null>(null);
