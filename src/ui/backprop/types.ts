@@ -64,7 +64,9 @@ export interface Mechanism {
 export interface WiggleResult {
   nodeId: string;
   displayName: string;
-  coord: [number, number]; // [out, in]
+  coord: number[]; // per-dim index: Linear [out, in]; Conv [out, in, kh, kw]
+  weightShape: number[]; // the weight tensor's shape
+  numWeights: number; // total scalar weights (for "wiggle another")
   outDim: number;
   inDim: number;
   lr: number;

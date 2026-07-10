@@ -116,7 +116,7 @@ export function WiggleWeight({
       data={data}
       dragW={dragW ?? data.current.w}
       onDrag={setDragW}
-      onAnother={() => fetchWiggle(Math.floor(Math.random() * data.outDim * data.inDim))}
+      onAnother={() => fetchWiggle(Math.floor(Math.random() * data.numWeights))}
       loading={loading}
     />
   );
@@ -136,6 +136,14 @@ function WigglePlot({
   loading: boolean;
 }) {
   const { curve, current, step, lr, coord, trueLabel, classNames } = data;
+  // Describe which scalar weight we're sweeping, in words that fit the layer:
+  // Linear → "input i → output o"; Conv → the kernel slot; else a raw index.
+  const coordDesc =
+    coord.length === 2
+      ? `input ${coord[1]} → output ${coord[0]}`
+      : coord.length === 4
+        ? `out-ch ${coord[0]}, in-ch ${coord[1]}, kernel (${coord[2]}, ${coord[3]})`
+        : `W[${coord.join(', ')}]`;
   const losses = curve.map((c) => c.loss ?? 0);
   const wMin = curve[0].w;
   const wMax = curve[curve.length - 1].w;
@@ -172,9 +180,9 @@ function WigglePlot({
     <div className="bp-wiggle">
       <div className="bp-mech-q">Wiggle a weight — the gradient is the slope of this curve</div>
       <div className="bp-wiggle-sub">
-        We take <strong>one</strong> weight of this layer (out {coord[0]}, in {coord[1]}), freeze
-        every other weight, and re-measure the loss as we slide it from side to side — that's the
-        curve. You're sitting at the <span className="bp-wiggle-key-cur">dot</span>; the curve's{' '}
+        We take <strong>one</strong> weight of this layer ({coordDesc}), freeze every other weight,
+        and re-measure the loss as we slide it from side to side — that's the curve. You're sitting
+        at the <span className="bp-wiggle-key-cur">dot</span>; the curve's{' '}
         <span className="bp-wiggle-key-tan">slope right there is the gradient</span>, and lowering
         the loss means stepping <span className="bp-wiggle-key-down">downhill</span>.
       </div>

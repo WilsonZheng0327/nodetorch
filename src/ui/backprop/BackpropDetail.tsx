@@ -12,6 +12,12 @@ import { WiggleWeight } from './WiggleWeight';
 import { SamplePreview } from './SamplePreview';
 import { fmt } from './format';
 
+/** Layers whose weight is a matrix/kernel we can sweep — Linear and Conv. Others
+ * (norm, activation, pooling) have no such weight, so no wiggle curve. Mirrors the
+ * backend guard in run_weight_wiggle. */
+const canWiggle = (nodeType?: string): boolean =>
+  !!nodeType && (nodeType.includes('linear') || nodeType.includes('conv'));
+
 export function BackpropDetail({
   stage,
   stepLayer,
@@ -72,10 +78,10 @@ export function BackpropDetail({
           <GradFlow side="in" stats={stage.stats} shape={shapeIn} neighbor={fromName} />
         </div>
 
-        {stage.mechanism && (
+        {(stage.mechanism || canWiggle(stage.nodeType)) && (
           <div className="bp-lower">
-            <MechanismViz mechanism={stage.mechanism} toName={toName} />
-            {graphJson && (
+            {stage.mechanism && <MechanismViz mechanism={stage.mechanism} toName={toName} />}
+            {graphJson && canWiggle(stage.nodeType) && (
               <WiggleWeight
                 key={`${stage.nodeId}-${sampleIdx}`}
                 graphJson={graphJson}

@@ -968,6 +968,16 @@ def _eval_point(
     return {"loss": loss, "pTrue": p_true, "pred": pred}
 
 
+def _unravel_index(flat: int, shape: tuple[int, ...]) -> list[int]:
+    """Turn a flat weight index into per-dimension coordinates (like np.unravel_index).
+    e.g. Linear [out, in] → [o, i]; Conv2d [out, in, kh, kw] → [o, i, r, c]."""
+    coord: list[int] = []
+    for dim in reversed(shape):
+        coord.append(flat % dim)
+        flat //= dim
+    return list(reversed(coord))
+
+
 @_no_cudnn
 def run_weight_wiggle(
     graph_data: dict,
@@ -976,8 +986,8 @@ def run_weight_wiggle(
     weight_index: int | None = None,
     num_points: int = 41,
 ) -> dict:
-    """Sweep ONE weight of a Linear layer and report the loss at each value — the
-    loss-vs-weight curve. The gradient ∂L/∂w is the slope of this curve at the
+    """Sweep ONE weight of a Linear or Conv layer and report the loss at each value
+    — the loss-vs-weight curve. The gradient ∂L/∂w is the slope of this curve at the
     current value, and a gradient step (w − lr·∂L/∂w) walks downhill along it.
 
     All other weights are frozen; only the chosen weight varies. The stored model
@@ -998,8 +1008,12 @@ def run_weight_wiggle(
         graph_data, sample_idx=sample_idx, train_mode=False
     )
     data_nid, loss_nid, pred_nid = _find_key_nodes(nodes, edges)
-    if node_id not in modules or not isinstance(modules[node_id], torch.nn.Linear):
-        return {"error": "Wiggle currently supports Linear layers only"}
+    module = modules.get(node_id)
+    weight = getattr(module, "weight", None)
+    # Works for any layer whose weight is a matrix or kernel — Linear [out, in] and
+    # Conv[out, in, *kernel]. (1D weights like BatchNorm's scale aren't a wiggle.)
+    if not isinstance(module, torch.nn.Module) or not isinstance(weight, torch.Tensor) or weight.dim() < 2:
+        return {"error": "Wiggle supports layers with a weight matrix or kernel (Linear, Conv)"}
 
     # True label + class names — so we can show the prediction change as the weight
     # slides (the model's confidence in the correct answer moves with the loss).
@@ -1018,44 +1032,50 @@ def run_weight_wiggle(
             m.zero_grad(set_to_none=False)
     loss_tensor.backward()
 
-    module = modules[node_id]
-    W = module.weight
+    W = weight
     G = W.grad
     if G is None:
         return {"error": "This layer received no gradient on this sample"}
 
-    in_dim = int(W.shape[1])
+    # Index a single scalar weight by flat position — works for a 2D matrix or an
+    # N-D conv kernel alike. A view shares storage, so writing Wflat mutates W.
+    Wflat = W.view(-1)
+    Gflat = G.reshape(-1)
+    num_weights = int(Wflat.numel())
     if weight_index is None:
-        weight_index = int(G.detach().abs().flatten().argmax())
-    i, j = divmod(int(weight_index), in_dim)
+        weight_index = int(Gflat.detach().abs().argmax())
+    weight_index = max(0, min(int(weight_index), num_weights - 1))
+    coord = _unravel_index(weight_index, tuple(W.shape))
 
-    w0 = float(W[i, j].detach())
-    g = float(G[i, j].detach())
+    w0 = float(Wflat[weight_index].detach())
+    g = float(Gflat[weight_index].detach())
     lr, opt_type = _optimizer_lr(nodes)
 
     data_out = results.get(data_nid, {})
-    orig = W.detach()[i, j].item()
+    orig = w0
     R = max(0.5, 2.0 * abs(w0))
 
     curve = []
     with torch.no_grad():
         for t in range(num_points):
             wv = w0 - R + (2.0 * R) * t / (num_points - 1)
-            W[i, j] = wv
+            Wflat[weight_index] = wv
             pt = _eval_point(modules, nodes, edges, data_out, data_nid, loss_nid, pred_nid, true_label)
             curve.append({"w": _safe_float(wv), "loss": pt["loss"], "pTrue": pt["pTrue"], "pred": pt["pred"]})
         # One gradient step along this weight: w − lr·∂L/∂w
         w_step = w0 - lr * g
-        W[i, j] = w_step
+        Wflat[weight_index] = w_step
         loss_step = _eval_point(modules, nodes, edges, data_out, data_nid, loss_nid)["loss"]
-        W[i, j] = orig  # restore — leave the stored model unchanged
+        Wflat[weight_index] = orig  # restore — leave the stored model unchanged
 
     return {
         "nodeId": node_id,
         "displayName": _friendly_name(nodes[node_id]["type"]),
-        "coord": [i, j],
+        "coord": coord,
+        "weightShape": [int(d) for d in W.shape],
+        "numWeights": num_weights,
         "outDim": int(W.shape[0]),
-        "inDim": in_dim,
+        "inDim": int(W.shape[1]),
         "lr": lr,
         "optimizerType": opt_type,
         "sampleIdx": sample_idx,
