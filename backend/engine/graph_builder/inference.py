@@ -240,7 +240,16 @@ def infer_graph(graph_data: dict) -> dict:
     }
 
 
-def pick_tracked_samples(dataset, dataset_type: str, n: int = 4) -> list[dict]:
+def pick_tracked_samples(
+    dataset,
+    dataset_type: str,
+    n: int = 4,
+    *,
+    modules: dict | None = None,
+    nodes: dict | None = None,
+    edges: list | None = None,
+    order: list[str] | None = None,
+) -> list[dict]:
     """Pick N fixed samples from the dataset to track across epochs.
 
     Returns a list of dicts, each with:
@@ -249,11 +258,19 @@ def pick_tracked_samples(dataset, dataset_type: str, n: int = 4) -> list[dict]:
       - image: pixel data for display (if image dataset)
       - text: raw text (if text dataset)
       - input: the raw input tensor (for forwarding through the model)
+
+    When the (untrained) model context is supplied and the task is
+    classification, the pick is biased toward examples the fresh model gets
+    *wrong* — so the "over training" playback shows predictions flipping from
+    wrong → right instead of samples that were already correct at epoch 0.
     """
     import random
     from dataprep.data_loaders import DENORMALIZERS
 
-    indices = random.sample(range(len(dataset)), min(n, len(dataset)))
+    # Draw a larger candidate pool so we have room to prefer the hard ones.
+    can_bias = bool(modules and nodes and edges and order)
+    pool = min(len(dataset), max(n * 4, n)) if can_bias else min(n, len(dataset))
+    indices = random.sample(range(len(dataset)), pool)
     samples = []
 
     for idx in indices:
@@ -287,7 +304,62 @@ def pick_tracked_samples(dataset, dataset_type: str, n: int = 4) -> list[dict]:
 
         samples.append(sample)
 
-    return samples
+    if can_bias and len(samples) > n:
+        samples = _bias_toward_misclassified(
+            samples, modules, nodes, edges, order, dataset_type, n
+        )
+    return samples[:n]
+
+
+def _bias_toward_misclassified(
+    samples: list[dict],
+    modules: dict,
+    nodes: dict,
+    edges: list,
+    order: list[str],
+    dataset_type: str,
+    n: int,
+) -> list[dict]:
+    """Reorder a candidate pool so the fresh model's *mistakes* come first.
+
+    Probes the untrained model once. Non-classification tasks (no per-sample
+    predicted class) fall back to the original random order. Otherwise: most
+    confidently-wrong examples first (the most dramatic to watch flip), spread
+    across distinct true labels for variety, then topped up with the rest.
+    """
+    probes = probe_tracked_samples(samples, modules, nodes, edges, order, dataset_type)
+
+    tagged = []
+    for s, p in zip(samples, probes):
+        pred = p.get("predictedClass")
+        if pred is None or s.get("label") is None:
+            return samples  # not a classification task — keep random order
+        tagged.append(
+            {"sample": s, "label": s["label"], "wrong": pred != s["label"],
+             "conf": p.get("confidence") or 0.0}
+        )
+
+    # Most-confident wrong first; correct ones ordered least-confident first.
+    wrong = sorted((t for t in tagged if t["wrong"]), key=lambda t: t["conf"], reverse=True)
+    right = sorted((t for t in tagged if not t["wrong"]), key=lambda t: t["conf"])
+
+    picked: list[dict] = []
+    seen_labels: set[int] = set()
+    # First pass: one wrong example per distinct true label (variety).
+    for t in wrong:
+        if len(picked) >= n:
+            break
+        if t["label"] not in seen_labels:
+            picked.append(t)
+            seen_labels.add(t["label"])
+    # Fill remaining slots: more wrong ones, then correct ones as a fallback.
+    for t in wrong + right:
+        if len(picked) >= n:
+            break
+        if t not in picked:
+            picked.append(t)
+
+    return [t["sample"] for t in picked]
 
 
 def probe_tracked_samples(

@@ -233,14 +233,20 @@ def build_training_context(
         return train_dataset  # error dict
 
     # Pick tracked samples (probed each epoch — shown in the dashboard + the
-    # backprop "over training" playback).
-    tracked_samples = pick_tracked_samples(train_dataset, dataset_type, n=12)
+    # backprop "over training" playback). Passing the freshly-built model biases
+    # the pick toward examples it currently gets wrong, so the playback shows
+    # predictions flipping from wrong → right.
+    order = topological_sort(nodes, edges)
+    tracked_samples = pick_tracked_samples(
+        train_dataset, dataset_type, n=12,
+        modules=modules, nodes=nodes, edges=edges, order=order,
+    )
 
     return TrainingContext(
         graph_data=graph_data,
         nodes=nodes,
         edges=edges,
-        order=topological_sort(nodes, edges),
+        order=order,
         modules=modules,
         data_node=data_node,
         data_node_id=data_node["id"],
