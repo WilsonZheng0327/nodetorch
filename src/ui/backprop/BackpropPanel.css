@@ -1039,10 +1039,14 @@
   font-family: 'JetBrains Mono', monospace;
 }
 .bp-play-bar-lab {
-  width: 18px;
+  min-width: 18px;
+  max-width: 72px;
   text-align: right;
   color: #7f849c;
   flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .bp-play-bar-lab.true {
   color: #a6e3a1;

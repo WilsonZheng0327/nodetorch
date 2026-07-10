@@ -55,6 +55,7 @@ export function TrackedSamplesView({
 
   // Get sample info from the first epoch (images don't change)
   const firstProbes = progress[0].trackedSamples!;
+  const classNames = progress[0].classNames ?? null;
 
   return (
     <div className="tracked-samples-view">
@@ -66,6 +67,7 @@ export function TrackedSamplesView({
           probes={progress.map((ep) => ep.trackedSamples?.[sIdx])}
           epochs={progress.map((ep) => ep.epoch)}
           selectedEpoch={selectedEpoch}
+          classNames={classNames}
         />
       ))}
     </div>
@@ -77,13 +79,17 @@ function TrackedSampleRow({
   probes,
   epochs,
   selectedEpoch,
+  classNames,
 }: {
   sampleIdx: number;
   sample: TrackedSampleProbe;
   probes: (TrackedSampleProbe | undefined)[];
   epochs: number[];
   selectedEpoch: number | null;
+  classNames: string[] | null;
 }) {
+  const clsLabel = (c: number | null | undefined): string =>
+    c == null ? '?' : classNames && c < classNames.length ? classNames[c] : String(c);
   // The epoch in view: the slider selection (1-based) or the latest.
   const selIdx =
     selectedEpoch != null
@@ -108,7 +114,7 @@ function TrackedSampleRow({
         ) : (
           <div className="tracked-sample-no-img">#{sample.idx}</div>
         )}
-        <div className="tracked-sample-label">Label: {sample.label ?? '?'}</div>
+        <div className="tracked-sample-label">Label: {clsLabel(sample.label)}</div>
       </div>
 
       {/* Selected-epoch prediction — one horizontal bar that scrubs with the slider */}
@@ -120,7 +126,7 @@ function TrackedSampleRow({
               <span className="tracked-sample-latest">
                 {probe?.predictedClass != null ? (
                   <>
-                    Predicted: {probe.predictedClass} ({conf.toFixed(1)}%)
+                    Predicted: {clsLabel(probe.predictedClass)} ({conf.toFixed(1)}%)
                   </>
                 ) : (
                   'no data'
@@ -129,7 +135,7 @@ function TrackedSampleRow({
             </div>
             <div
               className="tracked-sample-hbar-track"
-              title={`Epoch ${epochNum}: class ${probe?.predictedClass ?? '?'} (${conf.toFixed(1)}%)`}
+              title={`Epoch ${epochNum}: class ${clsLabel(probe?.predictedClass)} (${conf.toFixed(1)}%)`}
             >
               <div
                 className={`tracked-sample-hbar-fill ${correct ? 'tracked-sample-bar-correct' : 'tracked-sample-bar-wrong'}`}

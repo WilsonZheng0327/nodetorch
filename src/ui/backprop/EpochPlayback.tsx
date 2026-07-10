@@ -45,6 +45,9 @@ export function EpochPlayback({ progress }: { progress: EpochData[] }) {
   const epoch = progress[epochIdx];
   const probes = epoch.trackedSamples ?? [];
   const isClassification = firstProbes.some((p) => p.probabilities?.length);
+  const classNames = progress[0].classNames ?? null;
+  const clsLabel = (c: number | null | undefined): string =>
+    c == null ? '?' : classNames && c < classNames.length ? classNames[c] : String(c);
 
   const play = () => {
     if (epochIdx >= last) setEpochIdx(0); // replay from the start
@@ -72,7 +75,13 @@ export function EpochPlayback({ progress }: { progress: EpochData[] }) {
 
       <div className="bp-play-samples">
         {firstProbes.map((s, i) => (
-          <SampleCard key={s.idx} image={s} probe={probes[i]} classification={isClassification} />
+          <SampleCard
+            key={s.idx}
+            image={s}
+            probe={probes[i]}
+            classification={isClassification}
+            clsLabel={clsLabel}
+          />
         ))}
       </div>
 
@@ -134,10 +143,12 @@ function SampleCard({
   image,
   probe,
   classification,
+  clsLabel,
 }: {
   image: TrackedSampleProbe;
   probe: TrackedSampleProbe | undefined;
   classification: boolean;
+  clsLabel: (c: number | null | undefined) => string;
 }) {
   const trueLabel = image.label;
   const pred = probe?.predictedClass;
@@ -159,12 +170,12 @@ function SampleCard({
         <SampleImage image={image} />
         <div className="bp-play-card-meta">
           <div className="bp-play-truth">
-            true <strong>{trueLabel ?? '?'}</strong>
+            true <strong>{clsLabel(trueLabel)}</strong>
           </div>
           {classification ? (
             pred != null ? (
               <div className={`bp-play-pred ${correct ? 'ok' : 'wrong'}`}>
-                pred <strong>{pred}</strong> {correct ? '✓' : '✗'}
+                pred <strong>{clsLabel(pred)}</strong> {correct ? '✓' : '✗'}
               </div>
             ) : (
               <div className="bp-play-pred">—</div>
@@ -183,7 +194,9 @@ function SampleCard({
             const isPred = c === pred;
             return (
               <div key={c} className="bp-play-bar-row">
-                <span className={`bp-play-bar-lab ${isTrue ? 'true' : ''}`}>{c}</span>
+                <span className={`bp-play-bar-lab ${isTrue ? 'true' : ''}`} title={clsLabel(c)}>
+                  {clsLabel(c)}
+                </span>
                 <div className="bp-play-bar-track">
                   <div
                     className={`bp-play-bar-fill ${isTrue ? 'true' : isPred ? 'pred' : ''}`}

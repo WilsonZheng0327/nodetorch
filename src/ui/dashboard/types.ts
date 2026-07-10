@@ -36,6 +36,7 @@ export interface EpochData {
   samples?: number;
   gradientFlow?: { name: string; norm: number; rms?: number }[];
   perClassAccuracy?: { cls: number; accuracy: number }[];
+  classNames?: string[];
   trackedSamples?: TrackedSampleProbe[];
   generatedSamples?: (number[][] | number[][][])[];
   dLoss?: number;

@@ -79,6 +79,7 @@ class EpochMessage(TypedDict):
     # Heavy payloads (see the TS types / producers for exact shape)
     gradientFlow: NotRequired[list[dict[str, Any]]]
     perClassAccuracy: NotRequired[list[dict[str, Any]]]
+    classNames: NotRequired[list[str]]  # dataset class labels, for index → name display
     trackedSamples: NotRequired[list[dict[str, Any]]]
     generatedSamples: NotRequired[list]
     nodeSnapshots: NotRequired[dict[str, Any]]  # stored separately on the frontend
@@ -587,6 +588,7 @@ def build_epoch_result(epoch, ctx, avg_loss, accuracy, val_loss, val_accuracy,
         "samples": total,
         "gradientFlow": gradient_flow,
         "perClassAccuracy": per_class_accuracy,
+        "classNames": CLASS_NAMES.get(ctx.dataset_type, []),
         "nodeSnapshots": node_snapshots,
         "trackedSamples": tracked_probes,
     }
