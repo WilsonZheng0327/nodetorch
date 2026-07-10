@@ -69,11 +69,60 @@ class ActivationInfo(TypedDict):
     sparsity: SafeFloat
 
 
+class PredictionInfo(TypedDict, total=False):
+    """A single-sample classifier prediction summary (softmax over logits).
+
+    `predictedClass`, `confidence`, and `probabilities` are always present;
+    `trueLabelProb` appears only when a true label is supplied and `topK` only
+    when `top_k > 0` (see prediction_from_logits)."""
+    predictedClass: int
+    confidence: SafeFloat
+    probabilities: list[SafeFloat]
+    trueLabelProb: SafeFloat
+    topK: list[dict]
+
+
 def _safe_float(v: float) -> SafeFloat:
     """Convert to JSON-safe float. NaN and Inf become None."""
     if math.isnan(v) or math.isinf(v):
         return None
     return v
+
+
+def prediction_from_logits(
+    logits: torch.Tensor,
+    true_label: int | None = None,
+    top_k: int = 0,
+) -> PredictionInfo | None:
+    """Turn classifier logits into a single-sample prediction summary.
+
+    Reads row 0 of a [batch, classes] tensor: softmax → predicted class, its
+    confidence, and the full probability vector. Returns None for non-2D output
+    (autoencoders, autoregressive 3D logits, etc). `true_label` adds
+    `trueLabelProb`; `top_k > 0` adds a sorted `topK` list of {index, value}.
+    """
+    if not isinstance(logits, torch.Tensor) or logits.dim() != 2:
+        return None
+    probs = torch.softmax(logits.detach(), dim=1)[0]
+    n_classes = probs.numel()
+    pred_class = int(probs.argmax())
+    out: PredictionInfo = {
+        "predictedClass": pred_class,
+        "confidence": _safe_float(float(probs[pred_class])),
+        "probabilities": [_safe_float(float(p)) for p in probs.tolist()],
+    }
+    if true_label is not None:
+        out["trueLabelProb"] = (
+            _safe_float(float(probs[true_label])) if 0 <= true_label < n_classes else None
+        )
+    if top_k > 0:
+        k = min(top_k, n_classes)
+        top = torch.topk(probs, k)
+        out["topK"] = [
+            {"index": int(i), "value": _safe_float(float(v))}
+            for v, i in zip(top.values.tolist(), top.indices.tolist())
+        ]
+    return out
 
 
 def tensor_info(t: torch.Tensor) -> TensorInfo:

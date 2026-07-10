@@ -43,6 +43,7 @@ from engine.graph_builder import (
     has_trained_model,
     get_trained_modules,
     _safe_float,
+    prediction_from_logits,
     OPTIMIZER_NODES,
     LOSS_NODES,
     ALL_LOSS_NODES,
@@ -807,31 +808,6 @@ def _optimizer_lr(nodes: dict) -> tuple[float, str | None]:
     return 0.01, None
 
 
-def _prediction_from_logits(logits, true_label: int | None, class_names: list | None) -> dict | None:
-    """Turn classifier logits [1, C] into a prediction summary. None for non-2D outputs."""
-    if not isinstance(logits, torch.Tensor) or logits.dim() != 2:
-        return None
-    probs = torch.softmax(logits.detach(), dim=1)[0]
-    n_classes = probs.numel()
-    pred_class = int(probs.argmax())
-    k = min(5, n_classes)
-    top = torch.topk(probs, k)
-    return {
-        "predictedClass": pred_class,
-        "confidence": _safe_float(float(probs[pred_class])),
-        "trueLabelProb": (
-            _safe_float(float(probs[true_label]))
-            if true_label is not None and 0 <= true_label < n_classes
-            else None
-        ),
-        "probabilities": [_safe_float(float(p)) for p in probs.tolist()],
-        "topK": [
-            {"index": int(i), "value": _safe_float(float(v))}
-            for v, i in zip(top.values.tolist(), top.indices.tolist())
-        ],
-    }
-
-
 @_no_cudnn
 def run_one_step(graph_data: dict, sample_idx: int | None = None) -> dict:
     """Apply ONE gradient-descent step (W ← W − lr·∂L/∂W) on a single sample and
@@ -874,8 +850,8 @@ def run_one_step(graph_data: dict, sample_idx: int | None = None) -> dict:
     class_names = CLASS_NAMES.get(nodes[data_nid]["type"]) if data_nid else None
 
     loss_before = _safe_float(float(loss_tensor.detach().item()))
-    pred_before = _prediction_from_logits(
-        results.get(pred_nid, {}).get("out") if pred_nid else None, true_label, class_names
+    pred_before = prediction_from_logits(
+        results.get(pred_nid, {}).get("out") if pred_nid else None, true_label, top_k=5
     )
 
     # Snapshot every learnable parameter (clone — these tensors are the live weights)
@@ -927,8 +903,8 @@ def run_one_step(graph_data: dict, sample_idx: int | None = None) -> dict:
         _, loss_nid2, pred_nid2 = _find_key_nodes(nodes2, edges2)
         loss_after_tensor = results_after.get(loss_nid2, {}).get("out") if loss_nid2 else None
         loss_after = _safe_float(float(loss_after_tensor.detach().item())) if loss_after_tensor is not None else None
-        pred_after = _prediction_from_logits(
-            results_after.get(pred_nid2, {}).get("out") if pred_nid2 else None, true_label, class_names
+        pred_after = prediction_from_logits(
+            results_after.get(pred_nid2, {}).get("out") if pred_nid2 else None, true_label, top_k=5
         )
     finally:
         # Restore the original weights so the stored model is unchanged

@@ -17,7 +17,7 @@ from engine.graph_builder._state import (
     get_device, has_trained_model, get_trained_modules, ensure_trained_model, _last_run,
 )
 from engine.graph_builder.build import topological_sort
-from engine.graph_builder.stats import _safe_float
+from engine.graph_builder.stats import _safe_float, prediction_from_logits
 from engine.graph_builder.runners import RunContext, execute, describe_inference
 
 
@@ -371,13 +371,10 @@ def probe_tracked_samples(
             if pred_nid and pred_nid in batch_results:
                 pred_out = batch_results[pred_nid].get("out")
                 if isinstance(pred_out, torch.Tensor):
-                    if pred_out.dim() == 2:
-                        # Classification: softmax probabilities
-                        probs = torch.softmax(pred_out, dim=1)[0]
-                        probe["probabilities"] = [_safe_float(float(p)) for p in probs.tolist()]
-                        pred_class = int(probs.argmax())
-                        probe["predictedClass"] = pred_class
-                        probe["confidence"] = _safe_float(float(probs[pred_class]))
+                    pred = prediction_from_logits(pred_out)
+                    if pred is not None:
+                        # Classification: softmax probabilities + predicted class
+                        probe.update(pred)
                     else:
                         # Non-classification (autoencoder etc): just report output norm
                         probe["outputNorm"] = _safe_float(float(pred_out.detach().float().norm()))

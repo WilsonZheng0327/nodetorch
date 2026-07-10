@@ -35,6 +35,7 @@ from engine.graph_builder.constants import (
 from engine.graph_builder.build import gather_inputs, build_subgraph_module
 from engine.graph_builder.stats import (
     tensor_info, _safe_float, module_weight_info, batchnorm_info, activation_info,
+    prediction_from_logits,
 )
 from engine.node_builders import NODE_BUILDERS, TorchModuleBuilder
 from dataprep.data_loaders import DATA_LOADERS, DENORMALIZERS
@@ -493,13 +494,7 @@ def describe_inference(node: dict, exe: Execution, edges: list, nodes: dict) -> 
         for e in edges
     )
     if is_final and output.dim() == 2:
-        probs = torch.softmax(output, dim=1)[0]
-        predicted_class = int(probs.argmax())
-        meta["prediction"] = {
-            "predictedClass": predicted_class,
-            "confidence": _safe_float(float(probs[predicted_class])),
-            "probabilities": [_safe_float(float(p)) for p in probs],
-        }
+        meta["prediction"] = prediction_from_logits(output)
     elif is_final and output.dim() == 4:
         _add_image_preview(meta, output[0], node_type)
         meta["reconstruction"] = True

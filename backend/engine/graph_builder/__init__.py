@@ -26,7 +26,7 @@ from engine.graph_builder._state import (
 )
 from engine.graph_builder.stats import (
     _safe_float, tensor_info, module_weight_info, batchnorm_info,
-    gradient_info, activation_info,
+    gradient_info, activation_info, prediction_from_logits,
 )
 from engine.graph_builder.build import (
     topological_sort, gather_inputs, SubGraphModule,
