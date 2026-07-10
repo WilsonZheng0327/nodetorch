@@ -6,16 +6,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { WiggleResult } from './types';
 import { apiUrl } from '../../api/base';
-
-const fmt = (v: number | null | undefined, d = 4): string => {
-  if (v === null || v === undefined) return '—';
-  if (v === 0) return '0';
-  const a = Math.abs(v);
-  if (a < 1e-3 || a >= 1e6) return v.toExponential(2);
-  return v.toFixed(d);
-};
-const signed = (v: number | null | undefined, d = 4): string =>
-  v === null || v === undefined ? '—' : (v >= 0 ? '+' : '') + fmt(v, d);
+import { fmt, signed } from './format';
 
 /** Linear-interpolate the loss at weight value w from the sampled curve. */
 function lossAt(curve: { w: number; loss: number | null }[], w: number): number | null {

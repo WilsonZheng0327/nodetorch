@@ -5,16 +5,7 @@
 // is left out on purpose — the point is the flow, not the numbers.
 
 import type { Mechanism } from './types';
-
-const fmt = (v: number | null | undefined, d = 4): string => {
-  if (v === null || v === undefined) return '—';
-  if (v === 0) return '0';
-  const a = Math.abs(v);
-  if (a < 1e-3 || a >= 1e6) return v.toExponential(2);
-  return v.toFixed(d);
-};
-const signed = (v: number | null | undefined, d = 4): string =>
-  v === null || v === undefined ? '—' : (v >= 0 ? '+' : '') + fmt(v, d);
+import { signed } from './format';
 
 export function MechanismViz({
   mechanism,
