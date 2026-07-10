@@ -4,8 +4,9 @@
 // scrubber (play / step / rewind) so you can fast-forward and rewind through
 // training and see how each example's prediction changes.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { EpochData, TrackedSampleProbe } from '../dashboard/types';
+import { PixelCanvas } from '../PixelCanvas';
 
 export function EpochPlayback({ progress }: { progress: EpochData[] }) {
   const hasData = progress.length > 0 && !!progress[0].trackedSamples?.length;
@@ -200,40 +201,8 @@ function SampleCard({
 }
 
 function SampleImage({ image }: { image: TrackedSampleProbe }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = ref.current;
-    const pixels = image.imagePixels;
-    if (!canvas || !pixels) return;
-    const h = pixels.length;
-    const firstRow = pixels[0] as number[] | number[][];
-    const isRGB = Array.isArray((firstRow as number[][])[0]);
-    const w = isRGB ? (firstRow as number[][]).length : (firstRow as number[]).length;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const data = ctx.createImageData(w, h);
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        if (isRGB) {
-          const px = (pixels as number[][][])[y][x];
-          data.data[idx] = px[0];
-          data.data[idx + 1] = px[1];
-          data.data[idx + 2] = px[2];
-        } else {
-          const v = (pixels as number[][])[y][x];
-          data.data[idx] = v;
-          data.data[idx + 1] = v;
-          data.data[idx + 2] = v;
-        }
-        data.data[idx + 3] = 255;
-      }
-    ctx.putImageData(data, 0, 0);
-  }, [image.imagePixels]);
   if (!image.imagePixels) return <div className="bp-play-noimg">#{image.idx}</div>;
-  return <canvas ref={ref} className="bp-play-img" />;
+  return <PixelCanvas pixels={image.imagePixels} className="bp-play-img" />;
 }
 
 /** Training curve — loss (falling) and accuracy (rising) across epochs, with a

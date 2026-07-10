@@ -2,9 +2,9 @@
 // Only shows feature map previews for layers that produce spatial data.
 // Other layers just show an enlarged name and shape.
 
-import { useRef, useEffect } from 'react';
 import type { Stage, Transformation, FeatureMaps } from './types';
 import { compactShape } from './insights';
+import { PixelCanvas } from '../PixelCanvas';
 
 interface Props {
   stage: Stage;
@@ -29,7 +29,7 @@ export function StageCard({ stage, active, onClick }: Props) {
       </div>
       {hasPreview && (
         <div className="stage-card-preview">
-          <MiniFeatureMap pixels={fmaps!.maps[0]} />
+          <PixelCanvas pixels={fmaps!.maps[0]} className="stage-card-canvas" />
         </div>
       )}
       <div className="stage-card-shape">{compactShape(stage.outputShape)}</div>
@@ -55,31 +55,4 @@ function extractOutputFeatureMaps(t: Transformation): FeatureMaps | undefined {
     default:
       return undefined;
   }
-}
-
-function MiniFeatureMap({ pixels }: { pixels: number[][] }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || pixels.length === 0) return;
-    const h = pixels.length;
-    const w = pixels[0].length;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const data = ctx.createImageData(w, h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        const v = pixels[y][x];
-        data.data[idx] = v;
-        data.data[idx + 1] = v;
-        data.data[idx + 2] = v;
-        data.data[idx + 3] = 255;
-      }
-    }
-    ctx.putImageData(data, 0, 0);
-  }, [pixels]);
-  return <canvas ref={canvasRef} className="stage-card-canvas" />;
 }

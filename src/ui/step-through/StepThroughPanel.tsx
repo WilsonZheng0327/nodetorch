@@ -1,7 +1,7 @@
 // StepThroughPanel — full-screen overlay.
 // Architecture: sample is top-level, forward/backward are views of the same sample.
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type {
   StepThroughResult,
   StepThroughMode,
@@ -13,6 +13,7 @@ import { StageTimeline } from './StageTimeline';
 import { StageDetail } from './StageDetail';
 import './StepThroughPanel.css';
 import { apiUrl } from '../../api/base';
+import { PixelCanvas } from '../PixelCanvas';
 
 interface Props {
   open: boolean;
@@ -508,50 +509,9 @@ function DenoiseView({
       </div>
       <div className="denoise-samples">
         {step.pixels.map((pixels, i) => (
-          <DenoiseImage key={i} pixels={pixels} channels={channels} />
+          <PixelCanvas key={i} pixels={pixels} channels={channels} className="denoise-sample-img" />
         ))}
       </div>
     </div>
   );
-}
-
-function DenoiseImage({
-  pixels,
-  channels,
-}: {
-  pixels: number[][] | number[][][];
-  channels: number;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || pixels.length === 0) return;
-    const h = pixels.length;
-    const firstRow = pixels[0];
-    const isRGB = Array.isArray(firstRow[0]);
-    const w = isRGB ? (firstRow as number[][]).length : (firstRow as number[]).length;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const data = ctx.createImageData(w, h);
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        if (isRGB) {
-          const px = (pixels as number[][][])[y][x];
-          data.data[idx] = px[0];
-          data.data[idx + 1] = px[1];
-          data.data[idx + 2] = px[2];
-        } else {
-          const v = (pixels as number[][])[y][x];
-          data.data[idx] = v;
-          data.data[idx + 1] = v;
-          data.data[idx + 2] = v;
-        }
-        data.data[idx + 3] = 255;
-      }
-    ctx.putImageData(data, 0, 0);
-  }, [pixels, channels]);
-  return <canvas ref={canvasRef} className="denoise-sample-img" />;
 }
