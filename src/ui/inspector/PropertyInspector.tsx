@@ -44,6 +44,7 @@ export function PropertyInspector({
         {datasetDetailType && (
           <DatasetDetail
             datasetType={datasetDetailType}
+            properties={node?.properties}
             augOptions={node?.properties as any}
             onClose={() => setDatasetDetailType(null)}
           />
@@ -64,6 +65,7 @@ export function PropertyInspector({
       {datasetDetailType && (
         <DatasetDetail
           datasetType={datasetDetailType}
+          properties={node.properties}
           augOptions={node.properties as any}
           onClose={() => setDatasetDetailType(null)}
         />

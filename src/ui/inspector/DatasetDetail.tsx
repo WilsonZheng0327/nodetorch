@@ -36,11 +36,12 @@ interface AugPreview {
 
 interface Props {
   datasetType: string;
+  properties?: Record<string, unknown>;
   augOptions?: AugOptions;
   onClose: () => void;
 }
 
-export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
+export function DatasetDetail({ datasetType, properties, augOptions, onClose }: Props) {
   const [info, setInfo] = useState<DatasetInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,10 +57,18 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
+  // POST carries the node's properties, so a custom dataset (whose behavior lives
+  // in its properties) resolves correctly; built-ins simply ignore them. Re-fetch
+  // when the type or the (serialized) properties change.
+  const propsKey = JSON.stringify(properties ?? {});
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(apiUrl(`/dataset/${datasetType}`))
+    fetch(apiUrl('/dataset-detail'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: datasetType, properties: properties ?? {} }),
+    })
       .then((r) => r.json())
       .then((data) => {
         if (data.status === 'ok') {
@@ -70,7 +79,8 @@ export function DatasetDetail({ datasetType, augOptions, onClose }: Props) {
       })
       .catch(() => setError('Cannot connect to backend'))
       .finally(() => setLoading(false));
-  }, [datasetType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasetType, propsKey]);
 
   // Reset page when search changes
   useEffect(() => {
