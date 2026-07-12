@@ -38,6 +38,7 @@ from engine.graph_builder import (
     collect_misclassifications,
 )
 from dataprep.data_loaders import DATA_LOADERS, TRAIN_DATASETS, CLASS_NAMES, get_raw_texts, BPETextDataset, BPELMDataset
+from dataprep.resolve import resolve_train_dataset, resolve_class_names, resolve_denormalizer, is_custom
 from dataprep.bpe import get_bpe_tokenizer
 from engine.forward_utils import run_forward_pass
 
@@ -106,6 +107,8 @@ class TrainingContext:
     loss_node_ids: list[str]        # list for GAN (multiple losses)
     optimizer_nodes: list[dict]     # list for GAN (multiple optimizers)
     dataset_type: str               # e.g. "data.mnist"
+    class_names: list[str]          # resolved once (built-in registry or custom spec)
+    denorm: callable | None         # (img[C,H,W] → img) preview de-normalizer, or None
 
     # Hyperparameters (from primary optimizer)
     epochs: int
@@ -220,18 +223,24 @@ def build_training_context(
             tokenizer_config = n.get("properties", {})
             break
 
-    # Load dataset (swap in BPE dataset if tokenizer is BPE)
+    # Load dataset. A BPE tokenizer node swaps in a BPE-encoded dataset — but the
+    # custom dataset does its own tokenization (per its spec), so it never takes
+    # the node-BPE path.
     dataset_type = data_node["type"]
-    if tokenizer_type == "ml.preprocessing.tokenizer_bpe":
+    if tokenizer_type == "ml.preprocessing.tokenizer_bpe" and not is_custom(data_node):
         train_dataset, train_loader, val_loader = load_bpe_dataset(
             dataset_type, data_node, props, batch_size, tokenizer_config,
         )
     else:
         train_dataset, train_loader, val_loader = load_dataset(
-            dataset_type, data_node, props, batch_size,
+            data_node, props, batch_size,
         )
     if isinstance(train_dataset, dict):
         return train_dataset  # error dict
+
+    # Resolve display metadata once (built-in registry, or custom spec).
+    class_names = resolve_class_names(data_node)
+    denorm = resolve_denormalizer(data_node)
 
     # Pick tracked samples (probed each epoch — shown in the dashboard + the
     # backprop "over training" playback). Passing the freshly-built model biases
@@ -254,6 +263,8 @@ def build_training_context(
         loss_node_ids=loss_node_ids,
         optimizer_nodes=optimizer_nodes,
         dataset_type=dataset_type,
+        class_names=class_names,
+        denorm=denorm,
         epochs=epochs,
         batch_size=batch_size,
         grad_clip_norm=grad_clip_norm,
@@ -273,23 +284,14 @@ def build_training_context(
 # Shared utilities
 # ============================================================================
 
-def load_dataset(dataset_type, data_node, optimizer_props, batch_size):
+def load_dataset(data_node, optimizer_props, batch_size):
     """Load dataset and create train/val DataLoaders.
 
     Returns (dataset, train_loader, val_loader) or an error dict.
     """
-    dataset_builder = TRAIN_DATASETS.get(dataset_type)
-    if not dataset_builder:
-        return {"error": f"Training not supported for dataset: {dataset_type}"}
-
-    data_props = data_node.get("properties", {})
-    sig = inspect.signature(dataset_builder)
-    if sig.parameters:
-        train_dataset = dataset_builder(**{
-            k: data_props[k] for k in sig.parameters if k in data_props
-        })
-    else:
-        train_dataset = dataset_builder()
+    train_dataset = resolve_train_dataset(data_node)
+    if train_dataset is None:
+        return {"error": f"Training not supported for dataset: {data_node['type']}"}
 
     val_split = optimizer_props.get("valSplit", 0.1)
     val_loader = None
@@ -588,7 +590,7 @@ def build_epoch_result(epoch, ctx, avg_loss, accuracy, val_loss, val_accuracy,
         "samples": total,
         "gradientFlow": gradient_flow,
         "perClassAccuracy": per_class_accuracy,
-        "classNames": CLASS_NAMES.get(ctx.dataset_type, []),
+        "classNames": ctx.class_names,
         "nodeSnapshots": node_snapshots,
         "trackedSamples": tracked_probes,
     }
