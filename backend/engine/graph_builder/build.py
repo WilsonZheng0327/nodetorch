@@ -17,6 +17,10 @@ from engine.graph_builder.constants import (
 )
 from engine.graph_builder._state import get_device
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph, SerializedGraphData
+
 
 def topological_sort(nodes: dict, edges: list) -> list[str]:
     """Kahn's algorithm — same logic as the TypeScript version."""
@@ -149,7 +153,7 @@ class SubGraphModule(nn.Module):
         return results.get(output_node_id, {}) if output_node_id else {}
 
 
-def build_subgraph_module(subgraph_data: dict, parent_input_shapes: dict) -> SubGraphModule:
+def build_subgraph_module(subgraph_data: "SerializedGraphData", parent_input_shapes: dict) -> SubGraphModule:
     """Build a SubGraphModule from a serialized subgraph."""
     nodes = {n["id"]: n for n in subgraph_data["nodes"]}
     edges = subgraph_data["edges"]
@@ -219,7 +223,7 @@ def build_subgraph_module(subgraph_data: dict, parent_input_shapes: dict) -> Sub
     return SubGraphModule(inner_modules, nodes, edges, order)
 
 
-def build_modules(graph_data: dict) -> dict[str, nn.Module]:
+def build_modules(graph_data: "SerializedGraph") -> dict[str, nn.Module]:
     """Build modules from the graph without storing results or metadata.
 
     Runs a minimal forward pass internally (needed to determine input shapes

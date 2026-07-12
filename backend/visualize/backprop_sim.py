@@ -58,8 +58,12 @@ from dataprep.resolve import resolve_class_names, resolve_denormalizer, resolve_
 from engine.forward_utils import execute_node
 from visualize.node_viz import get_backward_viz, compact_stats_with_norm, param_grad_stats
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
 
-def simulate_backprop(graph_data: dict, batch_size: int = 4) -> dict:
+
+def simulate_backprop(graph_data: "SerializedGraph", batch_size: int = 4) -> dict:
     """Run a single forward+backward pass and return per-node gradient magnitudes
     in topological order. Frontend reverses this for the animation."""
     # Build modules (fresh or trained — doesn't matter much for visualization)
@@ -192,7 +196,7 @@ def _retain_grad_recursive(modules: dict) -> None:
             _retain_grad_recursive(dict(mod.inner_modules))
 
 
-def _loss_for_sample(graph_data: dict, sample_idx: int) -> float | None:
+def _loss_for_sample(graph_data: "SerializedGraph", sample_idx: int) -> float | None:
     """Forward-only pass on one sample with trained weights; return its loss."""
     try:
         _, nodes, _, results = _build_with_trained(graph_data, sample_idx=sample_idx, train_mode=False)
@@ -210,7 +214,7 @@ def _loss_for_sample(graph_data: dict, sample_idx: int) -> float | None:
         return None
 
 
-def _pick_hard_sample(graph_data: dict, k: int = 40, hard_enough: float = 1.0) -> int | None:
+def _pick_hard_sample(graph_data: "SerializedGraph", k: int = 40, hard_enough: float = 1.0) -> int | None:
     """Scan up to k random candidates and return the highest-loss sample index.
 
     A well-trained classifier gets most random samples right (near-0 loss), so its
@@ -355,7 +359,7 @@ def _linear_mechanism(module, out_grad, in_grad) -> dict | None:
     }
 
 
-def _sample_of_class(graph_data: dict, filter_label: int) -> int | None:
+def _sample_of_class(graph_data: "SerializedGraph", filter_label: int) -> int | None:
     """Resolve a random sample index belonging to the given class."""
     from dataprep.data_loaders import load_sample_by_label
 
@@ -372,7 +376,7 @@ def _sample_of_class(graph_data: dict, filter_label: int) -> int | None:
 
 @_no_cudnn
 def run_backward_step_through(
-    graph_data: dict, sample_idx: int | None = None, filter_label: int | None = None
+    graph_data: "SerializedGraph", sample_idx: int | None = None, filter_label: int | None = None
 ) -> dict:
     """Run a forward+backward pass and return rich per-node backward stages.
 
@@ -627,7 +631,7 @@ def _forward_pass(modules: dict, nodes: dict, edges: list) -> dict:
     return results
 
 
-def _build_with_trained(graph_data: dict, sample_idx: int | None = None, train_mode: bool = True) -> tuple:
+def _build_with_trained(graph_data: "SerializedGraph", sample_idx: int | None = None, train_mode: bool = True) -> tuple:
     """Build modules using trained weights and run forward pass.
 
     train_mode=False runs the modules in eval() mode (dropout off, BN frozen) so a
@@ -809,7 +813,7 @@ def _optimizer_lr(nodes: dict) -> tuple[float, str | None]:
 
 
 @_no_cudnn
-def run_one_step(graph_data: dict, sample_idx: int | None = None) -> dict:
+def run_one_step(graph_data: "SerializedGraph", sample_idx: int | None = None) -> dict:
     """Apply ONE gradient-descent step (W ← W − lr·∂L/∂W) on a single sample and
     report the before/after effect: loss, prediction, and per-layer weight change.
 
@@ -978,7 +982,7 @@ def _unravel_index(flat: int, shape: tuple[int, ...]) -> list[int]:
 
 @_no_cudnn
 def run_weight_wiggle(
-    graph_data: dict,
+    graph_data: "SerializedGraph",
     node_id: str,
     sample_idx: int | None = None,
     weight_index: int | None = None,

@@ -18,6 +18,9 @@ GAN_NOISE_TYPE = "ml.gan.noise_input"
 # Diffusion-specific node types
 DIFFUSION_SCHEDULER_TYPE = "ml.diffusion.noise_scheduler"
 DIFFUSION_EMBED_TYPE = "ml.diffusion.timestep_embed"
+# Sequence pooling: a single-input reducer that also accepts an OPTIONAL second
+# "mask" input (token ids / padding mask) so it can pool over real positions only.
+SEQUENCE_POOL_TYPE = "ml.structural.sequence_pool"
 SUBGRAPH_TYPE = "subgraph.block"
 SENTINEL_INPUT = "subgraph.input"
 SENTINEL_OUTPUT = "subgraph.output"

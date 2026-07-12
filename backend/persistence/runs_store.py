@@ -18,6 +18,10 @@ import time
 
 from paths import STORAGE_DIR
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
+
 RUNS_DIR = STORAGE_DIR / "runs"
 RUNS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -77,7 +81,7 @@ def delete_run(run_id: str) -> bool:
 
 def build_run_record(
     *,
-    graph_data: dict,
+    graph_data: "SerializedGraph",
     epoch_results: list[dict],
     optimizer_props: dict,
     data_node: dict,

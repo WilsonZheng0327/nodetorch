@@ -21,6 +21,10 @@ from engine.forward_utils import run_forward_pass
 from dataprep.data_loaders import get_shakespeare_vocab, LM_DATASET_TYPES, get_raw_texts
 from dataprep.bpe import get_bpe_tokenizer
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
+
 TOKENIZER_TYPES = {
     "ml.preprocessing.tokenizer_char",
     "ml.preprocessing.tokenizer_word",
@@ -48,7 +52,7 @@ def _get_dataset_type(nodes: dict) -> str | None:
 
 
 def generate_text(
-    graph_data: dict,
+    graph_data: "SerializedGraph",
     prompt: str = "",
     max_tokens: int = 200,
     temperature: float = 0.8,

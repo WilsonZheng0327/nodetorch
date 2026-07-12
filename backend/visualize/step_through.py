@@ -31,9 +31,13 @@ from dataprep.data_loaders import DATA_LOADERS, load_sample_by_label
 from dataprep.resolve import resolve_class_names, resolve_denormalizer, is_custom
 from visualize.node_viz import get_forward_viz
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
+
 
 def run_step_through(
-    graph_data: dict,
+    graph_data: "SerializedGraph",
     filter_label: int | None = None,
     sample_idx: int | None = None,
 ) -> dict:
@@ -107,7 +111,7 @@ def run_step_through(
 
 # --- Standard forward pass ---
 
-def _forward_with_trained(graph_data, filter_label=None, sample_idx=None):
+def _forward_with_trained(graph_data: "SerializedGraph", filter_label=None, sample_idx=None):
     trained = get_trained_modules()
     graph = graph_data["graph"]
     nodes = {n["id"]: n for n in graph["nodes"]}
@@ -154,7 +158,7 @@ def _forward_with_trained(graph_data, filter_label=None, sample_idx=None):
 
 # --- Diffusion-aware forward pass ---
 
-def _forward_diffusion(graph_data, filter_label=None, sample_idx=None):
+def _forward_diffusion(graph_data: "SerializedGraph", filter_label=None, sample_idx=None):
     """Diffusion step-through: add noise at a random timestep, run model to predict noise."""
     trained = get_trained_modules()
     graph = graph_data["graph"]
@@ -239,7 +243,7 @@ def _forward_diffusion(graph_data, filter_label=None, sample_idx=None):
 
 # --- GAN-aware forward pass ---
 
-def _forward_gan(graph_data, filter_label=None, sample_idx=None):
+def _forward_gan(graph_data: "SerializedGraph", filter_label=None, sample_idx=None):
     """GAN step-through: runs generator, then discriminator on real AND fake.
 
     1. Load real image from data node

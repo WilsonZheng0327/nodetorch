@@ -6,7 +6,7 @@ All training loop plugins use these building blocks. Adding a new paradigm
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any, NotRequired, TypedDict
+from typing import Any, NotRequired, TypedDict, TYPE_CHECKING
 import logging
 import threading
 import time
@@ -41,6 +41,12 @@ from dataprep.data_loaders import DATA_LOADERS, TRAIN_DATASETS, CLASS_NAMES, get
 from dataprep.resolve import resolve_train_dataset, resolve_class_names, resolve_denormalizer, is_custom
 from dataprep.bpe import get_bpe_tokenizer
 from engine.forward_utils import run_forward_pass
+
+# TYPE_CHECKING is False at runtime, True only under a type checker — so this
+# import is skipped when the app runs (no import cost, no circular-import risk),
+# while `graph_data: SerializedGraph` still resolves for hovers and checks.
+if TYPE_CHECKING:
+    from serialization import SerializedGraph
 
 
 # ============================================================================
@@ -91,7 +97,7 @@ class TrainingContext:
     """Everything a training loop needs. Built once, passed to the loop function."""
 
     # Raw graph data (for run history serialization)
-    graph_data: dict
+    graph_data: SerializedGraph
 
     # Parsed graph
     nodes: dict                     # node_id → node dict
@@ -150,7 +156,7 @@ class TrainingResult:
 # ============================================================================
 
 def build_training_context(
-    graph_data: dict,
+    graph_data: SerializedGraph,
     on_epoch=None,
     on_batch=None,
     cancel_event=None,

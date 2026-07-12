@@ -11,9 +11,13 @@ from export.model import _generate_model_class, _generate_subgraph_class
 from export.templates import _POSITIONAL_ENCODING_CLASS, _TOKENIZER_CLASS
 from export.training_loops import _autoregressive_training_loop, _diffusion_training_loop, _gan_training_loop, _standard_classification_loop, _standard_reconstruction_loop, _vae_training_loop
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
+
 # ─── Main export function ─────────────────────────────────────────────────────
 
-def export_to_python(graph_data: dict) -> str:
+def export_to_python(graph_data: "SerializedGraph") -> str:
     """Generate a standalone Python file from a NodeTorch graph.
 
     Args:

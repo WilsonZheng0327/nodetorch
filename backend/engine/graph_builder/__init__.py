@@ -15,7 +15,7 @@
 from engine.graph_builder.constants import (
     LOSS_NODES, OPTIMIZER_NODES, MULTI_INPUT_NODES, ALL_LOSS_NODES,
     GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE, DIFFUSION_EMBED_TYPE,
-    SUBGRAPH_TYPE, SENTINEL_INPUT, SENTINEL_OUTPUT,
+    SEQUENCE_POOL_TYPE, SUBGRAPH_TYPE, SENTINEL_INPUT, SENTINEL_OUTPUT,
 )
 from engine.graph_builder._state import (
     get_device, set_device, get_device_name,
@@ -39,8 +39,15 @@ from engine.graph_builder.inference import (
     pick_tracked_samples, probe_tracked_samples, collect_misclassifications,
 )
 
+from typing import TYPE_CHECKING
+# TYPE_CHECKING is False at runtime, True only under a type checker — so this
+# import is skipped when the app runs (no import cost, no circular-import risk),
+# while `graph_data: SerializedGraph` still resolves for hovers and checks.
+if TYPE_CHECKING:
+    from serialization import SerializedGraph  # noqa: F401  (hover-doc type only)
 
-def train_graph(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=None) -> dict:
+
+def train_graph(graph_data: "SerializedGraph", on_epoch=None, on_batch=None, cancel_event=None) -> dict:
     """Run a training loop. Delegates to the training plugin system.
 
     Auto-detects the training paradigm (standard, GAN, diffusion) from node

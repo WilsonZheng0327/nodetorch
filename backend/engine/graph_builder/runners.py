@@ -30,7 +30,7 @@ from engine.graph_builder._state import get_device
 from engine.graph_builder.constants import (
     LOSS_NODES, OPTIMIZER_NODES, MULTI_INPUT_NODES, ALL_LOSS_NODES,
     GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE, DIFFUSION_EMBED_TYPE,
-    SUBGRAPH_TYPE, SENTINEL_INPUT, SENTINEL_OUTPUT,
+    SEQUENCE_POOL_TYPE, SUBGRAPH_TYPE, SENTINEL_INPUT, SENTINEL_OUTPUT,
 )
 from engine.graph_builder.build import gather_inputs, build_subgraph_module
 from engine.graph_builder.stats import (
@@ -237,6 +237,23 @@ def execute_subgraph(node, ctx: RunContext) -> Execution:
     return Execution(kind="subgraph", module=sg_module, outputs={"out": primary}, primary=primary)
 
 
+def execute_sequence_pool(node, ctx: RunContext) -> Execution:
+    """Sequence pool: single "in" plus an OPTIONAL "mask" (token ids / padding
+    mask) so pooling can ignore pad positions. Falls back to unmasked when no
+    mask edge is connected."""
+    builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
+    if not builder:
+        return _err(f"Unknown node type: {node['type']}")
+    inputs = gather_inputs(node["id"], ctx.edges, ctx.results)
+    if "in" not in inputs:
+        return _err("No input connected")
+    input_shapes = {k: list(v.shape) for k, v in inputs.items()}
+    module = ctx.get_nn_module(node, lambda: builder(node["properties"], input_shapes=input_shapes))
+    raw = module(inputs["in"], inputs.get("mask"))
+    ctx.results[node["id"]] = {"out": raw}
+    return Execution(kind="layer", module=module, outputs={"out": raw}, primary=raw)
+
+
 def execute_layer(node, ctx: RunContext) -> Execution:
     """Default: a regular single-input layer (conv, linear, activation, …)."""
     builder: TorchModuleBuilder | None = NODE_BUILDERS.get(node["type"])
@@ -273,6 +290,7 @@ _register([DIFFUSION_SCHEDULER_TYPE], execute_diffusion_scheduler)
 _register([DIFFUSION_EMBED_TYPE], execute_diffusion_embed)
 _register(LOSS_NODES, execute_loss)
 _register(MULTI_INPUT_NODES, execute_multi_input)
+_register([SEQUENCE_POOL_TYPE], execute_sequence_pool)
 _register([SUBGRAPH_TYPE], execute_subgraph)
 
 

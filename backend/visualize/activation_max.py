@@ -31,9 +31,13 @@ from engine.graph_builder import (
 from dataprep.data_loaders import DATA_LOADERS
 from engine.forward_utils import execute_node
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
+
 
 def activation_maximization(
-    graph_data: dict,
+    graph_data: "SerializedGraph",
     target_node_id: str,
     num_filters: int = 8,
     iterations: int = 25,

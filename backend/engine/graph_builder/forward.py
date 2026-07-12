@@ -6,6 +6,8 @@ for later layer-detail queries. ``inspect_graph`` wraps it in ``no_grad`` for
 the /forward endpoint. This is the inspector pass, not the training forward.
 """
 
+from typing import TYPE_CHECKING
+
 import torch
 import torch.nn as nn
 
@@ -13,8 +15,14 @@ from engine.graph_builder._state import _last_run
 from engine.graph_builder.build import topological_sort
 from engine.graph_builder.runners import RunContext, inspect_node
 
+# TYPE_CHECKING is False at runtime, True only under a type checker — so this
+# import is skipped when the app runs (no import cost, no circular-import risk),
+# while `graph_data: SerializedGraph` still resolves for hovers and checks.
+if TYPE_CHECKING:
+    from serialization import SerializedGraph
 
-def build_and_run_graph(graph_data: dict) -> tuple[
+
+def build_and_run_graph(graph_data: "SerializedGraph") -> tuple[
     dict[str, nn.Module],
     dict[str, dict[str, torch.Tensor]],
     dict[str, dict],
@@ -45,7 +53,7 @@ def build_and_run_graph(graph_data: dict) -> tuple[
     return ctx.modules, ctx.results, node_results, nodes, edges
 
 
-def inspect_graph(graph_data: dict) -> dict:
+def inspect_graph(graph_data: "SerializedGraph") -> dict:
     """Run a single inspection forward pass. Returns per-node results."""
     with torch.no_grad():
         _, _, node_results, _, _ = build_and_run_graph(graph_data)

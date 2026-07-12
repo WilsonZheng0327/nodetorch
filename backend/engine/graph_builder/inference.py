@@ -21,8 +21,12 @@ from engine.graph_builder.build import topological_sort
 from engine.graph_builder.stats import _safe_float, prediction_from_logits
 from engine.graph_builder.runners import RunContext, execute, describe_inference
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
 
-def evaluate_test_set(graph_data: dict) -> dict:
+
+def evaluate_test_set(graph_data: "SerializedGraph") -> dict:
     """Evaluate trained model on the held-out test set.
 
     Returns test loss, test accuracy, per-class accuracy, and sample count.
@@ -168,7 +172,7 @@ def evaluate_test_set(graph_data: dict) -> dict:
     }
 
 
-def infer_graph(graph_data: dict) -> dict:
+def infer_graph(graph_data: "SerializedGraph") -> dict:
     """
     Run inference using trained weights.
     Loads a single sample, runs through stored trained modules,

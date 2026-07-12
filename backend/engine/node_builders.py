@@ -556,17 +556,42 @@ def build_permute(props: dict, input_shapes: dict) -> nn.Module:
 
 
 class SequencePoolModule(nn.Module):
-    """Why wrapper: sequence pooling (last/mean/max over dim=1) is a tensor op, not a module."""
+    """Why wrapper: sequence pooling (last/mean/max over dim=1) is a tensor op, not a module.
+
+    Optionally takes a padding ``mask`` as a second input so pooling ignores pad
+    positions — critical for variable-length text, where right-padding otherwise
+    corrupts every mode (``mean`` divides by pad, ``max`` can pick a pad state,
+    ``last`` reads padding instead of the final real token). ``mask`` is any
+    ``[B, T]`` tensor where **nonzero = a real token** — typically the token ids
+    straight from the data node (pad id ``0`` by convention). Assumes right-padding
+    (pad at the end), matching the datasets. With no mask, behaves exactly as
+    before (unmasked), so existing graphs are unchanged.
+    """
     def __init__(self, mode: str):
         super().__init__()
         self.mode = mode
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self.mode == 'last':
-            return x[:, -1, :]
-        elif self.mode == 'mean':
+    def forward(self, x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
+        # Use the mask only when it's a real per-position mask aligned to x's
+        # sequence length; otherwise fall back to plain pooling.
+        if mask is not None and mask.dim() >= 2 and mask.shape[1] == x.shape[1]:
+            valid = mask != 0                                  # [B, T] bool
+            if self.mode == 'mean':
+                v = valid.unsqueeze(-1).to(x.dtype)            # [B, T, 1]
+                counts = v.sum(dim=1).clamp(min=1.0)           # [B, 1]  (avoid /0)
+                return (x * v).sum(dim=1) / counts
+            if self.mode == 'max':
+                neg = torch.finfo(x.dtype).min
+                out = x.masked_fill(~valid.unsqueeze(-1), neg).max(dim=1).values
+                # All-pad rows would be all -inf; zero them instead.
+                return out.masked_fill(~valid.any(dim=1, keepdim=True), 0.0)
+            # 'last' — index of each row's final real token (right-padded).
+            idx = (valid.sum(dim=1) - 1).clamp(min=0)          # [B]
+            return x[torch.arange(x.shape[0], device=x.device), idx]
+
+        if self.mode == 'mean':
             return x.mean(dim=1)
-        elif self.mode == 'max':
+        if self.mode == 'max':
             return x.max(dim=1).values
         return x[:, -1, :]
 

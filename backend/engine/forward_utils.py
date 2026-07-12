@@ -20,6 +20,7 @@ from engine.graph_builder import (
     LOSS_NODES,
     MULTI_INPUT_NODES,
     SUBGRAPH_TYPE,
+    SEQUENCE_POOL_TYPE,
     OPTIMIZER_NODES,
     GAN_NOISE_TYPE,
     DIFFUSION_SCHEDULER_TYPE,
@@ -57,6 +58,13 @@ def execute_node(node_type: str, module: nn.Module, inputs: dict) -> dict | None
     # Multi-input structural nodes (Add, Concat, Attention) — pass all as kwargs
     if node_type in MULTI_INPUT_NODES:
         return {"out": module(**inputs)}
+
+    # Sequence pool: single "in" plus an OPTIONAL "mask" (can't use **inputs —
+    # the port is literally named "in", not a valid kwarg).
+    if node_type == SEQUENCE_POOL_TYPE:
+        if "in" in inputs:
+            return {"out": module(inputs["in"], inputs.get("mask"))}
+        return None
 
     # Default: single-input layer node
     if "in" in inputs:

@@ -14,8 +14,12 @@ from engine.graph_builder import (
 )
 from dataprep.data_loaders import DATA_LOADERS
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
 
-def generate_latent_grid(graph_data: dict, grid_size: int = 10, latent_range: float = 3.0) -> dict:
+
+def generate_latent_grid(graph_data: "SerializedGraph", grid_size: int = 10, latent_range: float = 3.0) -> dict:
     """Generate a grid of decoded images by sweeping 2 latent dimensions.
 
     Picks the first two dimensions of the latent space, sweeps from

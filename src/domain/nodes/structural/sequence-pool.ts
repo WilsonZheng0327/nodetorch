@@ -7,7 +7,7 @@ export const sequencePoolNode: NodeDefinition = {
   description: 'Pool over sequence dimension: [B, seq, H] \u2192 [B, H]',
   category: ['ML', 'Structural'],
   learnMore:
-    'Reduces a sequence to a single vector. "last" takes the final timestep (captures the full sequence context in LSTMs). "mean" averages all timesteps (gives equal weight to each position). "max" takes the element-wise maximum across timesteps.',
+    'Reduces a sequence to a single vector. "last" takes the final timestep (captures the full sequence context in LSTMs). "mean" averages all timesteps (gives equal weight to each position). "max" takes the element-wise maximum across timesteps.\n\nOptional "mask" input: connect the data node’s token output here so pooling ignores padding. Text is right-padded to a fixed length, and without a mask every mode reads those pad positions — "mean" divides by padding, "max" can pick a pad value, and "last" reads the pad token instead of the final real word (which collapses training to chance on short texts). With the mask wired, pooling runs over real tokens only. Nonzero = a real token (pad id is 0).',
 
   getProperties: () => [
     {
@@ -35,6 +35,14 @@ export const sequencePoolNode: NodeDefinition = {
       dataType: 'tensor',
       allowMultiple: false,
       optional: false,
+    },
+    {
+      id: 'mask',
+      name: 'Mask',
+      direction: 'input',
+      dataType: 'tensor',
+      allowMultiple: false,
+      optional: true,
     },
     {
       id: 'out',

@@ -6,6 +6,10 @@ from engine.graph_builder import (
 from export.helpers import _get_optimizer_props, _get_optimizer_type
 from export.templates import DATASET_CODE
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
+
 # ─── Training loop templates ─────────────────────────────────────────────────
 
 def _standard_classification_loop(opt_props: dict, opt_type: str, loss_node: dict | None) -> str:
@@ -196,7 +200,7 @@ def _vae_training_loop(opt_props: dict, opt_type: str, loss_props: dict) -> str:
     return '\n'.join(lines)
 
 
-def _gan_training_loop(graph_data: dict, modules: dict) -> str:
+def _gan_training_loop(graph_data: "SerializedGraph", modules: dict) -> str:
     """Generate GAN training loop with Generator and Discriminator."""
     graph = graph_data["graph"]
     nodes = {n["id"]: n for n in graph["nodes"]}
@@ -279,7 +283,7 @@ def _gan_training_loop(graph_data: dict, modules: dict) -> str:
     return '\n'.join(lines)
 
 
-def _diffusion_training_loop(graph_data: dict, modules: dict) -> str:
+def _diffusion_training_loop(graph_data: "SerializedGraph", modules: dict) -> str:
     """Generate diffusion training loop with noise scheduler."""
     graph = graph_data["graph"]
     nodes = {n["id"]: n for n in graph["nodes"]}

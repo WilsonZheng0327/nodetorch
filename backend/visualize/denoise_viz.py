@@ -23,8 +23,12 @@ from engine.graph_builder import (
 )
 from dataprep.data_loaders import DATA_LOADERS, DENORMALIZERS
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
 
-def run_denoise_step_through(graph_data: dict, num_samples: int = 4, capture_every: int = 1) -> dict:
+
+def run_denoise_step_through(graph_data: "SerializedGraph", num_samples: int = 4, capture_every: int = 1) -> dict:
     """Run DDPM denoising and capture the image at each timestep.
 
     Args:

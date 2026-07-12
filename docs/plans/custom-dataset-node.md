@@ -1,7 +1,8 @@
 # Plan: Modality-agnostic custom dataset node (`data.custom`)
 
-> Status: **proposed** — implements [issue #7](https://github.com/WilsonZheng0327/nodetorch/issues/7).
-> Not yet started. This is a design for review.
+> Status: **implemented** — [issue #7](https://github.com/WilsonZheng0327/nodetorch/issues/7).
+> This is the original design; see [`../features/custom-datasets.md`](../features/custom-datasets.md)
+> for how it actually shipped.
 
 ## Context
 

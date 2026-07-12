@@ -12,6 +12,10 @@ import torch.nn as nn
 
 from paths import STORAGE_DIR
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
+
 # A self-contained "model" bundle: the graph (so the architecture is known) plus
 # every module's state_dict, in one torch archive. This is what the Save/Load
 # "Model" actions and the crash-recovery snapshot both read/write — unlike a bare
@@ -81,7 +85,7 @@ def save_model_bytes() -> bytes | None:
     return buf.getvalue()
 
 
-def load_model_bytes(graph_data: dict, data: bytes) -> dict:
+def load_model_bytes(graph_data: "SerializedGraph", data: bytes) -> dict:
     """Load state dicts from bytes into freshly built modules."""
     import io
     from engine.graph_builder.build import build_modules  # local: avoids import cycle
@@ -98,7 +102,7 @@ def load_model_bytes(graph_data: dict, data: bytes) -> dict:
     return {"status": "ok"}
 
 
-def load_model(graph_data: dict, filepath: str = "storage/weights/current.pt") -> dict:
+def load_model(graph_data: "SerializedGraph", filepath: str = "storage/weights/current.pt") -> dict:
     """Load saved state dicts into freshly built modules from the graph."""
     if not os.path.exists(filepath):
         return {"error": f"No saved model at {filepath}"}
@@ -120,7 +124,7 @@ def load_model(graph_data: dict, filepath: str = "storage/weights/current.pt") -
 
 # --- Self-contained model bundles (graph + weights) ---
 
-def save_bundle_bytes(graph_data: dict) -> bytes | None:
+def save_bundle_bytes(graph_data: "SerializedGraph") -> bytes | None:
     """Serialize the trained model as a graph+weights bundle (bytes), or None if
     nothing is trained. The graph is embedded so the bundle reloads on its own."""
     if "current" not in _model_store:
@@ -162,7 +166,7 @@ def load_bundle_bytes(data: bytes) -> dict:
     return {"status": "ok", "graph": graph_data}
 
 
-def snapshot_trained_model(graph_data: dict, filepath: str = _AUTOSAVE_PATH) -> dict:
+def snapshot_trained_model(graph_data: "SerializedGraph", filepath: str = _AUTOSAVE_PATH) -> dict:
     """Persist the current trained model to disk as a bundle so it survives a
     backend restart. Best-effort — callers should not fail if this fails."""
     data = save_bundle_bytes(graph_data)

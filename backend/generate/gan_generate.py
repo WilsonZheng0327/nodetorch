@@ -20,8 +20,12 @@ from engine.graph_builder import (
 from engine.forward_utils import execute_node
 from dataprep.data_loaders import DENORMALIZERS
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
 
-def generate_gan_images(graph_data: dict, num_samples: int = 8) -> dict:
+
+def generate_gan_images(graph_data: "SerializedGraph", num_samples: int = 8) -> dict:
     """Generate images by running noise through the trained generator.
 
     Returns: { images: [sample][y][x] or [sample][y][x][rgb], numSamples, imageH, imageW, channels }

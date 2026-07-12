@@ -12,9 +12,15 @@ Adding a new training paradigm:
   4. Add detection logic to detect_training_mode()
 """
 
-from typing import Protocol
+from typing import Protocol, TYPE_CHECKING
 
 from .base import TrainingContext, TrainingResult, build_training_context, save_training_results
+
+# TYPE_CHECKING is False at runtime, True only under a type checker — so this
+# import is skipped when the app runs (no import cost, no circular-import risk),
+# while `graph_data: SerializedGraph` still resolves for hovers and checks.
+if TYPE_CHECKING:
+    from serialization import SerializedGraph  # noqa: F401  (hover-doc type only)
 from .standard import standard_train
 from .gan import gan_train
 from .diffusion import diffusion_train
@@ -64,7 +70,7 @@ def detect_training_mode(nodes: dict) -> str:
     return "standard"
 
 
-def run_training(graph_data: dict, on_epoch=None, on_batch=None, cancel_event=None) -> dict:
+def run_training(graph_data: "SerializedGraph", on_epoch=None, on_batch=None, cancel_event=None) -> dict:
     """Drop-in replacement for graph_builder.train_graph().
 
     Builds the training context, detects the paradigm, runs the appropriate

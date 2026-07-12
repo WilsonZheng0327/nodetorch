@@ -15,8 +15,12 @@ from engine.graph_builder.build import gather_inputs, SubGraphModule
 from engine.graph_builder.forward import build_and_run_graph
 from engine.graph_builder.stats import _safe_float
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # type-only import (skipped at runtime); see serialization.py
+    from serialization import SerializedGraph
 
-def get_layer_detail(graph_data: dict, node_id: str) -> dict:
+
+def get_layer_detail(graph_data: "SerializedGraph", node_id: str) -> dict:
     """Return detailed visualization data for a specific node.
 
     Uses cached results from the last forward/train/infer pass.

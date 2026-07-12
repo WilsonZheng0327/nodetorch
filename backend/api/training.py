@@ -14,7 +14,9 @@ router = APIRouter(tags=["training"])
 
 
 @router.post("/train")
-async def train(graph_data: dict, scope: str = "all"):
+async def train(graph_data: dict, scope: str = "all"):  # kept `dict`, not SerializedGraph:
+    # FastAPI builds the request-body parser from this annotation, so a TypedDict would
+    # impose schema validation on the body. The runtime shape is serialization.SerializedGraph.
     """Run a training pass under VizTracer for call-tree visualization.
 
     The UI trains over the WebSocket (/ws); this REST endpoint exists purely

@@ -9,7 +9,9 @@ router = APIRouter(tags=["inference"])
 
 
 @router.post("/infer")
-async def infer(graph_data: dict):
+async def infer(graph_data: dict):  # kept `dict`, not SerializedGraph: FastAPI builds
+    # the request-body parser from this annotation, so a TypedDict would impose schema
+    # validation on the body. The runtime shape is serialization.SerializedGraph.
     """Run inference using trained weights on a single sample."""
     logger.info("Inference requested")
     try:
