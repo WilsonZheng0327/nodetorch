@@ -19,7 +19,7 @@ from .standard import standard_train
 from .gan import gan_train
 from .diffusion import diffusion_train
 from .autoregressive import autoregressive_train
-from dataprep.data_loaders import LM_DATASET_TYPES
+from dataprep.resolve import resolve_is_lm
 
 
 class TrainingLoop(Protocol):
@@ -59,7 +59,7 @@ def detect_training_mode(nodes: dict) -> str:
             return "gan"
         if ntype == "ml.diffusion.noise_scheduler":
             return "diffusion"
-        if ntype in LM_DATASET_TYPES:
+        if resolve_is_lm(n):
             return "autoregressive"
     return "standard"
 

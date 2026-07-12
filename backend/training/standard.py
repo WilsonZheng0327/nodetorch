@@ -18,7 +18,6 @@ from engine.graph_builder import (
     probe_tracked_samples,
     collect_misclassifications,
 )
-from dataprep.data_loaders import CLASS_NAMES
 from engine.forward_utils import run_forward_pass
 
 from .base import (
@@ -208,7 +207,7 @@ def standard_train(ctx: TrainingContext) -> TrainingResult:
         confusion_data = {
             "data": matrix,
             "size": n_classes,
-            "classNames": CLASS_NAMES.get(ctx.dataset_type, []),
+            "classNames": ctx.class_names,
         }
 
     return TrainingResult(

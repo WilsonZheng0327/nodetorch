@@ -314,8 +314,7 @@ def diffusion_train(ctx: TrainingContext) -> TrainingResult:
                         scheduler_module, sample_shape, dev,
                     )
                     if sample_images is not None:
-                        from dataprep.data_loaders import DENORMALIZERS
-                        denorm = DENORMALIZERS.get(ctx.dataset_type)
+                        denorm = ctx.denorm
                         generated_samples = []
                         for i in range(min(8, sample_images.size(0))):
                             img = sample_images[i].detach().cpu()
