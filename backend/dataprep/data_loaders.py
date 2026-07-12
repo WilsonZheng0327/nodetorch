@@ -598,6 +598,18 @@ def load_sample_by_label(
     return {}, idx
 
 
+def load_custom(props: dict) -> dict[str, torch.Tensor]:
+    """Load one batch from a custom (spec-driven) dataset. Registering this under
+    ``data.custom`` also makes every ``type in DATA_LOADERS`` finder recognize the
+    custom node. The heavy lifting lives in custom_dataset.CustomDataset."""
+    from dataprep.custom_dataset import CustomDataset, DatasetSpec
+    spec = DatasetSpec.from_props(props)
+    dataset = CustomDataset(spec, spec.train_split)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=spec.batch_size, shuffle=True)
+    inputs, targets = next(iter(loader))
+    return {"out": inputs, "labels": targets}
+
+
 # --- Registries ---
 # Each registry maps node type string → function.
 # graph_builder.py uses these — no if/else chains needed.
@@ -611,6 +623,7 @@ DATA_LOADERS: dict[str, BatchLoader] = {
     "data.imdb": load_imdb,
     "data.ag_news": load_ag_news,
     "data.tiny_shakespeare": load_tiny_shakespeare,
+    "data.custom": load_custom,
 }
 
 # Get full training dataset: () → Dataset
