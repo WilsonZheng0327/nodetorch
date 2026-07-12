@@ -43,6 +43,7 @@ EXPECTED_PATHS = {
     "/upload-model",
     # data
     "/dataset/{dataset_type:path}",
+    "/dataset-detail",
     "/tokenizer/preview",
     "/augmentation-preview",
     # runs
@@ -99,7 +100,7 @@ def test_route_count():
             http_endpoints += len(methods - {"HEAD", "OPTIONS"})
         else:
             ws_endpoints += 1
-    assert http_endpoints + ws_endpoints == 44
+    assert http_endpoints + ws_endpoints == 45
 
 
 def test_health():
