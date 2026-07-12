@@ -6,6 +6,7 @@ import { fashionMnistNode } from './fashion-mnist';
 import { imdbNode } from './imdb';
 import { agNewsNode } from './ag-news';
 import { tinyShakespeareNode } from './tiny-shakespeare';
+import { customNode } from './custom';
 
 export const dataNodes: NodeDefinition[] = [
   mnistNode,
@@ -15,4 +16,5 @@ export const dataNodes: NodeDefinition[] = [
   imdbNode,
   agNewsNode,
   tinyShakespeareNode,
+  customNode,
 ];
