@@ -248,7 +248,7 @@ def build_training_context(
     # predictions flipping from wrong → right.
     order = topological_sort(nodes, edges)
     tracked_samples = pick_tracked_samples(
-        train_dataset, dataset_type, n=12,
+        train_dataset, denorm, n=12,
         modules=modules, nodes=nodes, edges=edges, order=order,
     )
 

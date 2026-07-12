@@ -9,7 +9,8 @@ helpers support the training dashboard and are imported by ``training/``.
 import torch
 import torch.nn as nn
 
-from dataprep.data_loaders import DATA_LOADERS, DENORMALIZERS
+from dataprep.data_loaders import DATA_LOADERS
+from dataprep.resolve import resolve_is_lm, resolve_class_names, resolve_test_dataset
 from engine.graph_builder.constants import (
     LOSS_NODES, ALL_LOSS_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE,
 )
@@ -40,9 +41,8 @@ def evaluate_test_set(graph_data: dict) -> dict:
             return {"error": "Diffusion models don't use test set evaluation — use Step Through > Denoise to generate samples"}
         if n["type"] == GAN_NOISE_TYPE:
             return {"error": "GAN models don't use test set evaluation — check generated samples in the training dashboard"}
-    from dataprep.data_loaders import LM_DATASET_TYPES
     for n in graph["nodes"]:
-        if n["type"] in LM_DATASET_TYPES:
+        if resolve_is_lm(n):
             return {"error": "Language models don't use test set evaluation — use Step Through > Generate to produce text samples"}
 
     trained_modules = get_trained_modules()
@@ -69,22 +69,12 @@ def evaluate_test_set(graph_data: dict) -> dict:
         return {"error": "No data node in graph"}
 
     # Load test dataset
-    from dataprep.data_loaders import TEST_DATASETS, CLASS_NAMES
     dataset_type = data_node["type"]
-    test_builder = TEST_DATASETS.get(dataset_type)
-    if not test_builder:
+    test_dataset = resolve_test_dataset(data_node)
+    if test_dataset is None:
         return {"error": f"No test set available for {dataset_type}"}
 
     data_props = data_node.get("properties", {})
-    import inspect
-    if inspect.signature(test_builder).parameters:
-        test_dataset = test_builder(**{
-            k: data_props[k] for k in inspect.signature(test_builder).parameters
-            if k in data_props
-        })
-    else:
-        test_dataset = test_builder()
-
     batch_size = data_props.get("batchSize", 32)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
@@ -148,7 +138,7 @@ def evaluate_test_set(graph_data: dict) -> dict:
     avg_loss = total_loss / n_batches if n_batches > 0 else 0
     accuracy = correct / total if total > 0 else 0
 
-    class_names = CLASS_NAMES.get(dataset_type, [])
+    class_names = resolve_class_names(data_node)
     per_class = []
     for cls in sorted(per_class_total.keys()):
         acc = per_class_correct.get(cls, 0) / per_class_total[cls] if per_class_total.get(cls, 0) > 0 else 0
@@ -197,9 +187,8 @@ def infer_graph(graph_data: dict) -> dict:
             return {"error": "Diffusion models generate images via denoising — use Step Through > Denoise tab"}
         if n["type"] == GAN_NOISE_TYPE:
             return {"error": "GAN inference generates images from noise — use Step Through > Denoise or check training dashboard for generated samples"}
-    from dataprep.data_loaders import LM_DATASET_TYPES
     for n in graph["nodes"]:
-        if n["type"] in LM_DATASET_TYPES:
+        if resolve_is_lm(n):
             return {"error": "Language models generate text autoregressively — use Step Through > Generate tab"}
 
     trained_modules = get_trained_modules()
@@ -242,7 +231,7 @@ def infer_graph(graph_data: dict) -> dict:
 
 def pick_tracked_samples(
     dataset,
-    dataset_type: str,
+    denorm,
     n: int = 4,
     *,
     modules: dict | None = None,
@@ -265,7 +254,6 @@ def pick_tracked_samples(
     wrong → right instead of samples that were already correct at epoch 0.
     """
     import random
-    from dataprep.data_loaders import DENORMALIZERS
 
     # Draw a larger candidate pool so we have room to prefer the hard ones.
     can_bias = bool(modules and nodes and edges and order)
@@ -290,7 +278,6 @@ def pick_tracked_samples(
         # Image preview (4D-capable datasets)
         if isinstance(inp, torch.Tensor) and inp.dim() == 3:
             img = inp.detach().cpu()
-            denorm = DENORMALIZERS.get(dataset_type)
             if denorm:
                 img = denorm(img)
             img = (img.clamp(0, 1) * 255).byte()
@@ -306,7 +293,7 @@ def pick_tracked_samples(
 
     if can_bias and len(samples) > n:
         samples = _bias_toward_misclassified(
-            samples, modules, nodes, edges, order, dataset_type, n
+            samples, modules, nodes, edges, order, n
         )
     return samples[:n]
 
@@ -317,7 +304,6 @@ def _bias_toward_misclassified(
     nodes: dict,
     edges: list,
     order: list[str],
-    dataset_type: str,
     n: int,
 ) -> list[dict]:
     """Reorder a candidate pool so the fresh model's *mistakes* come first.
@@ -327,7 +313,7 @@ def _bias_toward_misclassified(
     confidently-wrong examples first (the most dramatic to watch flip), spread
     across distinct true labels for variety, then topped up with the rest.
     """
-    probes = probe_tracked_samples(samples, modules, nodes, edges, order, dataset_type)
+    probes = probe_tracked_samples(samples, modules, nodes, edges, order)
 
     tagged = []
     for s, p in zip(samples, probes):
@@ -368,7 +354,6 @@ def probe_tracked_samples(
     nodes: dict,
     edges: list,
     order: list[str],
-    dataset_type: str,
 ) -> list[dict]:
     """Run tracked samples through the current model and record predictions.
 
@@ -472,7 +457,7 @@ def collect_misclassifications(
     predicted: torch.Tensor,
     labels: torch.Tensor,
     logits: torch.Tensor,
-    dataset_type: str,
+    denorm,
     samples: list,
     counts: dict,
     max_per_pair: int = 4,
@@ -490,7 +475,6 @@ def collect_misclassifications(
     if not wrong.any():
         return
 
-    denorm = DENORMALIZERS.get(dataset_type)
     probs_batch = torch.softmax(logits, dim=1)
 
     for i in range(labels.size(0)):

@@ -125,7 +125,7 @@ def standard_train(ctx: TrainingContext) -> TrainingResult:
                             confusion_labels.extend(labels.cpu().tolist())
                             collect_misclassifications(
                                 images, predicted, labels, preds,
-                                ctx.dataset_type, misclass_samples, misclass_counts,
+                                ctx.denorm, misclass_samples, misclass_counts,
                             )
                         break
 
@@ -164,7 +164,7 @@ def standard_train(ctx: TrainingContext) -> TrainingResult:
 
         # Tracked samples
         tracked_probes = probe_tracked_samples(
-            ctx.tracked_samples, ctx.modules, ctx.nodes, ctx.edges, ctx.order, ctx.dataset_type,
+            ctx.tracked_samples, ctx.modules, ctx.nodes, ctx.edges, ctx.order,
         )
 
         # Per-class accuracy — one .tolist() sync, then plain Python arithmetic.
