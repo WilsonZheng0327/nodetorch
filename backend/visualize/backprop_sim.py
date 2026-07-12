@@ -53,7 +53,8 @@ from engine.graph_builder import (
     DIFFUSION_SCHEDULER_TYPE,
     SubGraphModule,
 )
-from dataprep.data_loaders import DATA_LOADERS, DENORMALIZERS, CLASS_NAMES
+from dataprep.data_loaders import DATA_LOADERS
+from dataprep.resolve import resolve_class_names, resolve_denormalizer, resolve_train_dataset
 from engine.forward_utils import execute_node
 from visualize.node_viz import get_backward_viz, compact_stats_with_norm, param_grad_stats
 
@@ -158,9 +159,9 @@ def _friendly_name(node_type: str) -> str:
     return last[0].upper() + last[1:]
 
 
-def _tensor_to_preview_image(img: torch.Tensor, dataset_type: str) -> dict:
+def _tensor_to_preview_image(img: torch.Tensor, data_node: dict) -> dict:
     """Convert [C, H, W] to displayable pixels."""
-    denorm = DENORMALIZERS.get(dataset_type)
+    denorm = resolve_denormalizer(data_node)
     if denorm:
         img = denorm(img.cpu())
     img = (img.clamp(0, 1) * 255).byte()
@@ -222,17 +223,16 @@ def _pick_hard_sample(graph_data: dict, k: int = 40, hard_enough: float = 1.0) -
     nothing produced a loss — the caller then behaves exactly as before.
     """
     import random as _random
-    from dataprep.data_loaders import TRAIN_DATASETS
 
-    data_type = next(
-        (n["type"] for n in graph_data["graph"]["nodes"] if n["type"] in DATA_LOADERS),
+    data_node = next(
+        (n for n in graph_data["graph"]["nodes"] if n["type"] in DATA_LOADERS),
         None,
     )
-    dataset_fn = TRAIN_DATASETS.get(data_type) if data_type else None
-    if dataset_fn is None:
+    dataset = resolve_train_dataset(data_node) if data_node else None
+    if dataset is None:
         return None
     try:
-        n_samples = len(dataset_fn())
+        n_samples = len(dataset)
     except Exception:
         return None
     if n_samples <= 0:
@@ -418,7 +418,7 @@ def run_backward_step_through(
     if not data_nid or not loss_nid:
         return {"error": "Graph must have a data node and a loss node"}
 
-    class_names = CLASS_NAMES.get(nodes[data_nid]["type"]) if data_nid else None
+    class_names = resolve_class_names(nodes[data_nid]) if data_nid else None
 
     # Extract sample info for the header
     sample_info = {}
@@ -435,7 +435,7 @@ def run_backward_step_through(
             "classNames": class_names,
         }
         if out is not None and isinstance(out, torch.Tensor) and out.dim() == 4:
-            sample_info.update(_tensor_to_preview_image(out[0].detach(), nodes[data_nid]["type"]))
+            sample_info.update(_tensor_to_preview_image(out[0].detach(), nodes[data_nid]))
         elif out is not None and isinstance(out, torch.Tensor) and out.dim() == 2:
             sample_info["tokenIds"] = out[0].tolist()[:64]
             if "_texts" in data_tensors:
@@ -820,8 +820,6 @@ def run_one_step(graph_data: dict, sample_idx: int | None = None) -> dict:
     if not has_trained_model():
         raise RuntimeError("Train the model first — one-step requires trained weights")
 
-    from dataprep.data_loaders import CLASS_NAMES
-
     graph_data = copy.deepcopy(graph_data)
     for n in graph_data["graph"]["nodes"]:
         if n["type"] in DATA_LOADERS:
@@ -847,7 +845,7 @@ def run_one_step(graph_data: dict, sample_idx: int | None = None) -> dict:
     labels = results.get(data_nid, {}).get("labels") if data_nid else None
     if isinstance(labels, torch.Tensor) and labels.dim() == 1 and labels.numel() > 0:
         true_label = int(labels[0])
-    class_names = CLASS_NAMES.get(nodes[data_nid]["type"]) if data_nid else None
+    class_names = resolve_class_names(nodes[data_nid]) if data_nid else None
 
     loss_before = _safe_float(float(loss_tensor.detach().item()))
     pred_before = prediction_from_logits(
@@ -1019,7 +1017,7 @@ def run_weight_wiggle(
     # slides (the model's confidence in the correct answer moves with the loss).
     labels = results.get(data_nid, {}).get("labels")
     true_label = int(labels[0]) if isinstance(labels, torch.Tensor) and labels.dim() == 1 else None
-    class_names = CLASS_NAMES.get(nodes[data_nid]["type"]) if data_nid else None
+    class_names = resolve_class_names(nodes[data_nid]) if data_nid else None
 
     loss_tensor = results.get(loss_nid, {}).get("out") if loss_nid else None
     if loss_tensor is None:

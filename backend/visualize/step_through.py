@@ -27,7 +27,8 @@ from engine.graph_builder import (
     SubGraphModule,
 )
 from engine.forward_utils import execute_node
-from dataprep.data_loaders import DATA_LOADERS, DENORMALIZERS, CLASS_NAMES, load_sample_by_label
+from dataprep.data_loaders import DATA_LOADERS, load_sample_by_label
+from dataprep.resolve import resolve_class_names, resolve_denormalizer, is_custom
 from visualize.node_viz import get_forward_viz
 
 
@@ -433,15 +434,16 @@ def _extract_sample_info(nodes, results):
                 "datasetType": dataset_type,
                 "actualLabel": int(labels[0].item()) if labels is not None and isinstance(labels, torch.Tensor) and labels.dim() == 1 else None,
             }
-            if dataset_type in CLASS_NAMES:
-                info["classNames"] = CLASS_NAMES[dataset_type]
+            class_names = resolve_class_names(node)
+            if class_names:
+                info["classNames"] = class_names
             if out is not None and isinstance(out, torch.Tensor) and out.dim() == 4:
-                info.update(_tensor_to_preview_image(out[0], dataset_type))
+                info.update(_tensor_to_preview_image(out[0], node))
             elif out is not None and isinstance(out, torch.Tensor) and out.dim() == 2:
                 # Send full token sequence — frontend can decide how much to render.
                 ids = out[0].tolist()
                 info["tokenIds"] = ids
-                tokens, text = _decode_tokens(dataset_type, ids, nodes)
+                tokens, text = _decode_tokens(node, ids, nodes)
                 if tokens is not None:
                     info["tokens"] = tokens
                 if text is not None:
@@ -452,13 +454,33 @@ def _extract_sample_info(nodes, results):
     return {}
 
 
-def _decode_tokens(dataset_type, ids, nodes):
+def _decode_tokens(data_node, ids, nodes):
     """Decode token IDs into (per-token strings, joined text). Returns (None, None) if unknown.
 
-    Detects the tokenizer node in the graph and picks the matching decoder:
+    A custom dataset decodes with its own tokenizer (spec). Otherwise the graph's
+    tokenizer node picks the decoder:
       - tokenizer_bpe → BPE subword decoder
       - tokenizer_char (default for shakespeare) → char-level vocab
     """
+    dataset_type = data_node["type"]
+
+    # Custom dataset: decode with the spec's own tokenizer (no tokenizer node needed).
+    if is_custom(data_node):
+        try:
+            from dataprep.custom_dataset import DatasetSpec, get_lm_vocab, get_raw_text
+            spec = DatasetSpec.from_props(data_node.get("properties", {}), data_node.get("id", ""))
+            if spec.tokenizer == "bpe":
+                from dataprep.bpe import get_bpe_tokenizer
+                bpe = get_bpe_tokenizer(get_raw_text(spec), spec.vocab_size, spec.cache_key)
+                tokens = [bpe.decode_token(int(i)) for i in ids]
+                return tokens, "".join(tokens)
+            _, idx2token = get_lm_vocab(spec)
+            tokens = [idx2token.get(int(i), "?") for i in ids]
+            sep = "" if spec.tokenizer == "char" else " "
+            return tokens, sep.join(tokens)
+        except Exception:
+            return None, None
+
     # Find tokenizer node (if any) so we can pick the right decoder for BPE/word modes.
     tok_node = None
     for n in nodes.values():
@@ -498,8 +520,8 @@ def _decode_tokens(dataset_type, ids, nodes):
     return None, None
 
 
-def _tensor_to_preview_image(img, dataset_type):
-    denorm = DENORMALIZERS.get(dataset_type)
+def _tensor_to_preview_image(img, node):
+    denorm = resolve_denormalizer(node)
     if denorm:
         img = denorm(img)
     img = (img.clamp(0, 1) * 255).byte()

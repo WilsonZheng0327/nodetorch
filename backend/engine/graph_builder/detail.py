@@ -7,7 +7,8 @@ LSTM/GRU hidden state, and loss-node confusion matrices for a single node.
 
 import torch
 
-from dataprep.data_loaders import DATA_LOADERS, CLASS_NAMES
+from dataprep.data_loaders import DATA_LOADERS
+from dataprep.resolve import resolve_class_names
 from engine.graph_builder.constants import LOSS_NODES
 from engine.graph_builder._state import _last_run
 from engine.graph_builder.build import gather_inputs, SubGraphModule
@@ -252,16 +253,15 @@ def get_layer_detail(graph_data: dict, node_id: str) -> dict:
                 for p, l in zip(preds.tolist(), labels.tolist()):
                     if 0 <= p < n_classes and 0 <= l < n_classes:
                         matrix[l][p] += 1
-                from dataprep.data_loaders import CLASS_NAMES
-                data_type = None
+                data_node = None
                 for nid, nd in _last_run.get("nodes", {}).items():
                     if nd.get("type", "") in DATA_LOADERS:
-                        data_type = nd["type"]
+                        data_node = nd
                         break
                 detail["confusionMatrix"] = {
                     "data": matrix,
                     "size": n_classes,
-                    "classNames": CLASS_NAMES.get(data_type, []) if data_type else [],
+                    "classNames": resolve_class_names(data_node) if data_node else [],
                 }
 
     return detail
