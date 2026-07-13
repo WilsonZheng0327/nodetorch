@@ -41,4 +41,14 @@ describe('buildNodeCatalog', () => {
     const selectProp = adam!.properties.find((p) => p.kind === 'select');
     expect(selectProp?.options && selectProp.options.length).toBeGreaterThan(0);
   });
+
+  it('carries property help text and group (data.custom relies on them)', () => {
+    const custom = catalog.find((n) => n.type === 'data.custom');
+    expect(custom).toBeTruthy();
+    const hfId = custom!.properties.find((p) => p.id === 'hfId');
+    expect(hfId?.help).toMatch(/HuggingFace/);
+    expect(hfId?.group).toBe('Source');
+    // Image-only params are tagged with their group so the agent knows scope.
+    expect(custom!.properties.find((p) => p.id === 'imageSize')?.group).toBe('Image');
+  });
 });

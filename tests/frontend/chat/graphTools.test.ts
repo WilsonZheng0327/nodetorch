@@ -2,11 +2,15 @@
 // Uses a fake GraphToolApi backed by a real Graph so we exercise the tool
 // dispatch, validation, and result strings without the full useGraph hook.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 import { initDomain } from '../../../src/domain';
 import { createGraph, createNode, addNode, createEdge, addEdge } from '../../../src/core/graph';
 import { executeGraphTool, type GraphToolApi } from '../../../src/ui/chat/graphTools';
+import { callBackend } from '../../../src/api/client';
+
+// get_dataset_info calls the backend; stub it so tests stay offline.
+vi.mock('../../../src/api/client', () => ({ callBackend: vi.fn() }));
 
 const domain = initDomain();
 
@@ -112,6 +116,20 @@ describe('executeGraphTool', () => {
     expect(g.nodes.has('relu1')).toBe(true);
   });
 
+  it('add_node applies valid initial properties and reports unknown keys', async () => {
+    const { api, g } = makeApi();
+    const msg = await executeGraphTool(api, domain, 'add_node', {
+      type: 'ml.layers.conv2d',
+      id: 'c9',
+      properties: { outChannels: 8, bogus: 1 },
+    });
+    expect(msg).toMatch(/^ok: added ml\.layers\.conv2d as "c9"/);
+    expect(msg).toMatch(/ignored unknown property bogus/);
+    expect(msg).toMatch(/valid keys: .*outChannels/);
+    expect(g.nodes.get('c9')!.properties.outChannels).toBe(8);
+    expect(g.nodes.get('c9')!.properties.bogus).toBeUndefined();
+  });
+
   it('connect validates and errors on missing node / invalid port', async () => {
     const { api, g } = makeApi();
     addNode(g, createNode('r1', 'ml.activations.relu', { x: 1, y: 0 }, {}));
@@ -212,6 +230,76 @@ describe('executeGraphTool', () => {
     expect(node).toMatch(/c1 \(ml\.layers\.conv2d\)/);
     expect(node).toMatch(/outChannels/);
     expect(await executeGraphTool(api, domain, 'get_node', { nodeId: 'nope' })).toMatch(/^error/);
+  });
+
+  it('get_dataset_info summarizes the backend detail payload (no pixel blobs)', async () => {
+    const { api, g } = makeApi();
+    addNode(g, createNode('ds1', 'data.custom', { x: 0, y: 1 }, { hfId: 'beans' }));
+
+    vi.mocked(callBackend).mockResolvedValueOnce({
+      ok: true,
+      data: {
+        detail: {
+          name: 'beans',
+          description: 'Custom HuggingFace dataset: beans',
+          trainSamples: 1034,
+          testSamples: 128,
+          diskSize: '—',
+          labels: ['angular_leaf_spot', 'bean_rust', 'healthy'],
+          channels: 3,
+          imageSize: [32, 32],
+          sampleImages: { healthy: [] }, // must NOT appear in the summary
+        },
+      },
+    });
+    const summary = await executeGraphTool(api, domain, 'get_dataset_info', { nodeId: 'ds1' });
+    expect(callBackend).toHaveBeenCalledWith('/dataset-detail', {
+      type: 'data.custom',
+      id: 'ds1',
+      properties: { hfId: 'beans' },
+    });
+    expect(summary).toMatch(/train samples: 1034, test samples: 128/);
+    expect(summary).toMatch(/images: 3×32×32/);
+    expect(summary).toMatch(/classes \(3\): angular_leaf_spot, bean_rust, healthy/);
+    expect(summary).not.toMatch(/sampleImages/);
+
+    // Backend failure (e.g. bad hfId) surfaces as a tool error the model can act on.
+    vi.mocked(callBackend).mockResolvedValueOnce({ ok: false, error: 'Dataset not found' });
+    expect(await executeGraphTool(api, domain, 'get_dataset_info', { nodeId: 'ds1' })).toBe(
+      'error: Dataset not found',
+    );
+
+    // Non-data nodes and unknown ids are rejected without hitting the backend.
+    expect(await executeGraphTool(api, domain, 'get_dataset_info', { nodeId: 'c1' })).toMatch(
+      /not a data node/,
+    );
+    expect(await executeGraphTool(api, domain, 'get_dataset_info', { nodeId: 'nope' })).toMatch(
+      /^error: no node/,
+    );
+  });
+
+  it('get_dataset_info reports text/LM datasets with vocab and sample snippets', async () => {
+    const { api, g } = makeApi();
+    addNode(g, createNode('ds2', 'data.tiny_shakespeare', { x: 0, y: 2 }, {}));
+    vi.mocked(callBackend).mockResolvedValueOnce({
+      ok: true,
+      data: {
+        detail: {
+          name: 'Tiny Shakespeare',
+          description: 'Character-level corpus',
+          trainSamples: 1000,
+          diskSize: '—',
+          labels: [],
+          isText: true,
+          isLanguageModel: true,
+          vocabSize: 65,
+          sampleTexts: { Sample: ['First Citizen: Before we proceed any further'] },
+        },
+      },
+    });
+    const summary = await executeGraphTool(api, domain, 'get_dataset_info', { nodeId: 'ds2' });
+    expect(summary).toMatch(/language-model corpus, vocab size: 65/);
+    expect(summary).toMatch(/sample \(Sample\): "First Citizen/);
   });
 
   it('validate returns a forward/training report', async () => {

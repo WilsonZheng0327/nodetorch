@@ -52,6 +52,8 @@ function describeTool(name: string, args: Record<string, unknown>): string {
       return 'exit block';
     case 'save_block':
       return `save block ${args.nodeId}`;
+    case 'get_dataset_info':
+      return `inspect dataset ${args.nodeId}`;
     case 'get_training_results':
       return 'read training results';
     default:

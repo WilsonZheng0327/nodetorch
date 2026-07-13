@@ -5,7 +5,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiUrl } from '../../api/base';
 
-interface DatasetInfo {
+/** The `detail` payload of POST /dataset-detail (see backend resolve_detail).
+ *  Also consumed by the agent's get_dataset_info tool (src/ui/chat/graphTools). */
+export interface DatasetInfo {
   name: string;
   description: string;
   labels: string[];

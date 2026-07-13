@@ -82,6 +82,25 @@ class DatasetDetailFn(Protocol):
 LM_DATASET_TYPES = {"data.tiny_shakespeare"}
 
 
+# Built Dataset objects are memoized so the batch loaders below — which fire on
+# every inference / node-preview forward pass (via ``execute_data``) — don't
+# re-instantiate the whole dataset from disk each call. Sampling stays random (a
+# fresh shuffled DataLoader per call); only the expensive construction is cached.
+# Keyed by whatever params determine the dataset's *content* (dataset id, and for
+# text the sequence length), so a config change rebuilds. Training is unaffected —
+# it builds its own dataset once via TRAIN_DATASETS.
+_DATASET_CACHE: dict[tuple, torch.utils.data.Dataset] = {}
+
+
+def _cached_dataset(key: tuple, factory) -> torch.utils.data.Dataset:
+    """Return a memoized Dataset for ``key``, building it via ``factory`` on first use."""
+    ds = _DATASET_CACHE.get(key)
+    if ds is None:
+        ds = factory()
+        _DATASET_CACHE[key] = ds
+    return ds
+
+
 # --- MNIST ---
 
 def load_mnist(props: dict) -> dict[str, torch.Tensor]:
@@ -91,9 +110,9 @@ def load_mnist(props: dict) -> dict[str, torch.Tensor]:
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,)),
     ])
-    dataset = torchvision.datasets.MNIST(
+    dataset = _cached_dataset(("mnist",), lambda: torchvision.datasets.MNIST(
         root=DATASETS_DIR, train=True, download=True, transform=transform,
-    )
+    ))
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     images, labels = next(iter(loader))
     return {"out": images, "labels": labels}
@@ -127,9 +146,9 @@ def load_cifar100(props: dict) -> dict[str, torch.Tensor]:
             (0.2675, 0.2565, 0.2761),
         ),
     ])
-    dataset = torchvision.datasets.CIFAR100(
+    dataset = _cached_dataset(("cifar100",), lambda: torchvision.datasets.CIFAR100(
         root=DATASETS_DIR, train=True, download=True, transform=transform,
-    )
+    ))
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     images, labels = next(iter(loader))
     return {"out": images, "labels": labels if isinstance(labels, torch.Tensor) else torch.tensor(labels)}
@@ -172,9 +191,9 @@ def load_cifar10(props: dict) -> dict[str, torch.Tensor]:
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     ])
-    dataset = torchvision.datasets.CIFAR10(
+    dataset = _cached_dataset(("cifar10",), lambda: torchvision.datasets.CIFAR10(
         root=DATASETS_DIR, train=True, download=True, transform=transform,
-    )
+    ))
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     images, labels = next(iter(loader))
     return {"out": images, "labels": labels if isinstance(labels, torch.Tensor) else torch.tensor(labels)}
@@ -212,9 +231,9 @@ def load_fashion_mnist(props: dict) -> dict[str, torch.Tensor]:
         transforms.ToTensor(),
         transforms.Normalize((0.2860,), (0.3530,)),
     ])
-    dataset = torchvision.datasets.FashionMNIST(
+    dataset = _cached_dataset(("fashion_mnist",), lambda: torchvision.datasets.FashionMNIST(
         root=DATASETS_DIR, train=True, download=True, transform=transform,
-    )
+    ))
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     images, labels = next(iter(loader))
     return {"out": images, "labels": labels}
@@ -454,7 +473,7 @@ def load_tiny_shakespeare(props: dict) -> dict[str, torch.Tensor]:
     """Load a batch from TinyShakespeare."""
     batch_size = props.get("batchSize", 32)
     seq_len = props.get("seqLen", 128)
-    dataset = TinyShakespeareDataset(seq_len)
+    dataset = _cached_dataset(("tiny_shakespeare", seq_len), lambda: TinyShakespeareDataset(seq_len))
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     inputs, targets = next(iter(loader))
     return {"out": inputs, "labels": targets}

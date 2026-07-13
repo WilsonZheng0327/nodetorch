@@ -165,6 +165,25 @@ GRAPH_TOOLS: list[ToolSpec] = [
         },
     ),
     ToolSpec(
+        name="get_dataset_info",
+        description=(
+            "Load and inspect the actual dataset behind a data node: sample counts, "
+            "class names, image size/channels, or text/vocab info. Works for the "
+            "built-in datasets AND data.custom (it loads the node's configured "
+            "HuggingFace dataset). Use it to VERIFY a custom dataset loads and to "
+            "configure the graph from facts — e.g. set the final Linear's outFeatures "
+            "to the reported number of classes. The first call on a new dataset "
+            "downloads it and can be slow."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "nodeId": {"type": "string", "description": "id of the data node to inspect"},
+            },
+            "required": ["nodeId"],
+        },
+    ),
+    ToolSpec(
         name="get_training_results",
         description=(
             "Read the per-epoch training history of the most recent run this session "

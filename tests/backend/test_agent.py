@@ -68,6 +68,33 @@ def test_format_catalog():
     assert "ml.layers.conv2d" in text
     assert "outChannels" in text
     assert "in:tensor" in text and "out:tensor" in text
+    # No help/group anywhere → the compact single-line props form.
+    assert "props: outChannels" in text
+
+
+def test_format_catalog_property_help_and_group():
+    """Properties carrying help/group render one per line with both shown."""
+    catalog = [
+        {
+            "type": "data.custom",
+            "displayName": "Custom Dataset",
+            "category": ["Data"],
+            "properties": [
+                {
+                    "id": "hfId",
+                    "kind": "string",
+                    "group": "Source",
+                    "help": 'HuggingFace dataset id, e.g. "mnist".',
+                },
+                {"id": "batchSize", "kind": "number", "integer": True, "default": 32},
+            ],
+            "ports": [],
+        }
+    ]
+    text = format_catalog(catalog)
+    assert "- hfId (string) [Source] — HuggingFace dataset id" in text
+    # The help-less sibling still gets its own line in the multiline form.
+    assert "- batchSize (int) =default 32" in text
 
 
 def test_summarize_graph_forms():
@@ -96,7 +123,7 @@ def test_graph_tools_defined():
         "set_node_property", "add_node", "connect", "remove_node", "remove_edge",
         "clear_graph", "organize_layout", "add_block",
         "enter_block", "exit_block", "save_block",
-        "get_graph", "get_node", "get_training_results", "validate",
+        "get_graph", "get_node", "get_dataset_info", "get_training_results", "validate",
     }
     for t in GRAPH_TOOLS:
         assert t.parameters["type"] == "object"  # valid JSON-schema shape
@@ -200,6 +227,7 @@ def test_run_turn_tool_loop(monkeypatch):
         async def run(self, *, system, messages, on_text, tools=None, execute_tool=None):
             assert any(t.name == "set_node_property" for t in (tools or []))  # tools passed
             assert "EDIT the graph" in system  # editing persona active
+            assert "get_dataset_info" in system  # read tools documented, incl. dataset info
             await on_text("editing… ")
             result = await execute_tool("set_node_property", {"nodeId": "c1", "key": "outChannels", "value": 64})
             await on_text(f"({result})")

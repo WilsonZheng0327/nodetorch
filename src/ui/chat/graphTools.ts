@@ -7,6 +7,8 @@ import type * as RF from '@xyflow/react';
 import type { Graph, NodeInstance } from '../../core/graph';
 import type { NodeRegistry } from '../../core/nodedef';
 import { validateForward, validateTraining } from '../../core/validation';
+import { callBackend } from '../../api/client';
+import type { DatasetInfo } from '../inspector/DatasetDetail';
 import type { EpochData } from '../dashboard/types';
 
 /** The subset of useGraph the tool executor needs. */
@@ -179,6 +181,8 @@ export async function executeGraphTool(
         return summarizeGraph(graph.getCurrentGraph());
       case 'get_node':
         return getNode(graph, args);
+      case 'get_dataset_info':
+        return await getDatasetInfo(graph, domain, args);
       case 'get_training_results':
         return getTrainingResults(graph);
       case 'validate':
@@ -207,16 +211,29 @@ async function setNodeProperty(graph: GraphToolApi, domain: Domain, args: Args) 
 
 async function addNode(graph: GraphToolApi, domain: Domain, args: Args) {
   const type = String(args.type ?? '');
-  if (!domain.nodeRegistry.get(type)) return `error: unknown node type "${type}"`;
+  const def = domain.nodeRegistry.get(type);
+  if (!def) return `error: unknown node type "${type}"`;
   const requestedId = typeof args.id === 'string' && args.id ? args.id : undefined;
   const id = await graph.addNode(type, nextPosition(graph.getCurrentGraph()), requestedId);
   if (!id) return `error: failed to add node "${type}"`;
+  // Apply only property keys the node actually has — same check as
+  // set_node_property — and report the rest so the model can self-correct.
+  const valid = new Set(def.getProperties().map((p) => p.id));
+  const unknown: string[] = [];
   if (args.properties && typeof args.properties === 'object') {
     for (const [k, v] of Object.entries(args.properties as Args)) {
+      if (!valid.has(k)) {
+        unknown.push(k);
+        continue;
+      }
       await graph.updateProperty(id, k, v);
     }
   }
-  return `ok: added ${type} as "${id}"`;
+  let msg = `ok: added ${type} as "${id}"`;
+  if (unknown.length) {
+    msg += ` (ignored unknown propert${unknown.length > 1 ? 'ies' : 'y'} ${unknown.join(', ')} — valid keys: ${[...valid].join(', ') || '(none)'})`;
+  }
+  return msg;
 }
 
 async function connect(graph: GraphToolApi, args: Args) {
@@ -294,6 +311,49 @@ function getNode(graph: GraphToolApi, args: Args) {
   const node = graph.getCurrentGraph().nodes.get(nodeId);
   if (!node) return `error: no node with id "${nodeId}"`;
   return describeNode(node);
+}
+
+/** Text summary of a /dataset-detail payload for the model — everything except
+ *  the pixel blobs (sampleImages would flood the context). */
+function summarizeDatasetInfo(d: DatasetInfo): string {
+  const lines = [`${d.name} — ${d.description}`];
+  const counts = [`train samples: ${d.trainSamples}`];
+  if (typeof d.testSamples === 'number') counts.push(`test samples: ${d.testSamples}`);
+  lines.push(counts.join(', '));
+  if (d.channels != null && d.imageSize) {
+    lines.push(`images: ${d.channels}×${d.imageSize.join('×')} (C×H×W)`);
+  }
+  if (d.isLanguageModel) lines.push(`language-model corpus, vocab size: ${d.vocabSize ?? '?'}`);
+  else if (d.isText) lines.push('text dataset');
+  if (d.labels?.length) {
+    const shown = d.labels.slice(0, 30).join(', ');
+    lines.push(`classes (${d.labels.length}): ${shown}${d.labels.length > 30 ? ', …' : ''}`);
+  }
+  // A snippet or two so the model can see what a sample looks like.
+  for (const [label, texts] of Object.entries(d.sampleTexts ?? {}).slice(0, 2)) {
+    const t = texts?.[0];
+    if (t) lines.push(`sample (${label}): "${t.slice(0, 150)}${t.length > 150 ? '…' : ''}"`);
+  }
+  return lines.join('\n');
+}
+
+/** Bridge to POST /dataset-detail with the node's live properties — the same
+ *  endpoint the inspector modal uses, so data.custom resolves from its spec. */
+async function getDatasetInfo(graph: GraphToolApi, domain: Domain, args: Args) {
+  const nodeId = String(args.nodeId ?? '');
+  const node = graph.getCurrentGraph().nodes.get(nodeId);
+  if (!node) return `error: no node with id "${nodeId}"`;
+  const def = domain.nodeRegistry.get(node.type);
+  if (def?.category[0] !== 'Data') {
+    return `error: "${nodeId}" (${node.type}) is not a data node`;
+  }
+  const res = await callBackend<{ detail: DatasetInfo }>('/dataset-detail', {
+    type: node.type,
+    id: node.id,
+    properties: node.properties,
+  });
+  if (!res.ok) return `error: ${res.error}`;
+  return summarizeDatasetInfo(res.data.detail);
 }
 
 function validate(graph: GraphToolApi, domain: Domain, args: Args) {

@@ -14,6 +14,11 @@ export interface CatalogProperty {
   max?: number;
   integer?: boolean;
   options?: { label: string; value: unknown }[];
+  /** Inspector grouping label (e.g. "Image", "Text") — for property-driven nodes
+   *  like data.custom it tells the agent which mode a property belongs to. */
+  group?: string;
+  /** One-line usage hint (format, units, when it applies) from the node def. */
+  help?: string;
 }
 
 export interface CatalogPort {
@@ -42,6 +47,8 @@ function describeProperty(prop: {
   name: string;
   type: PropertyType;
   defaultValue: unknown;
+  group?: string;
+  help?: string;
 }): CatalogProperty {
   const t = prop.type;
   const out: CatalogProperty = {
@@ -60,6 +67,8 @@ function describeProperty(prop: {
   } else if (t.kind === 'select') {
     out.options = t.options;
   }
+  if (prop.group) out.group = prop.group;
+  if (prop.help) out.help = prop.help;
   return out;
 }
 

@@ -46,11 +46,22 @@ enter_block("myblock") → build the inner network with add_node/connect → exi
 optionally save_block("myblock", name). Prefer add_block when a suitable saved block \
 already exists rather than rebuilding it.
 
+For datasets beyond the built-in data nodes, use data.custom — it can load any \
+HuggingFace dataset: set hfId (e.g. "beans" or "user/dataset"), pick inputKind \
+(image/text/vector) and task, and map inputColumn/labelColumn to the dataset's \
+columns (property groups mark which settings apply to which inputKind). Then call \
+get_dataset_info on the node to confirm it loads and to read its REAL class names \
+and sizes — and size the rest of the graph from that (e.g. the classifier's final \
+linear outFeatures = the reported number of classes).
+
 You can also READ the graph (no changes):
 - get_graph() — re-read the current nodes & edges (the snapshot above can go stale \
 after you've made edits).
 - get_node(nodeId) — a node's properties, output shape, parameter count, final \
 training metrics (finalLoss/finalAccuracy on the optimizer), and any error.
+- get_dataset_info(nodeId) — load the dataset behind a data node and report sample \
+counts, class names, image size/channels or text/vocab info. Works for data.custom \
+too (first load of a new dataset can be slow — it downloads).
 - get_training_results() — the per-epoch training history (loss / accuracy / \
 validation / perplexity curves) of the latest run. Call this for any question \
 about how training went — convergence, plateaus, overfitting, final numbers.

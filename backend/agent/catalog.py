@@ -9,7 +9,7 @@ duplicates the node schema. Each entry:
       "displayName": "Conv2d",
       "category": ["ML", "Layers", "Convolution"],
       "description": "...",
-      "properties": [{"id","name","kind","default", ...}],
+      "properties": [{"id","name","kind","default","group"?,"help"?, ...}],
       "ports": [{"id","direction","dataType","allowMultiple","optional"}],
       "modes": ["shape","forward","train"]
     }
@@ -36,7 +36,13 @@ def _format_property(prop: dict) -> str:
     default = prop.get("default")
     default_str = f" =default {default}" if default is not None else ""
     inner = f" ({detail})" if detail else ""
-    return f"{pid}{inner}{default_str}"
+    # Group tells the agent when a property applies (e.g. [Image] vs [Text] on
+    # data.custom); help carries the format/units hint from the node definition.
+    group = prop.get("group")
+    group_str = f" [{group}]" if group else ""
+    help_text = prop.get("help")
+    help_str = f" — {help_text}" if help_text else ""
+    return f"{pid}{inner}{default_str}{group_str}{help_str}"
 
 
 def _format_ports(ports: list[dict]) -> str:
@@ -85,7 +91,13 @@ def format_catalog(catalog: list[dict]) -> str:
                 lines.append(f"    ports: {_format_ports(ports)}")
             props = node.get("properties") or []
             if props:
-                lines.append(
-                    "    props: " + ", ".join(_format_property(p) for p in props)
-                )
+                # Help sentences contain commas, so a comma-joined line turns to
+                # mush — go one-per-line as soon as any property carries them.
+                if any(p.get("help") or p.get("group") for p in props):
+                    lines.append("    props:")
+                    lines.extend(f"      - {_format_property(p)}" for p in props)
+                else:
+                    lines.append(
+                        "    props: " + ", ".join(_format_property(p) for p in props)
+                    )
     return "\n".join(lines)

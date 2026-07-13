@@ -63,7 +63,8 @@ ChatRail (browser)                          backend/agent/  (FastAPI)
   replies with a `tool_result`. Sends the node catalog once per connection.
 - **`graphTools.ts`** — the tool executor. Applies the model's graph edits through
   `useGraph` (guarded by the same `isValidConnection` / validation rules a human
-  action goes through) and answers read tools (e.g. training history).
+  action goes through) and answers read tools (training history; dataset facts via
+  `POST /dataset-detail` for `get_dataset_info`, which works for `data.custom` too).
 - **`AgentSettings.tsx`** — provider dropdown + base URL + model + API key, backed
   by the config REST routes; "Test connection" pings `POST /agent/test`.
 
@@ -74,6 +75,12 @@ The rich node catalog (types, properties, ports, descriptions) lives only in the
 `domain.nodeRegistry`, and `useAgentChat` sends it to the backend once per
 connection (cached server-side). New nodes therefore appear to the agent
 automatically — no second, drift-prone catalog on the backend.
+
+Each property also carries its inspector `help` text and `group` label, and
+`catalog.py` renders them into the prompt. That's what makes property-driven
+nodes like `data.custom` usable by the agent: the help strings state the expected
+formats (`hfId`, comma-separated `normalizeMean`, …) and the group tags
+(`[Image]` / `[Text]`) say when a property applies.
 
 ## Enabling it
 

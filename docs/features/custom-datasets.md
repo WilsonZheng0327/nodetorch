@@ -127,6 +127,13 @@ POSTs the node's `type` + `properties`; its render code already branches on
 `isText` / `isLanguageModel` / `sampleImages` / `sampleTexts`, which
 `build_detail` produces — so no render change was needed.
 
+The AI assistant reuses this endpoint: its `get_dataset_info(nodeId)` tool
+(see [agent.md](../explanation/agent.md)) POSTs the node's live properties and
+summarizes the reply for the model — counts, class names, image/vocab facts, no
+pixel arrays — so the agent can verify an `hfId` actually loads and size the rest
+of the graph from the real class count. The node's property `help`/`group`
+strings also reach the agent through the node catalog.
+
 ## 6. Adding a new modality or task cell
 
 The abstraction is meant to grow along its two axes:
