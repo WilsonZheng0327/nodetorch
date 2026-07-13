@@ -452,12 +452,12 @@ export default function App() {
                   onLoadWeights={graph.loadWeights}
                   onExportPython={graph.exportPython}
                   onInfer={graph.runInfer}
-                  onTest={() => {
+                  onTest={async () => {
                     if (graph.modelTrained && !graph.modelStale) {
                       setDashboardOpen(true);
                       setTestFocus((n) => n + 1);
                     }
-                    return graph.runTest();
+                    await graph.runTest();
                   }}
                   onTrain={() => {
                     setDashboardOpen(true);
@@ -511,13 +511,20 @@ export default function App() {
                 <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
                 <ChatRail
                   getGraphJson={() => graph.saveGraph()}
-                  // Agent-started training opens the dashboard, same as the
-                  // Toolbar's Train button above.
+                  // Agent-started training/testing opens the dashboard, same
+                  // as the Toolbar's Train and Test buttons above.
                   graph={{
                     ...graph,
                     runTrain: () => {
                       setDashboardOpen(true);
                       return graph.runTrain();
+                    },
+                    runTest: () => {
+                      if (graph.modelTrained && !graph.modelStale) {
+                        setDashboardOpen(true);
+                        setTestFocus((n) => n + 1);
+                      }
+                      return graph.runTest();
                     },
                   }}
                   closeSignal={closeChatSignal}

@@ -75,9 +75,12 @@ ChatRail (browser)                          backend/agent/  (FastAPI)
   Training control rides the same `useGraph` paths as the Toolbar: `start_training`
   pre-validates then fire-and-forgets `runTrain()` (the tool result returns
   immediately — training streams on in the background), `stop_training` calls
-  `cancelTrain()`. Live/dashboard reads: `get_training_status` (mid-run progress),
+  `cancelTrain()`, and `run_test` awaits `runTest()` and reports the fresh results
+  (`runTest` returns them because the executor's captured props are a render-time
+  snapshot). Live/dashboard reads: `get_training_status` (mid-run progress),
   `get_epoch_detail` (gradient flow, per-class accuracy, tracked samples, generated
-  text), `get_test_results`, and `get_saved_runs` (`GET /runs`).
+  text), `get_test_results`, `get_saved_runs` (`GET /runs`), and `get_system_info`
+  (`GET /system-info`).
 - **`agentPrefs.ts`** — browser-local agent preferences: which tools are gated
   behind user approval (`start_training` / `stop_training`) and whether to ask.
 - **`AgentSettings.tsx`** — provider dropdown + base URL + model + API key, backed

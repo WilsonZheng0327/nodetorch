@@ -75,6 +75,10 @@ function describeTool(name: string, args: Record<string, unknown>): string {
       return 'start training';
     case 'stop_training':
       return 'stop training';
+    case 'run_test':
+      return 'run test evaluation';
+    case 'get_system_info':
+      return 'read system info';
     default:
       return name;
   }

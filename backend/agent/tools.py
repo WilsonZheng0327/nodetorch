@@ -268,6 +268,26 @@ GRAPH_TOOLS: list[ToolSpec] = [
         parameters={"type": "object", "properties": {}},
     ),
     ToolSpec(
+        name="run_test",
+        description=(
+            "Evaluate the trained model on the held-out test set — the same as the "
+            "user pressing Test (classification models only). Needs a trained, "
+            "non-stale model. Takes a few seconds, then returns the results "
+            "(accuracy, loss, per-class accuracy, top confusions), which also "
+            "appear in the dashboard's Test tab."
+        ),
+        parameters={"type": "object", "properties": {}},
+    ),
+    ToolSpec(
+        name="get_system_info",
+        description=(
+            "The compute environment training runs on: Python/PyTorch versions, "
+            "CUDA/MPS availability, GPU names with VRAM, and the device currently "
+            "in use. Use for questions like 'is this using my GPU?'."
+        ),
+        parameters={"type": "object", "properties": {}},
+    ),
+    ToolSpec(
         name="validate",
         description="Run the pre-flight checks and return the exact problems (missing connections, shape mismatches, missing data/loss/optimizer, etc.). mode='forward' checks a forward pass; mode='training' checks everything needed to train.",
         parameters={

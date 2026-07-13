@@ -8,8 +8,9 @@ import type { Graph, NodeInstance } from '../../core/graph';
 import type { NodeRegistry } from '../../core/nodedef';
 import { validateForward, validateTraining } from '../../core/validation';
 import { callBackend, getBackend } from '../../api/client';
+import { apiUrl } from '../../api/base';
 import type { DatasetInfo } from '../inspector/DatasetDetail';
-import type { EpochData, FullRun, SavedRun, TestResult } from '../dashboard/types';
+import type { EpochData, FullRun, SavedRun, SystemInfo, TestResult } from '../dashboard/types';
 
 /** The subset of useGraph the tool executor needs. */
 export interface GraphToolApi {
@@ -26,10 +27,14 @@ export interface GraphToolApi {
   batchProgress: { batch: number; totalBatches: number } | null;
   /** Held-out test-set evaluation (the dashboard's Test tab), if the user ran Test. */
   testResult: TestResult | null;
+  /** True while a test evaluation is in flight. */
+  testing: boolean;
   /** Start a training run (the Train-button path). Resolves when training ENDS. */
   runTrain: () => Promise<void>;
   /** Ask the in-flight training run to cancel (stops after the current epoch). */
   cancelTrain: () => void;
+  /** Evaluate the trained model on the held-out test set (the Test-button path). */
+  runTest: () => Promise<{ result: TestResult } | { error: string }>;
   updateProperty: (nodeId: string, key: string, value: unknown) => Promise<void>;
   addNode: (
     type: string,
@@ -279,8 +284,12 @@ function getEpochDetail(graph: GraphToolApi, args: Args): string {
 function getTestResults(graph: GraphToolApi): string {
   const t = graph.testResult;
   if (!t) {
-    return 'no test results — the user has not run Test this session (Test evaluates the trained model on the held-out test set; classification models only)';
+    return 'no test results yet — run the run_test tool (or the Test button) to evaluate the trained model on the held-out test set (classification models only)';
   }
+  return summarizeTestResult(t);
+}
+
+function summarizeTestResult(t: TestResult): string {
   const lines = [
     `Test set: ${t.testSamples} samples — accuracy ${fmtMetric(t.testAccuracy, true)}, loss ${fmtMetric(t.testLoss)}`,
   ];
@@ -371,6 +380,47 @@ function stopTraining(graph: GraphToolApi): string {
   return 'ok: cancel requested — training stops after the current epoch';
 }
 
+/** Evaluate on the held-out test set (the Test-button path) and report the
+ *  fresh results — runTest returns them precisely because our captured
+ *  graph.testResult is a render-time snapshot. */
+async function runTestSet(graph: GraphToolApi): Promise<string> {
+  if (graph.trainingActive) {
+    return 'error: training is in progress — wait for it to finish before testing';
+  }
+  if (graph.testing) return 'error: a test evaluation is already running';
+  if (!graph.modelTrained) return 'error: no trained model in memory — train first';
+  if (graph.modelStale) {
+    return 'error: the trained model is STALE — the graph changed after training; retrain first';
+  }
+  const res = await graph.runTest();
+  if ('error' in res) return `error: ${res.error}`;
+  return `ok: test evaluation complete\n${summarizeTestResult(res.result)}`;
+}
+
+/** GET /system-info — NOTE: this endpoint returns the raw info dict with no
+ *  {status} envelope (the dashboard consumes it as-is), hence plain fetch. */
+async function getSystemInfo(): Promise<string> {
+  let info: SystemInfo;
+  try {
+    const r = await fetch(apiUrl('/system-info'));
+    info = (await r.json()) as SystemInfo;
+  } catch {
+    return 'error: Cannot connect to backend — is the server running?';
+  }
+  const lines = [`Python ${info.python}, PyTorch ${info.pytorch}`];
+  if (info.cudaAvailable && info.gpus?.length) {
+    lines.push(`CUDA available — ${info.gpuCount} GPU(s):`);
+    for (const gpu of info.gpus) {
+      lines.push(`- ${gpu.name}: ${gpu.vram} GB VRAM, compute capability ${gpu.computeCapability}`);
+    }
+  } else {
+    lines.push('CUDA not available');
+  }
+  if (info.mpsAvailable) lines.push('Apple MPS available');
+  if (info.currentDevice) lines.push(`current training device: ${info.currentDevice}`);
+  return lines.join('\n');
+}
+
 export async function executeGraphTool(
   graph: GraphToolApi,
   domain: Domain,
@@ -424,6 +474,10 @@ export async function executeGraphTool(
         return startTraining(graph, domain);
       case 'stop_training':
         return stopTraining(graph);
+      case 'run_test':
+        return await runTestSet(graph);
+      case 'get_system_info':
+        return await getSystemInfo();
       case 'validate':
         return validate(graph, domain, args);
       default:

@@ -25,6 +25,7 @@ function makeApi() {
     saved: '',
     trainStarted: 0,
     trainCancelled: 0,
+    tested: 0,
   };
 
   const api: GraphToolApi = {
@@ -81,11 +82,23 @@ function makeApi() {
     trainingActive: false,
     batchProgress: null,
     testResult: null,
+    testing: false,
     runTrain: async () => {
       flags.trainStarted += 1;
     },
     cancelTrain: () => {
       flags.trainCancelled += 1;
+    },
+    runTest: async () => {
+      flags.tested += 1;
+      return {
+        result: {
+          testLoss: 0.4,
+          testAccuracy: 0.88,
+          testSamples: 100,
+          perClassAccuracy: [{ cls: 0, name: 'cat', accuracy: 0.9, count: 50 }],
+        },
+      };
     },
   };
   return { api, g, flags };
@@ -558,6 +571,61 @@ describe('executeGraphTool', () => {
     expect(
       await executeGraphTool(makeApi().api, domain, 'get_saved_runs', { id: 'nope' }),
     ).toBe('error: Run not found');
+  });
+
+  it('run_test guards on model state, then runs and reports the fresh results', async () => {
+    const { api, flags } = makeApi();
+    expect(await executeGraphTool(api, domain, 'run_test', {})).toMatch(
+      /^error: no trained model/,
+    );
+
+    api.modelTrained = true;
+    api.modelStale = true;
+    expect(await executeGraphTool(api, domain, 'run_test', {})).toMatch(/STALE/);
+
+    api.modelStale = false;
+    api.trainingActive = true;
+    expect(await executeGraphTool(api, domain, 'run_test', {})).toMatch(/training is in progress/);
+
+    api.trainingActive = false;
+    expect(flags.tested).toBe(0); // none of the refusals ran the evaluation
+    const msg = await executeGraphTool(api, domain, 'run_test', {});
+    expect(flags.tested).toBe(1);
+    expect(msg).toMatch(/^ok: test evaluation complete/);
+    expect(msg).toMatch(/100 samples — accuracy 88\.0%, loss 0\.4000/);
+
+    // Backend failure surfaces as a tool error.
+    api.runTest = async () => ({ error: 'boom' });
+    expect(await executeGraphTool(api, domain, 'run_test', {})).toBe('error: boom');
+  });
+
+  it('get_system_info formats the raw (unenveloped) /system-info payload', async () => {
+    const { api } = makeApi();
+    const fetchMock = vi.fn(async () => ({
+      json: async () => ({
+        python: '3.11.9',
+        pytorch: '2.4.0',
+        cudaAvailable: true,
+        gpuCount: 1,
+        gpus: [{ name: 'RTX 3080', vram: 10, computeCapability: '8.6' }],
+        currentDevice: 'cuda',
+      }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const s = await executeGraphTool(api, domain, 'get_system_info', {});
+      expect(fetchMock.mock.calls[0][0]).toMatch(/\/system-info$/);
+      expect(s).toMatch(/Python 3\.11\.9, PyTorch 2\.4\.0/);
+      expect(s).toMatch(/- RTX 3080: 10 GB VRAM, compute capability 8\.6/);
+      expect(s).toMatch(/current training device: cuda/);
+
+      fetchMock.mockRejectedValueOnce(new Error('down'));
+      expect(await executeGraphTool(api, domain, 'get_system_info', {})).toMatch(
+        /^error: Cannot connect/,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('reports unknown tools', async () => {

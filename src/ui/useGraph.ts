@@ -706,29 +706,33 @@ export function useGraph(domain: DomainContext) {
   // True while a test evaluation is in flight — drives the dashboard's Test tab.
   const [testing, setTesting] = useState(false);
 
-  const runTest = useCallback(async () => {
+  // Returns the outcome as well as setting state, so a caller that awaits it
+  // (the agent's run_test tool) can report the fresh result — its captured
+  // props are a render-time snapshot and would still show the OLD testResult.
+  const runTest = useCallback(async (): Promise<{ result: TestResult } | { error: string }> => {
     if (!modelTrained) {
-      setStatus({ type: 'error', message: 'No trained model — train first' });
-      return;
+      const error = 'No trained model — train first';
+      setStatus({ type: 'error', message: error });
+      return { error };
     }
     if (modelStale) {
-      setStatus({
-        type: 'error',
-        message: 'Model outdated — graph changed since last training. Retrain first.',
-      });
-      return;
+      const error = 'Model outdated — graph changed since last training. Retrain first.';
+      setStatus({ type: 'error', message: error });
+      return { error };
     }
     // No toolbar status for test — results are shown in the dashboard test tab.
     setTesting(true);
-    const r = await callBackend<{ result: any }>('/evaluate-test', {
+    const r = await callBackend<{ result: TestResult }>('/evaluate-test', {
       graph: JSON.parse(saveGraph()),
     });
     setTesting(false);
     if (!r.ok) {
-      setStatus({ type: 'error', message: friendlyError(r.error) });
-      return;
+      const error = friendlyError(r.error);
+      setStatus({ type: 'error', message: error });
+      return { error };
     }
     setTestResult(r.data.result);
+    return { result: r.data.result };
   }, [modelTrained, modelStale, saveGraph]);
 
   const [trainingProgress, setTrainingProgress] = useState<EpochData[]>([]);
