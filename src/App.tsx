@@ -511,7 +511,15 @@ export default function App() {
                 <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
                 <ChatRail
                   getGraphJson={() => graph.saveGraph()}
-                  graph={graph}
+                  // Agent-started training opens the dashboard, same as the
+                  // Toolbar's Train button above.
+                  graph={{
+                    ...graph,
+                    runTrain: () => {
+                      setDashboardOpen(true);
+                      return graph.runTrain();
+                    },
+                  }}
                   closeSignal={closeChatSignal}
                   onOpenChange={setChatRailOpen}
                 />

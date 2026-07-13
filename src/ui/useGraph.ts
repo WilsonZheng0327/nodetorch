@@ -28,7 +28,7 @@ import {
 } from '../core/serialization';
 import { apiUrl, wsUrl } from '../api/base';
 import { callBackend } from '../api/client';
-import type { EpochData } from './dashboard/types';
+import type { EpochData, TestResult } from './dashboard/types';
 import { friendlyError } from './friendlyError';
 import { computeLayout } from '../core/layout';
 
@@ -700,12 +700,9 @@ export function useGraph(domain: DomainContext) {
     setTimeout(() => setStatus((s) => (s.type === 'success' ? { type: 'idle' } : s)), 5000);
   }, [syncToRF, modelTrained, modelStale]);
 
-  const [testResult, setTestResult] = useState<{
-    testLoss: number;
-    testAccuracy: number;
-    testSamples: number;
-    perClassAccuracy: { cls: number; name: string; accuracy: number; count: number }[];
-  } | null>(null);
+  // The shared TestResult type (dashboard/types) — the backend also sends the
+  // optional confusionMatrix, which the dashboard and the agent tools read.
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
   // True while a test evaluation is in flight — drives the dashboard's Test tab.
   const [testing, setTesting] = useState(false);
 

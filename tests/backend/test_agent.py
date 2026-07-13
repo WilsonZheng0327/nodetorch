@@ -124,6 +124,8 @@ def test_graph_tools_defined():
         "clear_graph", "organize_layout", "add_block",
         "enter_block", "exit_block", "save_block",
         "get_graph", "get_node", "get_dataset_info", "get_training_results", "validate",
+        "get_training_status", "get_epoch_detail", "get_test_results", "get_saved_runs",
+        "start_training", "stop_training",
     }
     for t in GRAPH_TOOLS:
         assert t.parameters["type"] == "object"  # valid JSON-schema shape
@@ -228,6 +230,8 @@ def test_run_turn_tool_loop(monkeypatch):
             assert any(t.name == "set_node_property" for t in (tools or []))  # tools passed
             assert "EDIT the graph" in system  # editing persona active
             assert "get_dataset_info" in system  # read tools documented, incl. dataset info
+            assert "start_training" in system  # training control documented
+            assert '"denied:" result' in system  # …including how to take no for an answer
             await on_text("editing… ")
             result = await execute_tool("set_node_property", {"nodeId": "c1", "key": "outChannels", "value": 64})
             await on_text(f"({result})")

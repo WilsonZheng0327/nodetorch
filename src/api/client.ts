@@ -28,7 +28,21 @@ export async function callBackend<T = unknown>(
   } catch {
     return { ok: false, error: 'Cannot connect to backend — is the server running?' };
   }
+  return normalize<T>(response);
+}
 
+/** GET a backend endpoint, with the same outcome normalization as callBackend. */
+export async function getBackend<T = unknown>(endpoint: string): Promise<BackendResult<T>> {
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(endpoint));
+  } catch {
+    return { ok: false, error: 'Cannot connect to backend — is the server running?' };
+  }
+  return normalize<T>(response);
+}
+
+async function normalize<T>(response: Response): Promise<BackendResult<T>> {
   let data: { status?: string; error?: string } & Record<string, unknown>;
   try {
     data = await response.json();

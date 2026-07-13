@@ -195,6 +195,79 @@ GRAPH_TOOLS: list[ToolSpec] = [
         parameters={"type": "object", "properties": {}},
     ),
     ToolSpec(
+        name="get_training_status",
+        description=(
+            "Whether training is running RIGHT NOW: epochs completed so far, "
+            "current-epoch batch progress, and the latest metrics — plus whether a "
+            "trained model is in memory and whether it's stale (graph edited after "
+            "training). Call this to report live progress mid-run; do NOT call it "
+            "repeatedly in a loop."
+        ),
+        parameters={"type": "object", "properties": {}},
+    ),
+    ToolSpec(
+        name="get_epoch_detail",
+        description=(
+            "Deep-dive ONE epoch of the current session's run (default: the most "
+            "recent epoch): all logged metrics, per-layer gradient norms, per-class "
+            "accuracy, tracked-sample predictions, and generated text (language "
+            "models). Use get_training_results for across-epoch curves; use this to "
+            "explain WHY one epoch looked the way it did (vanishing gradients, which "
+            "classes lag, …)."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "epoch": {"type": "number", "description": "epoch number; omit for the latest"},
+            },
+        },
+    ),
+    ToolSpec(
+        name="get_test_results",
+        description=(
+            "The held-out test-set evaluation (the dashboard's Test tab): accuracy, "
+            "loss, per-class accuracy, and the top confusions — if the user has run "
+            "Test this session. Distinct from training/validation metrics."
+        ),
+        parameters={"type": "object", "properties": {}},
+    ),
+    ToolSpec(
+        name="get_saved_runs",
+        description=(
+            "Past training runs saved on the backend (the dashboard's Runs tab). "
+            "Without `id`: the list with config + final metrics. With `id`: that "
+            "run's full summary and a condensed epoch history — use it to compare "
+            "against the current run."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "description": "run id from the list; omit to list all"},
+            },
+        },
+    ),
+    ToolSpec(
+        name="start_training",
+        description=(
+            "Start a training run of the current graph — the same as the user "
+            "pressing Train. Validates first and refuses if the graph isn't "
+            "trainable. Returns IMMEDIATELY while training continues in the "
+            "background: report that it started and answer later questions with "
+            "get_training_status — do NOT wait for it or poll in a loop. May ask the "
+            "user for confirmation and can be denied."
+        ),
+        parameters={"type": "object", "properties": {}},
+    ),
+    ToolSpec(
+        name="stop_training",
+        description=(
+            "Stop the training run currently in progress (it finishes the current "
+            "epoch, then cancels). Errors if nothing is training. May ask the user "
+            "for confirmation and can be denied."
+        ),
+        parameters={"type": "object", "properties": {}},
+    ),
+    ToolSpec(
         name="validate",
         description="Run the pre-flight checks and return the exact problems (missing connections, shape mismatches, missing data/loss/optimizer, etc.). mode='forward' checks a forward pass; mode='training' checks everything needed to train.",
         parameters={

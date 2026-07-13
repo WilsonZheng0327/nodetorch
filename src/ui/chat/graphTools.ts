@@ -7,9 +7,9 @@ import type * as RF from '@xyflow/react';
 import type { Graph, NodeInstance } from '../../core/graph';
 import type { NodeRegistry } from '../../core/nodedef';
 import { validateForward, validateTraining } from '../../core/validation';
-import { callBackend } from '../../api/client';
+import { callBackend, getBackend } from '../../api/client';
 import type { DatasetInfo } from '../inspector/DatasetDetail';
-import type { EpochData } from '../dashboard/types';
+import type { EpochData, FullRun, SavedRun, TestResult } from '../dashboard/types';
 
 /** The subset of useGraph the tool executor needs. */
 export interface GraphToolApi {
@@ -20,6 +20,16 @@ export interface GraphToolApi {
   /** Whether a trained model is in memory, and whether the graph has since changed. */
   modelTrained: boolean;
   modelStale: boolean;
+  /** True from the moment training starts until it finishes/cancels/errors. */
+  trainingActive: boolean;
+  /** Mid-epoch batch progress while training, else null. */
+  batchProgress: { batch: number; totalBatches: number } | null;
+  /** Held-out test-set evaluation (the dashboard's Test tab), if the user ran Test. */
+  testResult: TestResult | null;
+  /** Start a training run (the Train-button path). Resolves when training ENDS. */
+  runTrain: () => Promise<void>;
+  /** Ask the in-flight training run to cancel (stops after the current epoch). */
+  cancelTrain: () => void;
   updateProperty: (nodeId: string, key: string, value: unknown) => Promise<void>;
   addNode: (
     type: string,
@@ -144,6 +154,223 @@ function getTrainingResults(graph: GraphToolApi): string {
   return `Training results — ${epochs.length} epoch(s):\n${lines.join('\n')}${stale}`;
 }
 
+/** One epoch's metrics on a single line, including whichever of the optional
+ *  (val/LM/GAN) numbers this run actually produced. */
+function epochHeadline(e: EpochData): string {
+  const parts = [`loss=${fmtMetric(e.loss)}`];
+  const optional: [string, number | null | undefined, boolean?][] = [
+    ['acc', e.accuracy, true],
+    ['valLoss', e.valLoss],
+    ['valAcc', e.valAccuracy, true],
+    ['ppl', e.perplexity],
+    ['valPpl', e.valPerplexity],
+    ['dLoss', e.dLoss],
+    ['gLoss', e.gLoss],
+    ['lr', e.learningRate],
+  ];
+  for (const [label, v, pct] of optional) {
+    if (typeof v === 'number' && !Number.isNaN(v)) parts.push(`${label}=${fmtMetric(v, pct)}`);
+  }
+  return parts.join(', ');
+}
+
+/** Live view: is training running now, how far along, latest metrics. Reads UI
+ *  state that updates per epoch/batch, so it works mid-run. */
+function getTrainingStatus(graph: GraphToolApi): string {
+  const epochs = graph.trainingProgress;
+  const last = epochs[epochs.length - 1];
+  if (graph.trainingActive) {
+    const lines = ['training is RUNNING'];
+    lines.push(`epochs completed: ${epochs.length}${last?.totalEpochs ? ` of ${last.totalEpochs}` : ''}`);
+    if (graph.batchProgress) {
+      lines.push(
+        `current epoch: batch ${graph.batchProgress.batch}/${graph.batchProgress.totalBatches}`,
+      );
+    }
+    if (last) lines.push(`latest (epoch ${last.epoch}): ${epochHeadline(last)}`);
+    else lines.push('no epoch has completed yet');
+    return lines.join('\n');
+  }
+  const lines = ['no training is running'];
+  if (graph.modelTrained) {
+    lines.push(
+      graph.modelStale
+        ? 'a trained model is in memory but STALE — the graph changed after training (retrain before inference/testing)'
+        : 'a trained model is in memory and matches the current graph',
+    );
+  } else {
+    lines.push('no trained model in memory yet');
+  }
+  if (last) lines.push(`last run ended at epoch ${last.epoch}: ${epochHeadline(last)}`);
+  return lines.join('\n');
+}
+
+/** Deep-dive one epoch's record: gradient flow, per-class accuracy, tracked
+ *  samples, generated text — the dashboard's drill-in data, as text. */
+function getEpochDetail(graph: GraphToolApi, args: Args): string {
+  const epochs = graph.trainingProgress;
+  if (!epochs.length) return 'error: no training history this session — train first';
+  const wanted = args.epoch == null ? undefined : Number(args.epoch);
+  const e = wanted == null ? epochs[epochs.length - 1] : epochs.find((r) => r.epoch === wanted);
+  if (!e) {
+    return `error: no epoch ${wanted} in this run (have epochs ${epochs[0].epoch}–${epochs[epochs.length - 1].epoch})`;
+  }
+
+  const className = (c: number | null | undefined) =>
+    c == null ? '?' : (e.classNames?.[c] ?? String(c));
+  const lines = [
+    `Epoch ${e.epoch}${e.totalEpochs ? ` of ${e.totalEpochs}` : ''}: ${epochHeadline(e)}`,
+  ];
+  if (typeof e.time === 'number') {
+    lines.push(
+      `time: ${e.time.toFixed(1)}s${e.samples ? `, ${e.samples} samples` : ''}${e.batches ? `, ${e.batches} batches` : ''}`,
+    );
+  }
+
+  if (e.gradientFlow?.length) {
+    const sorted = [...e.gradientFlow].sort((a, b) => b.norm - a.norm);
+    const truncated = sorted.length > 20;
+    const shown = truncated ? [...sorted.slice(0, 10), ...sorted.slice(-5)] : sorted;
+    lines.push(
+      `gradient norms by layer, largest first${truncated ? ' (10 largest + 5 smallest of ' + sorted.length + ')' : ''}:`,
+    );
+    for (const gf of shown) lines.push(`- ${gf.name}: ${fmtMetric(gf.norm)}`);
+  }
+
+  if (e.perClassAccuracy?.length) {
+    const sorted = [...e.perClassAccuracy].sort((a, b) => a.accuracy - b.accuracy);
+    const truncated = sorted.length > 20;
+    const shown = truncated ? [...sorted.slice(0, 5), ...sorted.slice(-5)] : sorted;
+    lines.push(`per-class accuracy, worst first${truncated ? ' (5 worst + 5 best)' : ''}:`);
+    for (const c of shown) lines.push(`- ${className(c.cls)}: ${fmtMetric(c.accuracy, true)}`);
+  }
+
+  if (e.trackedSamples?.length) {
+    lines.push(`tracked samples (${e.trackedSamples.length}):`);
+    for (const t of e.trackedSamples.slice(0, 12)) {
+      const verdict =
+        t.predictedClass != null && t.label != null
+          ? t.predictedClass === t.label
+            ? ' ✓'
+            : ' ✗'
+          : '';
+      const conf = typeof t.confidence === 'number' ? ` (${fmtMetric(t.confidence, true)})` : '';
+      const loss = typeof t.loss === 'number' ? ` loss=${fmtMetric(t.loss)}` : '';
+      lines.push(
+        `- #${t.idx}: true=${className(t.label)} pred=${className(t.predictedClass)}${conf}${loss}${verdict}`,
+      );
+    }
+  }
+
+  if (e.generatedText) {
+    const text = e.generatedText;
+    lines.push(`generated text sample:\n"${text.slice(0, 300)}${text.length > 300 ? '…' : ''}"`);
+  }
+  if (e.generatedSamples?.length) {
+    lines.push(
+      `generated ${e.generatedSamples.length} sample image(s) — visible in the dashboard (pixels not shown here)`,
+    );
+  }
+  return lines.join('\n');
+}
+
+/** The dashboard's Test tab as text: overall metrics, per-class accuracy, and
+ *  the biggest off-diagonal confusions (matrix itself would flood the context). */
+function getTestResults(graph: GraphToolApi): string {
+  const t = graph.testResult;
+  if (!t) {
+    return 'no test results — the user has not run Test this session (Test evaluates the trained model on the held-out test set; classification models only)';
+  }
+  const lines = [
+    `Test set: ${t.testSamples} samples — accuracy ${fmtMetric(t.testAccuracy, true)}, loss ${fmtMetric(t.testLoss)}`,
+  ];
+  if (t.perClassAccuracy?.length) {
+    const sorted = [...t.perClassAccuracy].sort((a, b) => a.accuracy - b.accuracy);
+    const truncated = sorted.length > 20;
+    const shown = truncated ? [...sorted.slice(0, 5), ...sorted.slice(-5)] : sorted;
+    lines.push(`per-class accuracy, worst first${truncated ? ' (5 worst + 5 best)' : ''}:`);
+    for (const c of shown) {
+      lines.push(`- ${c.name}: ${fmtMetric(c.accuracy, true)} (${c.count} samples)`);
+    }
+  }
+  const cm = t.confusionMatrix;
+  if (cm?.data?.length) {
+    const name = (i: number) =>
+      cm.classNames?.[i] ?? t.perClassAccuracy.find((c) => c.cls === i)?.name ?? String(i);
+    const confusions: { from: number; to: number; n: number }[] = [];
+    for (let i = 0; i < cm.size; i++) {
+      for (let j = 0; j < cm.size; j++) {
+        if (i !== j && cm.data[i]?.[j] > 0) confusions.push({ from: i, to: j, n: cm.data[i][j] });
+      }
+    }
+    confusions.sort((a, b) => b.n - a.n);
+    if (confusions.length) {
+      lines.push('top confusions:');
+      for (const c of confusions.slice(0, 8)) {
+        lines.push(`- true ${name(c.from)} predicted as ${name(c.to)}: ${c.n}×`);
+      }
+    }
+  }
+  return lines.join('\n');
+}
+
+/** The dashboard's Runs tab: the saved-runs list, or one run in detail. */
+async function getSavedRuns(args: Args): Promise<string> {
+  const id = typeof args.id === 'string' && args.id ? args.id : undefined;
+  if (!id) {
+    const res = await getBackend<{ runs: SavedRun[] }>('/runs');
+    if (!res.ok) return `error: ${res.error}`;
+    const runs = res.data.runs ?? [];
+    if (!runs.length) return 'no saved runs yet — completed training runs are saved automatically';
+    const lines = [`Saved runs (${runs.length}):`];
+    for (const r of runs.slice(0, 20)) {
+      lines.push(
+        `- ${r.id} | ${r.timestamp} | ${r.datasetType} | ${r.epochs} epochs, ${r.optimizer} lr=${r.learningRate} | finalLoss=${fmtMetric(r.finalLoss)}, finalAcc=${fmtMetric(r.finalAccuracy, true)}, bestValAcc=${fmtMetric(r.bestValAccuracy, true)}`,
+      );
+    }
+    if (runs.length > 20) lines.push(`… and ${runs.length - 20} more`);
+    return lines.join('\n');
+  }
+
+  const res = await getBackend<{ run: FullRun }>(`/runs/${encodeURIComponent(id)}`);
+  if (!res.ok) return `error: ${res.error}`;
+  const r = res.data.run;
+  const lines = [
+    `Run ${r.id} (${r.timestamp})`,
+    `dataset: ${r.datasetType} | ${r.epochs} epochs | ${r.optimizer} lr=${r.learningRate} | scheduler: ${r.scheduler} | batchSize=${r.batchSize}, valSplit=${r.valSplit}, seed=${r.seed}`,
+    `model: ${r.nodeCount} nodes, ${r.totalParams} params | duration: ${r.duration.toFixed(1)}s`,
+    `final: loss=${fmtMetric(r.finalLoss)}, acc=${fmtMetric(r.finalAccuracy, true)}, bestValAcc=${fmtMetric(r.bestValAccuracy, true)}`,
+  ];
+  const history = r.epochHistory ?? [];
+  if (history.length) {
+    const truncated = history.length > 12;
+    const shown = truncated ? [...history.slice(0, 5), ...history.slice(-5)] : history;
+    lines.push(`epoch history${truncated ? ` (first 5 + last 5 of ${history.length})` : ''}:`);
+    for (const e of shown) lines.push(`- epoch ${e.epoch}: ${epochHeadline(e)}`);
+  }
+  return lines.join('\n');
+}
+
+/** Start a run the same way the Train button does — but only if pre-flight
+ *  validation passes, so the model gets the problems instead of a dead start. */
+function startTraining(graph: GraphToolApi, domain: Domain): string {
+  if (graph.trainingActive) return 'error: a training run is already in progress';
+  const report = validate(graph, domain, { mode: 'training' });
+  if (!report.startsWith('ok')) {
+    return `error: the graph is not ready to train — fix these first:\n${report}`;
+  }
+  // Fire and forget: runTrain's promise resolves when training ENDS (minutes
+  // away); the tool result must return now so the turn can continue.
+  void graph.runTrain();
+  return 'ok: training started — it runs in the background and the user sees live progress in the dashboard. Use get_training_status to check on it later; do not poll in a loop.';
+}
+
+function stopTraining(graph: GraphToolApi): string {
+  if (!graph.trainingActive) return 'error: no training run is in progress';
+  graph.cancelTrain();
+  return 'ok: cancel requested — training stops after the current epoch';
+}
+
 export async function executeGraphTool(
   graph: GraphToolApi,
   domain: Domain,
@@ -185,6 +412,18 @@ export async function executeGraphTool(
         return await getDatasetInfo(graph, domain, args);
       case 'get_training_results':
         return getTrainingResults(graph);
+      case 'get_training_status':
+        return getTrainingStatus(graph);
+      case 'get_epoch_detail':
+        return getEpochDetail(graph, args);
+      case 'get_test_results':
+        return getTestResults(graph);
+      case 'get_saved_runs':
+        return await getSavedRuns(args);
+      case 'start_training':
+        return startTraining(graph, domain);
+      case 'stop_training':
+        return stopTraining(graph);
       case 'validate':
         return validate(graph, domain, args);
       default:

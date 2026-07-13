@@ -451,3 +451,69 @@
   border-color: var(--accent, #89b4fa);
   color: var(--text, #cdd6f4);
 }
+
+/* ── Approval card — a gated tool call (start/stop training) awaiting Allow/Deny ── */
+
+.chat-rail-approval {
+  margin: 0 10px 8px;
+  padding: 10px 12px;
+  background: var(--bg-overlay, #313244);
+  border: 1px solid var(--accent, #89b4fa);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-rail-approval-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text, #cdd6f4);
+}
+
+.chat-rail-approval-text svg {
+  flex-shrink: 0;
+  color: var(--accent, #89b4fa);
+}
+
+.chat-rail-approval-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-rail-approval-btn {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border, #45475a);
+  background: var(--bg-surface, #1e1e2e);
+  color: var(--text, #cdd6f4);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.chat-rail-approval-allow {
+  border-color: var(--accent, #89b4fa);
+  color: var(--accent, #89b4fa);
+}
+
+.chat-rail-approval-allow:hover {
+  background: var(--accent, #89b4fa);
+  color: var(--bg-surface, #1e1e2e);
+}
+
+.chat-rail-approval-deny:hover {
+  border-color: #f38ba8;
+  color: #f38ba8;
+}
+
+.chat-rail-approval-hint {
+  font-size: 11px;
+  color: var(--text-faint, #6c7086);
+}

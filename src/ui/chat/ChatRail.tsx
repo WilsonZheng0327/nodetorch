@@ -21,6 +21,7 @@ import {
   Square,
   Settings,
   Wrench,
+  ShieldQuestion,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -141,14 +142,16 @@ export function ChatRail({ getGraphJson, graph, closeSignal, onOpenChange }: Pro
     [graph, domain],
   );
 
-  const { messages, status, error, send, cancel } = useAgentChat({
-    getGraph,
-    catalog,
-    blocks: graph.savedBlocks,
-    executeTool,
-    beginBatch: graph.beginBatch,
-    endBatch: graph.endBatch,
-  });
+  const { messages, status, error, send, cancel, pendingApproval, resolveApproval } = useAgentChat(
+    {
+      getGraph,
+      catalog,
+      blocks: graph.savedBlocks,
+      executeTool,
+      beginBatch: graph.beginBatch,
+      endBatch: graph.endBatch,
+    },
+  );
 
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -252,6 +255,42 @@ export function ChatRail({ getGraphJson, graph, closeSignal, onOpenChange }: Pro
       </div>
 
       {error && <div className="chat-rail-error">{error}</div>}
+
+      {pendingApproval && (
+        <div className="chat-rail-approval">
+          <div className="chat-rail-approval-text">
+            <ShieldQuestion size={15} />
+            <span>
+              The assistant wants to{' '}
+              <strong>
+                {pendingApproval.name === 'start_training'
+                  ? 'start a training run'
+                  : pendingApproval.name === 'stop_training'
+                    ? 'stop the training run'
+                    : pendingApproval.name}
+              </strong>
+              .
+            </span>
+          </div>
+          <div className="chat-rail-approval-actions">
+            <button
+              className="chat-rail-approval-btn chat-rail-approval-allow"
+              onClick={() => resolveApproval(true)}
+            >
+              Allow
+            </button>
+            <button
+              className="chat-rail-approval-btn chat-rail-approval-deny"
+              onClick={() => resolveApproval(false)}
+            >
+              Deny
+            </button>
+          </div>
+          <div className="chat-rail-approval-hint">
+            You can turn this prompt off in the assistant settings.
+          </div>
+        </div>
+      )}
 
       <div className="chat-rail-input-row">
         <textarea

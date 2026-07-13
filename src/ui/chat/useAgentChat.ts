@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeCatalog } from '../../domain/catalog';
 import { wsUrl } from '../../api/base';
+import { requiresApproval } from './agentPrefs';
 
 const AGENT_WS_URL = wsUrl('/agent');
 
@@ -13,6 +14,12 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   error?: boolean; // for tool messages whose result was an error
+}
+
+/** A gated tool call waiting for the user's Allow/Deny (see agentPrefs). */
+export interface PendingApproval {
+  name: string;
+  args: Record<string, unknown>;
 }
 
 export type ChatStatus = 'idle' | 'streaming' | 'error';
@@ -56,6 +63,18 @@ function describeTool(name: string, args: Record<string, unknown>): string {
       return `inspect dataset ${args.nodeId}`;
     case 'get_training_results':
       return 'read training results';
+    case 'get_training_status':
+      return 'check training status';
+    case 'get_epoch_detail':
+      return args.epoch != null ? `inspect epoch ${args.epoch}` : 'inspect latest epoch';
+    case 'get_test_results':
+      return 'read test results';
+    case 'get_saved_runs':
+      return args.id ? `read saved run ${args.id}` : 'list saved runs';
+    case 'start_training':
+      return 'start training';
+    case 'stop_training':
+      return 'stop training';
     default:
       return name;
   }
@@ -65,6 +84,9 @@ export function useAgentChat(opts: Options) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<ChatStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  // Gated tool call awaiting the user's decision; resolveApproval settles it.
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
+  const approvalResolveRef = useRef<((approved: boolean) => void) | null>(null);
 
   // Keep the latest callbacks reachable from the (stable) socket handler.
   const optsRef = useRef(opts);
@@ -88,10 +110,18 @@ export function useAgentChat(opts: Options) {
   }, []);
 
   const endTurn = useCallback(() => {
+    // A turn ending with a decision still pending (error/cancel) auto-denies it
+    // so the card can't outlive the turn it belongs to.
+    approvalResolveRef.current?.(false);
     if (batchOpenRef.current) {
       optsRef.current.endBatch();
       batchOpenRef.current = false;
     }
+  }, []);
+
+  /** Settle the pending gated tool call (Allow = true / Deny = false). */
+  const resolveApproval = useCallback((approved: boolean) => {
+    approvalResolveRef.current?.(approved);
   }, []);
 
   const handleMessage = useCallback(
@@ -116,18 +146,41 @@ export function useAgentChat(opts: Options) {
           break;
 
         case 'tool_call': {
-          // First edit of the turn opens the one-undo batch.
-          if (!batchOpenRef.current) {
-            optsRef.current.beginBatch();
-            batchOpenRef.current = true;
-          }
           const name = msg.name ?? '';
           const args = msg.args ?? {};
-          const result = await optsRef.current.executeTool(name, args);
+
+          // Gated tools (start/stop training) wait for the user's Allow/Deny.
+          // The provider awaits this tool's result, so the turn simply pauses.
+          let denied = false;
+          if (requiresApproval(name)) {
+            const approved = await new Promise<boolean>((resolve) => {
+              approvalResolveRef.current = resolve;
+              setPendingApproval({ name, args });
+            });
+            approvalResolveRef.current = null;
+            setPendingApproval(null);
+            denied = !approved;
+          }
+
+          let result: string;
+          if (denied) {
+            result = `denied: the user declined ${name}. Do not retry it; ask the user what they'd like to do instead.`;
+          } else {
+            // First executed call of the turn opens the one-undo batch.
+            if (!batchOpenRef.current) {
+              optsRef.current.beginBatch();
+              batchOpenRef.current = true;
+            }
+            result = await optsRef.current.executeTool(name, args);
+          }
           wsRef.current?.send(JSON.stringify({ type: 'tool_result', id: msg.id, result }));
           setMessages((prev) => [
             ...prev,
-            { role: 'tool', content: describeTool(name, args), error: result.startsWith('error') },
+            {
+              role: 'tool',
+              content: describeTool(name, args) + (denied ? ' — denied' : ''),
+              error: denied || result.startsWith('error'),
+            },
           ]);
           break;
         }
@@ -195,6 +248,9 @@ export function useAgentChat(opts: Options) {
   );
 
   const cancel = useCallback(() => {
+    // Deny any pending approval first so its promise settles; the backend
+    // ignores a tool_result for a cancelled turn.
+    approvalResolveRef.current?.(false);
     wsRef.current?.send(JSON.stringify({ type: 'cancel' }));
   }, []);
 
@@ -205,5 +261,5 @@ export function useAgentChat(opts: Options) {
     };
   }, []);
 
-  return { messages, status, error, send, cancel };
+  return { messages, status, error, send, cancel, pendingApproval, resolveApproval };
 }

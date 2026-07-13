@@ -1,9 +1,10 @@
 # AI Assistant Architecture
 
 NodeTorch ships an integrated, **provider-agnostic** AI assistant. It can read
-the current graph, explain it, and edit it (add/remove/connect nodes) by calling
-tools the browser applies locally. The agent loop runs in the **backend**; the
-browser hosts the chat UI and a tool-bridge.
+the current graph, explain it, edit it (add/remove/connect nodes), and — behind
+a user-approval gate — start and stop training runs, all by calling tools the
+browser applies locally. The agent loop runs in the **backend**; the browser
+hosts the chat UI and a tool-bridge.
 
 ```
 ChatRail (browser)                          backend/agent/  (FastAPI)
@@ -61,12 +62,27 @@ ChatRail (browser)                          backend/agent/  (FastAPI)
 - **`useAgentChat.ts`** — owns the `/agent` WebSocket: streaming assembly, session
   id, and the **tool-bridge** — on a `tool_call` it runs the tool locally and
   replies with a `tool_result`. Sends the node catalog once per connection.
+  Gated tools (see `agentPrefs.ts`) pause here: the hook exposes a
+  `pendingApproval` that ChatRail renders as an Allow/Deny card, and the
+  `tool_result` isn't sent until the user decides — the backend provider is
+  simply awaiting it, so the turn pauses cleanly. Deny sends a `denied:`
+  observation (the system prompt tells the model not to retry); Stop/cancel
+  auto-denies anything pending.
 - **`graphTools.ts`** — the tool executor. Applies the model's graph edits through
   `useGraph` (guarded by the same `isValidConnection` / validation rules a human
   action goes through) and answers read tools (training history; dataset facts via
   `POST /dataset-detail` for `get_dataset_info`, which works for `data.custom` too).
+  Training control rides the same `useGraph` paths as the Toolbar: `start_training`
+  pre-validates then fire-and-forgets `runTrain()` (the tool result returns
+  immediately — training streams on in the background), `stop_training` calls
+  `cancelTrain()`. Live/dashboard reads: `get_training_status` (mid-run progress),
+  `get_epoch_detail` (gradient flow, per-class accuracy, tracked samples, generated
+  text), `get_test_results`, and `get_saved_runs` (`GET /runs`).
+- **`agentPrefs.ts`** — browser-local agent preferences: which tools are gated
+  behind user approval (`start_training` / `stop_training`) and whether to ask.
 - **`AgentSettings.tsx`** — provider dropdown + base URL + model + API key, backed
-  by the config REST routes; "Test connection" pings `POST /agent/test`.
+  by the config REST routes; "Test connection" pings `POST /agent/test`. Also the
+  Permissions section ("Ask before the assistant starts or stops training").
 
 ## The node catalog
 

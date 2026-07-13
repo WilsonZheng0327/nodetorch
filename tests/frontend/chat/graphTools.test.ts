@@ -7,17 +7,25 @@ import { describe, it, expect, vi } from 'vitest';
 import { initDomain } from '../../../src/domain';
 import { createGraph, createNode, addNode, createEdge, addEdge } from '../../../src/core/graph';
 import { executeGraphTool, type GraphToolApi } from '../../../src/ui/chat/graphTools';
-import { callBackend } from '../../../src/api/client';
+import { callBackend, getBackend } from '../../../src/api/client';
 
-// get_dataset_info calls the backend; stub it so tests stay offline.
-vi.mock('../../../src/api/client', () => ({ callBackend: vi.fn() }));
+// get_dataset_info / get_saved_runs call the backend; stub it so tests stay offline.
+vi.mock('../../../src/api/client', () => ({ callBackend: vi.fn(), getBackend: vi.fn() }));
 
 const domain = initDomain();
 
 function makeApi() {
   const g = createGraph('main', 'Main');
   addNode(g, createNode('c1', 'ml.layers.conv2d', { x: 0, y: 0 }, { outChannels: 32 }));
-  const flags = { organized: false, blockAdded: '', entered: '', exited: 0, saved: '' };
+  const flags = {
+    organized: false,
+    blockAdded: '',
+    entered: '',
+    exited: 0,
+    saved: '',
+    trainStarted: 0,
+    trainCancelled: 0,
+  };
 
   const api: GraphToolApi = {
     getCurrentGraph: () => g,
@@ -70,6 +78,15 @@ function makeApi() {
     trainingProgress: [],
     modelTrained: false,
     modelStale: false,
+    trainingActive: false,
+    batchProgress: null,
+    testResult: null,
+    runTrain: async () => {
+      flags.trainStarted += 1;
+    },
+    cancelTrain: () => {
+      flags.trainCancelled += 1;
+    },
   };
   return { api, g, flags };
 }
@@ -344,6 +361,203 @@ describe('executeGraphTool', () => {
     expect(await executeGraphTool(api, domain, 'get_training_results', {})).toMatch(
       /stale|no longer reflect/i,
     );
+  });
+
+  // Replace the lone conv with a structurally-valid training graph:
+  // mnist → linear → cross_entropy ← labels, loss → adam.
+  function buildTrainableGraph(g: ReturnType<typeof createGraph>) {
+    g.nodes.delete('c1');
+    addNode(g, createNode('d', 'data.mnist', { x: 0, y: 0 }, {}));
+    addNode(g, createNode('lin', 'ml.layers.linear', { x: 1, y: 0 }, {}));
+    addNode(g, createNode('ce', 'ml.loss.cross_entropy', { x: 2, y: 0 }, {}));
+    addNode(g, createNode('opt', 'ml.optimizers.adam', { x: 3, y: 0 }, {}));
+    addEdge(g, createEdge('t1', 'd', 'out', 'lin', 'in'));
+    addEdge(g, createEdge('t2', 'lin', 'out', 'ce', 'predictions'));
+    addEdge(g, createEdge('t3', 'd', 'labels', 'ce', 'labels'));
+    addEdge(g, createEdge('t4', 'ce', 'out', 'opt', 'loss'));
+  }
+
+  it('start_training refuses an untrainable graph and reports the problems', async () => {
+    const { api, flags } = makeApi(); // just a dangling conv — not trainable
+    const msg = await executeGraphTool(api, domain, 'start_training', {});
+    expect(msg).toMatch(/^error: the graph is not ready to train/);
+    expect(flags.trainStarted).toBe(0);
+  });
+
+  it('start_training starts a valid graph, and refuses while one is running', async () => {
+    const { api, g, flags } = makeApi();
+    buildTrainableGraph(g);
+    expect(await executeGraphTool(api, domain, 'start_training', {})).toMatch(
+      /^ok: training started/,
+    );
+    expect(flags.trainStarted).toBe(1);
+
+    api.trainingActive = true;
+    expect(await executeGraphTool(api, domain, 'start_training', {})).toMatch(
+      /already in progress/,
+    );
+    expect(flags.trainStarted).toBe(1);
+  });
+
+  it('stop_training cancels only when a run is active', async () => {
+    const { api, flags } = makeApi();
+    expect(await executeGraphTool(api, domain, 'stop_training', {})).toMatch(
+      /^error: no training run/,
+    );
+    expect(flags.trainCancelled).toBe(0);
+
+    api.trainingActive = true;
+    expect(await executeGraphTool(api, domain, 'stop_training', {})).toMatch(/^ok: cancel/);
+    expect(flags.trainCancelled).toBe(1);
+  });
+
+  it('get_training_status reports idle, running, and stale states', async () => {
+    const { api } = makeApi();
+    let s = await executeGraphTool(api, domain, 'get_training_status', {});
+    expect(s).toMatch(/no training is running/);
+    expect(s).toMatch(/no trained model in memory/);
+
+    api.trainingActive = true;
+    api.trainingProgress = [{ epoch: 1, totalEpochs: 5, loss: 0.8, accuracy: 0.7 }];
+    api.batchProgress = { batch: 12, totalBatches: 400 };
+    s = await executeGraphTool(api, domain, 'get_training_status', {});
+    expect(s).toMatch(/RUNNING/);
+    expect(s).toMatch(/epochs completed: 1 of 5/);
+    expect(s).toMatch(/batch 12\/400/);
+    expect(s).toMatch(/loss=0\.8000, acc=70\.0%/);
+
+    api.trainingActive = false;
+    api.modelTrained = true;
+    api.modelStale = true;
+    s = await executeGraphTool(api, domain, 'get_training_status', {});
+    expect(s).toMatch(/STALE/);
+    expect(s).toMatch(/last run ended at epoch 1/);
+  });
+
+  it('get_epoch_detail reports gradients, per-class accuracy, tracked samples, text', async () => {
+    const { api } = makeApi();
+    expect(await executeGraphTool(api, domain, 'get_epoch_detail', {})).toMatch(
+      /^error: no training history/,
+    );
+
+    api.trainingProgress = [
+      { epoch: 1, loss: 1.2, accuracy: 0.5 },
+      {
+        epoch: 2,
+        totalEpochs: 2,
+        loss: 0.4,
+        accuracy: 0.9,
+        time: 3.2,
+        samples: 1000,
+        gradientFlow: [
+          { name: 'conv1', norm: 0.5 },
+          { name: 'fc', norm: 0.001 },
+        ],
+        perClassAccuracy: [
+          { cls: 0, accuracy: 0.95 },
+          { cls: 1, accuracy: 0.6 },
+        ],
+        classNames: ['cat', 'dog'],
+        trackedSamples: [
+          { idx: 7, label: 1, predictedClass: 0, confidence: 0.55, loss: 1.9 },
+        ],
+        generatedText: 'To be or not to be',
+      },
+    ];
+    // Defaults to the latest epoch.
+    const detail = await executeGraphTool(api, domain, 'get_epoch_detail', {});
+    expect(detail).toMatch(/Epoch 2 of 2: loss=0\.4000, acc=90\.0%/);
+    expect(detail).toMatch(/- conv1: 0\.5000/);
+    expect(detail).toMatch(/- fc: 0\.0010/);
+    expect(detail).toMatch(/- dog: 60\.0%/); // class names resolved, worst first
+    expect(detail).toMatch(/#7: true=dog pred=cat \(55\.0%\) loss=1\.9000 ✗/);
+    expect(detail).toMatch(/To be or not to be/);
+
+    expect(await executeGraphTool(api, domain, 'get_epoch_detail', { epoch: 1 })).toMatch(
+      /Epoch 1/,
+    );
+    expect(await executeGraphTool(api, domain, 'get_epoch_detail', { epoch: 9 })).toMatch(
+      /^error: no epoch 9/,
+    );
+  });
+
+  it('get_test_results summarizes the test tab including top confusions', async () => {
+    const { api } = makeApi();
+    expect(await executeGraphTool(api, domain, 'get_test_results', {})).toMatch(
+      /no test results/,
+    );
+
+    api.testResult = {
+      testLoss: 0.31,
+      testAccuracy: 0.91,
+      testSamples: 10000,
+      perClassAccuracy: [
+        { cls: 0, name: 'cat', accuracy: 0.97, count: 5000 },
+        { cls: 1, name: 'dog', accuracy: 0.85, count: 5000 },
+      ],
+      confusionMatrix: {
+        size: 2,
+        data: [
+          [4850, 150],
+          [750, 4250],
+        ],
+        classNames: ['cat', 'dog'],
+      },
+    };
+    const s = await executeGraphTool(api, domain, 'get_test_results', {});
+    expect(s).toMatch(/10000 samples — accuracy 91\.0%, loss 0\.3100/);
+    expect(s).toMatch(/- dog: 85\.0% \(5000 samples\)/);
+    expect(s).toMatch(/true dog predicted as cat: 750×/);
+  });
+
+  it('get_saved_runs lists runs and details one by id', async () => {
+    const run = {
+      id: 'run-1',
+      timestamp: '2026-07-12 10:00',
+      datasetType: 'data.mnist',
+      epochs: 5,
+      learningRate: 0.001,
+      optimizer: 'adam',
+      scheduler: 'none',
+      finalLoss: 0.2,
+      finalAccuracy: 0.93,
+      bestValAccuracy: 0.92,
+      duration: 42,
+      totalParams: 101770,
+      nodeCount: 5,
+    };
+    vi.mocked(getBackend).mockResolvedValueOnce({ ok: true, data: { runs: [run] } });
+    const list = await executeGraphTool(makeApi().api, domain, 'get_saved_runs', {});
+    expect(getBackend).toHaveBeenCalledWith('/runs');
+    expect(list).toMatch(/run-1 .* 5 epochs, adam lr=0\.001/);
+    expect(list).toMatch(/finalAcc=93\.0%/);
+
+    vi.mocked(getBackend).mockResolvedValueOnce({
+      ok: true,
+      data: {
+        run: {
+          ...run,
+          batchSize: 64,
+          seed: 42,
+          valSplit: 0.1,
+          epochHistory: [
+            { epoch: 1, loss: 0.9, accuracy: 0.6 },
+            { epoch: 2, loss: 0.5, accuracy: 0.8 },
+          ],
+        },
+      },
+    });
+    const detail = await executeGraphTool(makeApi().api, domain, 'get_saved_runs', {
+      id: 'run-1',
+    });
+    expect(getBackend).toHaveBeenLastCalledWith('/runs/run-1');
+    expect(detail).toMatch(/batchSize=64/);
+    expect(detail).toMatch(/- epoch 2: loss=0\.5000, acc=80\.0%/);
+
+    vi.mocked(getBackend).mockResolvedValueOnce({ ok: false, error: 'Run not found' });
+    expect(
+      await executeGraphTool(makeApi().api, domain, 'get_saved_runs', { id: 'nope' }),
+    ).toBe('error: Run not found');
   });
 
   it('reports unknown tools', async () => {

@@ -43,3 +43,5 @@ test_diffusion.py
 !/backend/**/*.py
 
 .claude
+# Agent e2e test harness + recorded transcripts (session artifacts, not source)
+/agent-tests/

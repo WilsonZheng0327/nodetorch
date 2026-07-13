@@ -7,6 +7,7 @@ import './AgentSettings.css';
 import { useEffect, useState } from 'react';
 import { X, Check, Loader2 } from 'lucide-react';
 import { API_BASE } from '../../api/base';
+import { askBeforeTraining, setAskBeforeTraining } from './agentPrefs';
 
 const API = API_BASE;
 
@@ -43,6 +44,9 @@ export function AgentSettings({ open, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
+  // Browser-local permission pref (only this dialog changes it, so lazy init
+  // stays correct across opens — no effect needed).
+  const [askTraining, setAskTraining] = useState(askBeforeTraining);
 
   useEffect(() => {
     if (!open) return;
@@ -122,7 +126,7 @@ export function AgentSettings({ open, onClose, onSaved }: Props) {
     >
       <div className="agent-settings">
         <div className="agent-settings-header">
-          <span>AI Assistant — Provider</span>
+          <span>AI Assistant — Settings</span>
           <button className="agent-settings-x" onClick={onClose} title="Close">
             <X size={16} />
           </button>
@@ -158,6 +162,19 @@ export function AgentSettings({ open, onClose, onSaved }: Props) {
               />
             </label>
           ))}
+
+          <div className="agent-settings-section">Permissions</div>
+          <label className="agent-settings-check">
+            <input
+              type="checkbox"
+              checked={askTraining}
+              onChange={(e) => {
+                setAskTraining(e.target.checked);
+                setAskBeforeTraining(e.target.checked);
+              }}
+            />
+            <span>Ask before the assistant starts or stops training</span>
+          </label>
 
           {feedback && (
             <div className={`agent-settings-feedback ${feedback.ok ? 'ok' : 'err'}`}>
