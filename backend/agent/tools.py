@@ -201,7 +201,8 @@ GRAPH_TOOLS: list[ToolSpec] = [
             "current-epoch batch progress, and the latest metrics — plus whether a "
             "trained model is in memory and whether it's stale (graph edited after "
             "training). Call this to report live progress mid-run; do NOT call it "
-            "repeatedly in a loop."
+            "repeatedly in a loop. It says nothing about hardware — for GPU/device "
+            "questions use get_system_info."
         ),
         parameters={"type": "object", "properties": {}},
     ),
@@ -249,8 +250,9 @@ GRAPH_TOOLS: list[ToolSpec] = [
     ToolSpec(
         name="start_training",
         description=(
-            "Start a training run of the current graph — the same as the user "
-            "pressing Train. Validates first and refuses if the graph isn't "
+            "Start a TRAINING run of the current graph — the same as the user "
+            "pressing Train. Not for evaluating: when the user asks to test the "
+            "model, use run_test instead. Validates first and refuses if the graph isn't "
             "trainable. Returns IMMEDIATELY while training continues in the "
             "background: report that it started and answer later questions with "
             "get_training_status — do NOT wait for it or poll in a loop. May ask the "
@@ -270,8 +272,9 @@ GRAPH_TOOLS: list[ToolSpec] = [
     ToolSpec(
         name="run_test",
         description=(
-            "Evaluate the trained model on the held-out test set — the same as the "
-            "user pressing Test (classification models only). Needs a trained, "
+            "THE tool for 'test it' / 'evaluate it' requests: runs the trained "
+            "model on the held-out test set, same as the user pressing Test "
+            "(classification models only; never starts training). Needs a trained, "
             "non-stale model. Takes a few seconds, then returns the results "
             "(accuracy, loss, per-class accuracy, top confusions), which also "
             "appear in the dashboard's Test tab."

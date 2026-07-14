@@ -358,7 +358,16 @@ def build_detail(spec: DatasetSpec) -> dict:
         "description": f"Custom HuggingFace dataset: {spec.hf_id}",
         "trainSamples": len(hf),
         "diskSize": "—",
+        # The dataset's real column names — lets the UI (and the agent) catch a
+        # wrong inputColumn/labelColumn mapping instead of silently showing no
+        # labels (e.g. beans names its label column "labels", not "label").
+        "columns": list(getattr(hf, "column_names", None) or []),
     }
+    if spec.test_split:
+        try:
+            detail["testSamples"] = len(_load_hf(spec, spec.test_split))
+        except Exception:
+            pass  # no such split — the card simply omits the count
     if spec.input_kind == "image":
         labels = infer_class_names(spec)
         detail.update({

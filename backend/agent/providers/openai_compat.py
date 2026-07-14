@@ -7,8 +7,10 @@ base_url + model + api_key.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import re
 
 from agent.config import AgentConfig
 from agent.providers.base import (
@@ -37,6 +39,20 @@ _MALFORMED_TOOL_ERRORS = (
 def _is_malformed_tool_error(text: str) -> bool:
     low = text.lower()
     return any(s in low for s in _MALFORMED_TOOL_ERRORS)
+
+
+# 429 messages usually suggest a wait ("Please try again in 178ms" / "in 1.2s").
+_RETRY_AFTER_RE = re.compile(r"try again in ([0-9.]+)\s*(ms|s)\b", re.IGNORECASE)
+
+
+def _retry_after_seconds(text: str) -> float | None:
+    """The provider-suggested backoff parsed from a rate-limit message, capped."""
+    m = _RETRY_AFTER_RE.search(text)
+    if not m:
+        return None
+    value = float(m.group(1))
+    seconds = value / 1000 if m.group(2).lower() == "ms" else value
+    return min(seconds, 20.0)
 
 
 def _failed_generation(e) -> str | None:
@@ -87,7 +103,7 @@ class OpenAICompatProvider(LLMProvider):
         if not self.config.model:
             raise ProviderError("No model configured")
 
-        from openai import OpenAIError
+        from openai import OpenAIError, RateLimitError
 
         client = self._client()
         convo = ([{"role": "system", "content": system}] if system else []) + list(messages)
@@ -97,6 +113,7 @@ class OpenAICompatProvider(LLMProvider):
         ]
         opts = self.config.options or {}
         nudges_left = 2  # corrective retries for malformed tool calls
+        rate_retries_left = 3  # 429 backoff retries (a long tool loop can hit TPM limits)
 
         turn_prompt = 0
         turn_completion = 0
@@ -157,6 +174,16 @@ class OpenAICompatProvider(LLMProvider):
                             usage.prompt_tokens, usage.completion_tokens, turn_prompt, turn_completion,
                         )
                 except OpenAIError as e:
+                    # Transient rate limit (TPM/RPM) — wait what the provider suggests
+                    # (or a ramping default) and retry, instead of killing the turn.
+                    if isinstance(e, RateLimitError) and rate_retries_left > 0:
+                        rate_retries_left -= 1
+                        wait = max(1.0, _retry_after_seconds(str(e)) or (3 - rate_retries_left) * 5.0)
+                        logger.warning(
+                            "⚠ rate limited; retrying in %.1fs (%d retries left)", wait, rate_retries_left
+                        )
+                        await asyncio.sleep(wait)
+                        continue
                     # Some providers (e.g. Groq + Llama) reject a malformed tool call
                     # server-side. Nudge the model to re-issue a clean call and retry.
                     if _is_malformed_tool_error(str(e)) and nudges_left > 0:

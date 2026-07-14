@@ -70,10 +70,17 @@ export const crossEntropyLossNode: NodeDefinition = {
         if (isSequence) {
           // [B, seq_len, C] with labels [B, seq_len]
           if (labels.length !== 2 || labels[0] !== B || labels[1] !== predictions[1]) {
+            // 1-D class labels against sequence-shaped logits almost always
+            // mean a classifier forgot to collapse the time axis — point at
+            // that fix, or people (and the AI agent) go rewiring the labels.
+            const hint =
+              labels.length === 1
+                ? ` — for classification, pool the sequence before the final Linear (e.g. ml.structural.sequence_pool) so predictions become [B, C]; only next-token LM training uses [${B}, ${predictions[1]}] labels`
+                : '';
             return {
               outputs: {},
               metadata: {
-                error: `Labels should be [${B}, ${predictions[1]}], got [${labels.join(', ')}]`,
+                error: `Labels should be [${B}, ${predictions[1]}] for sequence predictions, got [${labels.join(', ')}]${hint}`,
               },
             };
           }

@@ -10,6 +10,9 @@ import { apiUrl } from '../../api/base';
 export interface DatasetInfo {
   name: string;
   description: string;
+  /** Raw column names of the source dataset (custom datasets) — lets a wrong
+   *  inputColumn/labelColumn mapping be spotted and corrected. */
+  columns?: string[];
   labels: string[];
   coarseLabels?: string[];
   channels?: number;

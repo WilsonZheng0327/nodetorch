@@ -434,7 +434,7 @@ export async function executeGraphTool(
       case 'add_node':
         return await addNode(graph, domain, args);
       case 'connect':
-        return await connect(graph, args);
+        return await connect(graph, domain, args);
       case 'remove_node':
         return await removeNode(graph, args);
       case 'remove_edge':
@@ -523,31 +523,95 @@ async function addNode(graph: GraphToolApi, domain: Domain, args: Args) {
     }
   }
   let msg = `ok: added ${type} as "${id}"`;
+  if (requestedId && id !== requestedId) {
+    msg += ` — the requested id "${requestedId}" was already taken; use "${id}" in later calls`;
+  }
   if (unknown.length) {
     msg += ` (ignored unknown propert${unknown.length > 1 ? 'ies' : 'y'} ${unknown.join(', ')} — valid keys: ${[...valid].join(', ') || '(none)'})`;
   }
   return msg;
 }
 
-async function connect(graph: GraphToolApi, args: Args) {
-  const sourceId = String(args.sourceId ?? '');
-  const targetId = String(args.targetId ?? '');
-  const sourcePort = String(args.sourcePort ?? '');
-  const targetPort = String(args.targetPort ?? '');
+/** A node's ports in one direction, from its definition (ports can depend on
+ *  the node's properties). */
+function portsOf(domain: Domain, node: NodeInstance, direction: 'input' | 'output') {
+  const def = domain.nodeRegistry.get(node.type);
+  return (def?.getPorts(node.properties) ?? []).filter((p) => p.direction === direction);
+}
+
+/** Models habitually concatenate "nodeId.portId" into the id argument — split
+ *  it when the raw string isn't a node but its dot-prefix is. */
+function splitNodePort(g: Graph, raw: string): { nodeId: string; portId?: string } {
+  if (g.nodes.has(raw)) return { nodeId: raw };
+  const i = raw.lastIndexOf('.');
+  if (i > 0 && g.nodes.has(raw.slice(0, i))) {
+    return { nodeId: raw.slice(0, i), portId: raw.slice(i + 1) };
+  }
+  return { nodeId: raw };
+}
+
+async function connect(graph: GraphToolApi, domain: Domain, args: Args) {
   const g = graph.getCurrentGraph();
-  if (!g.nodes.has(sourceId)) return `error: no node "${sourceId}"`;
-  if (!g.nodes.has(targetId)) return `error: no node "${targetId}"`;
+  const s = splitNodePort(g, String(args.sourceId ?? ''));
+  const t = splitNodePort(g, String(args.targetId ?? ''));
+  const sourcePort = String(args.sourcePort ?? '') || s.portId || '';
+  const targetPort = String(args.targetPort ?? '') || t.portId || '';
+  const notes: string[] = [];
+  if (s.portId) notes.push(`read "${args.sourceId}" as node "${s.nodeId}" — pass ids and ports separately`);
+  if (t.portId) notes.push(`read "${args.targetId}" as node "${t.nodeId}" — pass ids and ports separately`);
+
+  const sNode = g.nodes.get(s.nodeId);
+  if (!sNode) return `error: no node "${args.sourceId}"`;
+  const tNode = g.nodes.get(t.nodeId);
+  if (!tNode) return `error: no node "${args.targetId}"`;
+
+  // Precise diagnostics before the generic validity check, so the model gets an
+  // actionable reason instead of a catch-all "invalid connection".
+  const outs = portsOf(domain, sNode, 'output');
+  if (!outs.some((p) => p.id === sourcePort)) {
+    return `error: "${s.nodeId}" has no output port "${sourcePort}" — its outputs: ${outs.map((p) => p.id).join(', ') || '(none)'}`;
+  }
+  const ins = portsOf(domain, tNode, 'input');
+  const inPort = ins.find((p) => p.id === targetPort);
+  if (!inPort) {
+    return `error: "${t.nodeId}" has no input port "${targetPort}" — its inputs: ${ins.map((p) => p.id).join(', ') || '(none)'}`;
+  }
+  if (!inPort.allowMultiple) {
+    const occupied = g.edges.find(
+      (e) => e.target.nodeId === t.nodeId && e.target.portId === targetPort,
+    );
+    if (occupied) {
+      return (
+        `error: ${t.nodeId}.${targetPort} is already connected (from ${occupied.source.nodeId}.${occupied.source.portId}) and takes a single connection — ` +
+        `to insert a node there, first remove_edge(${occupied.source.nodeId}, ${occupied.source.portId}, ${t.nodeId}, ${targetPort})`
+      );
+    }
+  }
+
   const connection: RF.Connection = {
-    source: sourceId,
+    source: s.nodeId,
     sourceHandle: sourcePort,
-    target: targetId,
+    target: t.nodeId,
     targetHandle: targetPort,
   };
   if (!graph.isValidConnection(connection)) {
-    return `error: invalid connection ${sourceId}.${sourcePort} -> ${targetId}.${targetPort} (check port ids and type compatibility)`;
+    return `error: invalid connection ${s.nodeId}.${sourcePort} -> ${t.nodeId}.${targetPort} (incompatible data types, or a self-connection/cycle)`;
   }
   await graph.connect(connection);
-  return `ok: connected ${sourceId}.${sourcePort} -> ${targetId}.${targetPort}`;
+  // Labels fed by a computed tensor pass the shape checks but are semantically
+  // wrong essentially always (seen: tokenizer.out wired as labels to silence a
+  // sequence-shape error). Warn loudly, but don't block exotic graphs.
+  if (
+    targetPort === 'labels' &&
+    domain.nodeRegistry.get(tNode.type)?.category.includes('Loss') &&
+    domain.nodeRegistry.get(sNode.type)?.category[0] !== 'Data'
+  ) {
+    notes.push(
+      'WARNING: loss labels normally come straight from a data node\'s labels output — feeding a computed tensor as labels is almost always wrong',
+    );
+  }
+  const note = notes.length ? ` (note: ${notes.join('; ')})` : '';
+  return `ok: connected ${s.nodeId}.${sourcePort} -> ${t.nodeId}.${targetPort}${note}`;
 }
 
 async function removeNode(graph: GraphToolApi, args: Args) {
@@ -613,6 +677,9 @@ function summarizeDatasetInfo(d: DatasetInfo): string {
   const counts = [`train samples: ${d.trainSamples}`];
   if (typeof d.testSamples === 'number') counts.push(`test samples: ${d.testSamples}`);
   lines.push(counts.join(', '));
+  // Source columns let the model verify (and fix) its inputColumn/labelColumn
+  // mapping — a wrong labelColumn otherwise just shows up as "no classes".
+  if (d.columns?.length) lines.push(`columns: ${d.columns.join(', ')}`);
   if (d.channels != null && d.imageSize) {
     lines.push(`images: ${d.channels}×${d.imageSize.join('×')} (C×H×W)`);
   }
@@ -646,7 +713,22 @@ async function getDatasetInfo(graph: GraphToolApi, domain: Domain, args: Args) {
     properties: node.properties,
   });
   if (!res.ok) return `error: ${res.error}`;
-  return summarizeDatasetInfo(res.data.detail);
+  let out = summarizeDatasetInfo(res.data.detail);
+  // A misconfigured column mapping otherwise fails silently (no class names) —
+  // tell the model exactly what to fix and to re-inspect afterwards.
+  const cols = res.data.detail.columns;
+  if (cols?.length) {
+    const mapped: [string, unknown][] = [['inputColumn', node.properties.inputColumn]];
+    if (node.properties.task !== 'language_model') {
+      mapped.push(['labelColumn', node.properties.labelColumn]);
+    }
+    for (const [key, value] of mapped) {
+      if (typeof value === 'string' && value && !cols.includes(value)) {
+        out += `\nWARNING: configured ${key} "${value}" is not a column of this dataset — set it to one of the columns above, then call get_dataset_info again`;
+      }
+    }
+  }
+  return out;
 }
 
 function validate(graph: GraphToolApi, domain: Domain, args: Args) {

@@ -74,8 +74,8 @@ function makeApi() {
     saveBlock: async (id) => {
       flags.saved = id;
     },
-    // fake validation: reject only the sentinel 'bad' target port
-    isValidConnection: (c) => c.targetHandle !== 'bad',
+    // fake validation: reject any connection into the sentinel node 'r2'
+    isValidConnection: (c) => c.target !== 'r2',
     trainingProgress: [],
     modelTrained: false,
     modelStale: false,
@@ -179,6 +179,7 @@ describe('executeGraphTool', () => {
         targetPort: 'in',
       }),
     ).toMatch(/^error/);
+    // Nonexistent ports name the node's real ports.
     expect(
       await executeGraphTool(api, domain, 'connect', {
         sourceId: 'c1',
@@ -186,7 +187,81 @@ describe('executeGraphTool', () => {
         targetId: 'r1',
         targetPort: 'bad',
       }),
+    ).toMatch(/"r1" has no input port "bad" — its inputs: in/);
+    expect(
+      await executeGraphTool(api, domain, 'connect', {
+        sourceId: 'c1',
+        sourcePort: 'bogus',
+        targetId: 'r1',
+        targetPort: 'in',
+      }),
+    ).toMatch(/"c1" has no output port "bogus" — its outputs: out/);
+    // Structurally fine but rejected by the validity rules (r2 is the sentinel).
+    addNode(g, createNode('r2', 'ml.activations.relu', { x: 2, y: 0 }, {}));
+    expect(
+      await executeGraphTool(api, domain, 'connect', {
+        sourceId: 'c1',
+        sourcePort: 'out',
+        targetId: 'r2',
+        targetPort: 'in',
+      }),
     ).toMatch(/invalid connection/);
+  });
+
+  it('connect splits "nodeId.portId" ids and flags occupied single-input ports', async () => {
+    const { api, g } = makeApi();
+    addNode(g, createNode('r1', 'ml.activations.relu', { x: 1, y: 0 }, {}));
+    // The "c1.out" concatenation habit is auto-resolved, with a corrective note.
+    expect(
+      await executeGraphTool(api, domain, 'connect', {
+        sourceId: 'c1.out',
+        targetId: 'r1.in',
+      }),
+    ).toMatch(/^ok: connected c1\.out -> r1\.in \(note: .*separately/);
+
+    // A single-input port that's taken points at the exact remove_edge call.
+    addEdge(g, createEdge('e1', 'c1', 'out', 'r1', 'in'));
+    expect(
+      await executeGraphTool(api, domain, 'connect', {
+        sourceId: 'c1',
+        sourcePort: 'out',
+        targetId: 'r1',
+        targetPort: 'in',
+      }),
+    ).toMatch(/already connected \(from c1\.out\).*remove_edge\(c1, out, r1, in\)/);
+  });
+
+  it('connect warns when loss labels come from a computed tensor', async () => {
+    const { api, g } = makeApi();
+    addNode(g, createNode('ce', 'ml.loss.cross_entropy', { x: 2, y: 0 }, {}));
+    const bad = await executeGraphTool(api, domain, 'connect', {
+      sourceId: 'c1',
+      sourcePort: 'out',
+      targetId: 'ce',
+      targetPort: 'labels',
+    });
+    expect(bad).toMatch(/^ok/);
+    expect(bad).toMatch(/WARNING: loss labels normally come straight from a data node/);
+
+    // Straight from a data node → no warning.
+    addNode(g, createNode('d', 'data.mnist', { x: 0, y: 1 }, {}));
+    const good = await executeGraphTool(api, domain, 'connect', {
+      sourceId: 'd',
+      sourcePort: 'labels',
+      targetId: 'ce',
+      targetPort: 'labels',
+    });
+    expect(good).toMatch(/^ok/);
+    expect(good).not.toMatch(/WARNING/);
+  });
+
+  it('add_node reports when the requested id is already taken', async () => {
+    const { api } = makeApi();
+    const msg = await executeGraphTool(api, domain, 'add_node', {
+      type: 'ml.activations.relu',
+      id: 'c1', // taken by the conv in makeApi
+    });
+    expect(msg).toMatch(/requested id "c1" was already taken; use "ml\.activations\.relu-new"/);
   });
 
   it('remove_node / remove_edge', async () => {
