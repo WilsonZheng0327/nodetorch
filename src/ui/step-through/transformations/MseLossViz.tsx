@@ -3,6 +3,7 @@
 import { useRef, useEffect } from 'react';
 import type { MseLossTransformation } from '../types';
 import { FeatureMapsGrid } from './shared';
+import { fmtValue } from './format';
 
 export function MseLossViz({ t }: { t: MseLossTransformation }) {
   return (
@@ -110,11 +111,12 @@ function ErrorMapCanvas({
   return <canvas ref={canvasRef} className="tfm-mse-error-canvas" />;
 }
 
-function fmtV(v: number): string {
-  if (v === 0) return '0';
-  const abs = Math.abs(v);
-  if (abs >= 1000) return v.toFixed(1);
-  if (abs >= 1) return v.toFixed(4);
-  if (abs >= 0.0001) return v.toFixed(6);
-  return v.toExponential(2);
-}
+const fmtV = (v: number) =>
+  fmtValue(v, {
+    bigThresh: 1000,
+    bigDigits: 1,
+    midDigits: 4,
+    smallThresh: 0.0001,
+    smallDigits: 6,
+    expDigits: 2,
+  });

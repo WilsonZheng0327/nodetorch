@@ -14,6 +14,8 @@ import {
   addEdge as addGraphEdge,
   setProperty,
   markDirty,
+  SUBGRAPH_INPUT_TYPE,
+  SUBGRAPH_OUTPUT_TYPE,
 } from '../core/graph';
 import type { DomainContext } from '../domain';
 import { validateForward, validateTraining } from '../core/validation';
@@ -430,13 +432,13 @@ export function useGraph(domain: DomainContext) {
         const innerGraph = createGraph(`${id}-inner`, 'Inner Graph');
         const inputNode = createNode(
           'input',
-          'subgraph.input',
+          SUBGRAPH_INPUT_TYPE,
           { x: 0, y: 100 },
           { portCount: 1, portNames: 'in' },
         );
         const outputNode = createNode(
           'output',
-          'subgraph.output',
+          SUBGRAPH_OUTPUT_TYPE,
           { x: 400, y: 100 },
           { portCount: 1, portNames: 'out' },
         );

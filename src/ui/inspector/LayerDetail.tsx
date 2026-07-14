@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import './LayerDetail.css';
 import { TokenizerDetail } from './TokenizerDetail';
 import { apiUrl } from '../../api/base';
+import { PixelCanvas } from '../PixelCanvas';
 
 const TOKENIZER_TYPES = new Set([
   'ml.preprocessing.tokenizer_char',
@@ -538,37 +539,9 @@ function heatColor(t: number, scheme: string): string {
 // --- Feature map small canvas ---
 
 function FeatureMapCanvas({ pixels, label }: { pixels: number[][]; label: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || pixels.length === 0 || !pixels[0]) return;
-
-    const h = pixels.length;
-    const w = pixels[0].length;
-    canvas.width = w;
-    canvas.height = h;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const imageData = ctx.createImageData(w, h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        const v = pixels[y][x];
-        imageData.data[idx] = v;
-        imageData.data[idx + 1] = v;
-        imageData.data[idx + 2] = v;
-        imageData.data[idx + 3] = 255;
-      }
-    }
-    ctx.putImageData(imageData, 0, 0);
-  }, [pixels]);
-
   return (
     <div className="feature-map-item">
-      <canvas ref={canvasRef} className="feature-map-canvas" />
+      <PixelCanvas pixels={pixels} className="feature-map-canvas" />
       <span className="feature-map-label">{label}</span>
     </div>
   );

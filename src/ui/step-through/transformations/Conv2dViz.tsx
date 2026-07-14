@@ -7,6 +7,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Conv2dTransformation } from '../types';
 import { GrayscaleCanvas } from './shared';
+import { fmtValue } from './format';
 
 export function Conv2dViz({ t }: { t: Conv2dTransformation }) {
   const hasInteractive = t.rawInputs && t.allKernels && t.rawOutputs;
@@ -610,11 +611,4 @@ function GridWithOverlay({
   );
 }
 
-function fmtV(v: number): string {
-  if (v === 0) return '0';
-  const abs = Math.abs(v);
-  if (abs >= 100) return v.toFixed(1);
-  if (abs >= 1) return v.toFixed(2);
-  if (abs >= 0.01) return v.toFixed(3);
-  return v.toExponential(1);
-}
+const fmtV = (v: number) => fmtValue(v, { bigDigits: 1 });

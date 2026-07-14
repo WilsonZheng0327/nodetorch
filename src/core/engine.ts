@@ -2,7 +2,13 @@
 // Runs the graph in different modes. Doesn't know what the modes do —
 // just how to propagate execution through nodes in the right order.
 
-import { type Graph, type ExecutionResult, topologicalSort } from './graph';
+import {
+  type Graph,
+  type ExecutionResult,
+  topologicalSort,
+  SUBGRAPH_INPUT_TYPE,
+  SUBGRAPH_OUTPUT_TYPE,
+} from './graph';
 
 // --- Execution Mode ---
 
@@ -64,6 +70,19 @@ export interface ExecutionContext {
 export type ExecutorLookup = (nodeType: string, executorKey: string) => Executor | undefined;
 
 /**
+ * Optional hook for enriching a subgraph (composite block) node's result metadata.
+ * The engine produces generic metadata (shapes + outputShape) for a block; a domain
+ * layer can register this to add ML/presentation fields (e.g. an aggregated param
+ * count and breakdown) without the engine — Layer 3 — knowing anything about them.
+ * Receives the inner graph and the generic metadata the engine already built, and
+ * returns the metadata to store on the block node.
+ */
+export type SubgraphMetadataBuilder = (
+  subgraph: Graph,
+  baseMetadata: Record<string, any>,
+) => Record<string, any>;
+
+/**
  * Runs execution modes on a graph. Walks nodes in topological order,
  * calls each node's executor, and stores results.
  * Doesn't know what the executors do — just when and in what order to call them.
@@ -71,6 +90,18 @@ export type ExecutorLookup = (nodeType: string, executorKey: string) => Executor
 export class ExecutionEngine {
   /** modeId → mode definition */
   private modes = new Map<string, ExecutionModeDefinition>();
+
+  /** Optional domain-supplied enricher for subgraph node metadata (see type). */
+  private subgraphMetadataBuilder?: SubgraphMetadataBuilder;
+
+  /**
+   * Register a hook that enriches subgraph (composite block) result metadata.
+   * Called by Layer 5 at startup to add ML/presentation fields the engine itself
+   * shouldn't know about. Without it, blocks get generic shape metadata only.
+   */
+  setSubgraphMetadataBuilder(fn: SubgraphMetadataBuilder): void {
+    this.subgraphMetadataBuilder = fn;
+  }
 
   /** Register a new execution mode. Called by Layer 5 at startup. */
   registerMode(mode: ExecutionModeDefinition): void {
@@ -127,7 +158,7 @@ export class ExecutionEngine {
       if (node.subgraph) {
         // 1. Inject inputs into the GraphInput sentinel(s) inside the subgraph
         for (const [, innerNode] of node.subgraph.nodes) {
-          if (innerNode.type === 'subgraph.input') {
+          if (innerNode.type === SUBGRAPH_INPUT_TYPE) {
             innerNode.lastResult = {
               outputs: inputs,
               metadata: {
@@ -149,37 +180,27 @@ export class ExecutionEngine {
         // 3. Read results from the GraphOutput sentinel(s)
         const outputs: Record<string, any> = {};
         for (const [, innerNode] of node.subgraph.nodes) {
-          if (innerNode.type === 'subgraph.output' && innerNode.lastResult?.outputs) {
+          if (innerNode.type === SUBGRAPH_OUTPUT_TYPE && innerNode.lastResult?.outputs) {
             Object.assign(outputs, innerNode.lastResult.outputs);
           }
         }
 
-        // Count total params from all inner nodes
-        let totalParams = 0;
-        const paramParts: string[] = [];
-        for (const [, innerNode] of node.subgraph.nodes) {
-          const pc = innerNode.lastResult?.metadata?.paramCount;
-          if (pc) {
-            totalParams += pc;
-            const shortName = innerNode.type.split('.').pop() ?? innerNode.type;
-            paramParts.push(`${shortName}: ${pc.toLocaleString()}`);
-          }
-        }
+        // Generic (ML-agnostic) metadata the engine can always produce. A domain
+        // layer may enrich this (e.g. add an aggregated param breakdown) via the
+        // registered SubgraphMetadataBuilder — Layer 3 stays out of that.
+        const baseMetadata: Record<string, any> = {
+          outputShape: Object.values(outputs)[0],
+          shapes: Object.entries(outputs).map(([key, val]) => ({
+            label: key,
+            value: Array.isArray(val) ? val : String(val),
+          })),
+        };
 
         node.lastResult = {
           outputs,
-          metadata: {
-            outputShape: Object.values(outputs)[0],
-            paramCount: totalParams || undefined,
-            paramBreakdown:
-              paramParts.length > 0
-                ? paramParts.join(' + ') + ` = ${totalParams.toLocaleString()}`
-                : undefined,
-            shapes: Object.entries(outputs).map(([key, val]) => ({
-              label: key,
-              value: Array.isArray(val) ? val : String(val),
-            })),
-          },
+          metadata: this.subgraphMetadataBuilder
+            ? this.subgraphMetadataBuilder(node.subgraph, baseMetadata)
+            : baseMetadata,
         };
         node.dirty = false;
         continue;

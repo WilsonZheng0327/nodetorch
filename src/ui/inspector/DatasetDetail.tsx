@@ -2,8 +2,9 @@
 // Opened from the inspector when a data node is selected.
 // Handles both image datasets (MNIST, CIFAR) and text datasets (IMDb, AG News).
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { apiUrl } from '../../api/base';
+import { PixelCanvas } from '../PixelCanvas';
 
 /** The `detail` payload of POST /dataset-detail (see backend resolve_detail).
  *  Also consumed by the agent's get_dataset_info tool (src/ui/chat/graphTools). */
@@ -315,47 +316,10 @@ export function DatasetDetail({ datasetType, properties, augOptions, onClose }: 
 
 // Small image thumbnail
 function MiniImage({ pixels, channels }: { pixels: number[][] | number[][][]; channels: number }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !pixels || pixels.length === 0) return;
-
-    const h = pixels.length;
-    const w = Array.isArray(pixels[0][0])
-      ? (pixels[0] as number[][]).length
-      : (pixels[0] as number[]).length;
-    canvas.width = w;
-    canvas.height = h;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const isRGB = channels >= 3;
-    const imageData = ctx.createImageData(w, h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        if (isRGB) {
-          const px = (pixels as number[][][])[y][x];
-          imageData.data[idx] = px[0];
-          imageData.data[idx + 1] = px[1];
-          imageData.data[idx + 2] = px[2];
-        } else {
-          const v = (pixels as number[][])[y][x];
-          imageData.data[idx] = v;
-          imageData.data[idx + 1] = v;
-          imageData.data[idx + 2] = v;
-        }
-        imageData.data[idx + 3] = 255;
-      }
-    }
-    ctx.putImageData(imageData, 0, 0);
-  }, [pixels, channels]);
-
   return (
-    <canvas
-      ref={canvasRef}
+    <PixelCanvas
+      pixels={pixels}
+      channels={channels}
       className="dataset-detail-thumb"
       style={{ imageRendering: 'pixelated' }}
     />

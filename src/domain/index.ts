@@ -6,6 +6,7 @@ import { ExecutionEngine } from '../core/engine';
 import { NodeRegistry } from '../core/nodedef';
 import { registerMLTypes } from './ml-types';
 import { registerMLModes } from './ml-modes';
+import { buildSubgraphMetadata } from './subgraph-metadata';
 
 // Each folder exports an array of NodeDefinitions
 import { dataNodes } from './nodes/data';
@@ -45,6 +46,7 @@ export function initDomain(): DomainContext {
 
   registerMLTypes(typeRegistry);
   registerMLModes(engine);
+  engine.setSubgraphMetadataBuilder(buildSubgraphMetadata);
 
   for (const node of allNodes) {
     nodeRegistry.register(node);

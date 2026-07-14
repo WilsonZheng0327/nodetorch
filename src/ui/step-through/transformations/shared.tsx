@@ -3,6 +3,7 @@
 import { useRef, useEffect } from 'react';
 import type { FeatureMaps, HistogramData } from '../types';
 import { fmtAxis } from './format';
+import { PixelCanvas } from '../../PixelCanvas';
 
 /** Render a grid of feature map channels as grayscale canvases. */
 export function FeatureMapsGrid({ data, label }: { data: FeatureMaps; label?: string }) {
@@ -34,33 +35,10 @@ export function GrayscaleCanvas({
   label?: string;
   size?: number;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || pixels.length === 0) return;
-    const h = pixels.length;
-    const w = pixels[0].length;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const data = ctx.createImageData(w, h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        const v = pixels[y][x];
-        data.data[idx] = v;
-        data.data[idx + 1] = v;
-        data.data[idx + 2] = v;
-        data.data[idx + 3] = 255;
-      }
-    }
-    ctx.putImageData(data, 0, 0);
-  }, [pixels]);
   return (
     <div className="tfm-fmap-item">
-      <canvas
-        ref={canvasRef}
+      <PixelCanvas
+        pixels={pixels}
         style={{ width: size, height: size, imageRendering: 'pixelated' }}
         className="tfm-fmap-canvas"
       />

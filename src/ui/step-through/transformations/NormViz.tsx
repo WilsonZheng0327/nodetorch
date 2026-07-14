@@ -3,6 +3,7 @@
 import { useRef, useEffect } from 'react';
 import type { NormTransformation, HistogramData } from '../types';
 import { Arrow } from './shared';
+import { fmtValue } from './format';
 
 export function NormViz({ t }: { t: NormTransformation }) {
   return (
@@ -138,11 +139,4 @@ function ParamBars({ values }: { values: number[] }) {
   return <canvas ref={canvasRef} className="tfm-param-bars-canvas" />;
 }
 
-function fmt(v: number): string {
-  if (v === 0) return '0';
-  const abs = Math.abs(v);
-  if (abs >= 100) return v.toFixed(0);
-  if (abs >= 1) return v.toFixed(2);
-  if (abs >= 0.01) return v.toFixed(3);
-  return v.toExponential(1);
-}
+const fmt = (v: number) => fmtValue(v);

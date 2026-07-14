@@ -9,15 +9,14 @@ helpers support the training dashboard and are imported by ``training/``.
 import torch
 import torch.nn as nn
 
-from dataprep.data_loaders import DATA_LOADERS
 from dataprep.resolve import resolve_is_lm, resolve_class_names, resolve_test_dataset
 from engine.graph_builder.constants import (
-    LOSS_NODES, ALL_LOSS_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE,
+    LOSS_NODES, GAN_NOISE_TYPE, DIFFUSION_SCHEDULER_TYPE,
 )
 from engine.graph_builder._state import (
     get_device, has_trained_model, get_trained_modules, ensure_trained_model, _last_run,
 )
-from engine.graph_builder.build import topological_sort
+from engine.graph_builder.build import topological_sort, find_key_nodes
 from engine.graph_builder.stats import _safe_float, prediction_from_logits
 from engine.graph_builder.runners import RunContext, execute, describe_inference
 
@@ -56,18 +55,8 @@ def evaluate_test_set(graph_data: "SerializedGraph") -> dict:
     order = topological_sort(nodes, edges)
 
     # Find data, loss, and prediction nodes
-    data_node = None
-    loss_node_id = None
-    pred_node_id = None
-    for nid in order:
-        n = nodes[nid]
-        if n["type"] in DATA_LOADERS:
-            data_node = n
-        if n["type"] in ALL_LOSS_NODES:
-            loss_node_id = nid
-            for edge in edges:
-                if edge["target"]["nodeId"] == nid and edge["target"]["portId"] == "predictions":
-                    pred_node_id = edge["source"]["nodeId"]
+    data_nid, loss_node_id, pred_node_id = find_key_nodes(nodes, edges)
+    data_node = nodes.get(data_nid) if data_nid else None
 
     if not data_node:
         return {"error": "No data node in graph"}
@@ -373,26 +362,10 @@ def probe_tracked_samples(
         return []
 
     dev = get_device()
-    data_nid = None
-    loss_nid = None
-    for nid in order:
-        n = nodes[nid]
-        if n["type"] in DATA_LOADERS:
-            data_nid = nid
-        if n["type"] in ALL_LOSS_NODES:
-            loss_nid = nid
+    data_nid, loss_nid, pred_nid = find_key_nodes(nodes, edges)
 
     if not data_nid:
         return []
-
-    # Find the node feeding predictions to loss (final layer)
-    pred_nid = None
-    if loss_nid:
-        for edge in edges:
-            if (edge["target"]["nodeId"] == loss_nid
-                    and edge["target"]["portId"] == "predictions"):
-                pred_nid = edge["source"]["nodeId"]
-                break
 
     # Probe in eval mode (deterministic batchnorm/dropout), restoring train after.
     for mod in modules.values():

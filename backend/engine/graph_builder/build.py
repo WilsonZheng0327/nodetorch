@@ -50,6 +50,28 @@ def topological_sort(nodes: dict, edges: list) -> list[str]:
     return sorted_ids
 
 
+def find_key_nodes(nodes: dict, edges: list) -> tuple[str | None, str | None, str | None]:
+    """Locate the graph's three load-bearing nodes: (data_nid, loss_nid, pred_nid).
+
+    - data_nid: the first dataset-loader node.
+    - loss_nid: the first loss node.
+    - pred_nid: the node whose output feeds the loss node's "predictions" port
+      (i.e. the logits producer). None if there's no loss node or nothing connected.
+
+    Recurring pattern across inference / backprop / eval code — reuse this instead
+    of re-walking nodes/edges. Returns node ids; callers map back to dicts as needed.
+    """
+    data_nid = next((nid for nid, n in nodes.items() if n["type"] in DATA_LOADERS), None)
+    loss_nid = next((nid for nid, n in nodes.items() if n["type"] in ALL_LOSS_NODES), None)
+    pred_nid = None
+    if loss_nid is not None:
+        for e in edges:
+            if e["target"]["nodeId"] == loss_nid and e["target"]["portId"] == "predictions":
+                pred_nid = e["source"]["nodeId"]
+                break
+    return data_nid, loss_nid, pred_nid
+
+
 def gather_inputs(
     node_id: str, edges: list, results: dict[str, dict[str, torch.Tensor]]
 ) -> dict[str, torch.Tensor]:

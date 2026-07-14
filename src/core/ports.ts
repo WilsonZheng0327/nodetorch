@@ -6,7 +6,7 @@
 //          pruneInvalidEdges (cleanup). Centralizes the "what ports
 //          does this node have?" question so subgraph support is transparent.
 
-import type { NodeInstance, Graph } from './graph';
+import { type NodeInstance, type Graph, SUBGRAPH_INPUT_TYPE, SUBGRAPH_OUTPUT_TYPE } from './graph';
 import type { PortDefinition, NodeRegistry } from './nodedef';
 
 /**
@@ -35,13 +35,13 @@ export function getSubgraphPorts(subgraph: Graph, registry: NodeRegistry): PortD
     const def = registry.get(node.type);
     if (!def) continue;
 
-    if (node.type === 'subgraph.input') {
+    if (node.type === SUBGRAPH_INPUT_TYPE) {
       for (const p of def.getPorts(node.properties)) {
         ports.push({ ...p, direction: 'input', allowMultiple: false });
       }
     }
 
-    if (node.type === 'subgraph.output') {
+    if (node.type === SUBGRAPH_OUTPUT_TYPE) {
       for (const p of def.getPorts(node.properties)) {
         ports.push({ ...p, direction: 'output', allowMultiple: true });
       }

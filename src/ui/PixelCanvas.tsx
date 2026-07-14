@@ -2,16 +2,18 @@
 // feature-map / generated image is previewed. `pixels` is either [y][x] grayscale
 // (0-255) or [y][x][channel] RGB; `channels >= 3` (or a nested first row) → RGB.
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, type CSSProperties } from 'react';
 
 export function PixelCanvas({
   pixels,
   channels = 1,
   className,
+  style,
 }: {
   pixels: number[][] | number[][][];
   channels?: number;
   className?: string;
+  style?: CSSProperties;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -44,5 +46,5 @@ export function PixelCanvas({
       }
     ctx.putImageData(data, 0, 0);
   }, [pixels, channels]);
-  return <canvas ref={ref} className={className} />;
+  return <canvas ref={ref} className={className} style={style} />;
 }

@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { PoolTransformation } from '../types';
 import { FeatureMapsGrid, VectorBars } from './shared';
+import { fmtValue } from './format';
 
 const KIND_LABELS: Record<string, string> = {
   max: 'Max Pool',
@@ -321,11 +322,4 @@ function PooledValues({ values, channels }: { values: number[]; channels: number
   );
 }
 
-function fmtV(v: number): string {
-  if (v === 0) return '0';
-  const abs = Math.abs(v);
-  if (abs >= 100) return v.toFixed(0);
-  if (abs >= 1) return v.toFixed(2);
-  if (abs >= 0.01) return v.toFixed(3);
-  return v.toExponential(1);
-}
+const fmtV = (v: number) => fmtValue(v);

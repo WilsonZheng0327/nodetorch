@@ -2,9 +2,10 @@
 // Each output port on this node becomes an input port on the parent SubGraph node.
 
 import type { NodeDefinition } from '../../../core/nodedef';
+import { SUBGRAPH_INPUT_TYPE } from '../../../core/graph';
 
 export const graphInputNode: NodeDefinition = {
-  type: 'subgraph.input',
+  type: SUBGRAPH_INPUT_TYPE,
   version: 1,
   displayName: 'Custom Block Input',
   description:

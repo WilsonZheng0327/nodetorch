@@ -5,8 +5,9 @@
 import * as RF from '@xyflow/react';
 import type { NodeInstance } from '../core/graph';
 import { getNodePorts } from '../core/ports';
-import { useContext, useRef, useEffect } from 'react';
+import { useContext } from 'react';
 import { VizPanel, type VizSnapshot } from './VizPanel';
+import { PixelCanvas } from './PixelCanvas';
 import { DomainCtx, GraphActionsCtx, VizCtx, ValidationCtx } from './contexts';
 import './EngineNode.css';
 
@@ -241,46 +242,13 @@ function ImagePreview({
   size: number;
   channels?: number;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !pixels || pixels.length === 0) return;
-
-    const h = pixels.length;
-    const w = (pixels[0] as number[]).length ?? (pixels[0] as number[][]).length;
-    canvas.width = w;
-    canvas.height = h;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const imageData = ctx.createImageData(w, h);
-    const isRGB = channels && channels >= 3;
-
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        if (isRGB) {
-          const px = (pixels as number[][][])[y][x];
-          imageData.data[idx] = px[0];
-          imageData.data[idx + 1] = px[1];
-          imageData.data[idx + 2] = px[2];
-        } else {
-          const v = (pixels as number[][])[y][x];
-          imageData.data[idx] = v;
-          imageData.data[idx + 1] = v;
-          imageData.data[idx + 2] = v;
-        }
-        imageData.data[idx + 3] = 255;
-      }
-    }
-    ctx.putImageData(imageData, 0, 0);
-  }, [pixels, channels]);
-
   return (
     <div className="layer-node-image">
-      <canvas ref={canvasRef} style={{ width: size, height: size, imageRendering: 'pixelated' }} />
+      <PixelCanvas
+        pixels={pixels}
+        channels={channels}
+        style={{ width: size, height: size, imageRendering: 'pixelated' }}
+      />
     </div>
   );
 }

@@ -2,6 +2,20 @@
 // Knows about nodes, ports, edges, and graph topology.
 // Does NOT know about ML, data types, or execution.
 
+// --- Subgraph sentinels ---
+
+/**
+ * Node-type ids for the I/O sentinels inside a subgraph (composite block). These
+ * are graph-core infrastructure, not ML: when the engine recurses into a block it
+ * injects the block's inputs into the SUBGRAPH_INPUT_TYPE node(s) and reads the
+ * block's outputs from the SUBGRAPH_OUTPUT_TYPE node(s). Port resolution derives a
+ * block's external ports from these too. Layer 5 registers the actual
+ * NodeDefinitions under these type strings — use these constants instead of the
+ * bare literals so the contract lives in one place.
+ */
+export const SUBGRAPH_INPUT_TYPE = 'subgraph.input';
+export const SUBGRAPH_OUTPUT_TYPE = 'subgraph.output';
+
 // --- Data Structures ---
 
 /**

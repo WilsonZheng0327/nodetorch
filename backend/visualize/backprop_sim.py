@@ -38,6 +38,7 @@ def _no_cudnn(fn):
 from engine.graph_builder import (
     build_and_run_graph,
     gather_inputs,
+    find_key_nodes,
     topological_sort,
     get_device,
     has_trained_model,
@@ -418,7 +419,7 @@ def run_backward_step_through(
     order = topological_sort(nodes, edges)
 
     # Find data, loss, and the logits node feeding the loss ("predictions" port)
-    data_nid, loss_nid, pred_nid = _find_key_nodes(nodes, edges)
+    data_nid, loss_nid, pred_nid = find_key_nodes(nodes, edges)
     if not data_nid or not loss_nid:
         return {"error": "Graph must have a data node and a loss node"}
 
@@ -786,19 +787,6 @@ def _build_backward_subgraph_stages(
 
 # --- One gradient step: before/after ---
 
-def _find_key_nodes(nodes: dict, edges: list) -> tuple:
-    """Return (data_nid, loss_nid, pred_nid) — pred_nid is the node whose output
-    feeds the loss node's 'predictions' port (the logits)."""
-    data_nid = next((nid for nid, n in nodes.items() if n["type"] in DATA_LOADERS), None)
-    loss_nid = next((nid for nid, n in nodes.items() if n["type"] in ALL_LOSS_NODES), None)
-    pred_nid = None
-    if loss_nid is not None:
-        for e in edges:
-            if e["target"]["nodeId"] == loss_nid and e["target"]["portId"] == "predictions":
-                pred_nid = e["source"]["nodeId"]
-                break
-    return data_nid, loss_nid, pred_nid
-
 
 def _optimizer_lr(nodes: dict) -> tuple[float, str | None]:
     """Read the learning rate (and optimizer type) from the graph's optimizer node."""
@@ -839,7 +827,7 @@ def run_one_step(graph_data: "SerializedGraph", sample_idx: int | None = None) -
     except Exception as e:
         raise RuntimeError(f"One-step failed: {e}")
 
-    data_nid, loss_nid, pred_nid = _find_key_nodes(nodes, edges)
+    data_nid, loss_nid, pred_nid = find_key_nodes(nodes, edges)
     loss_tensor = results.get(loss_nid, {}).get("out") if loss_nid else None
     if loss_tensor is None:
         return {"error": "No loss value — check the predictions/labels connections"}
@@ -902,7 +890,7 @@ def run_one_step(graph_data: "SerializedGraph", sample_idx: int | None = None) -
         _, nodes2, edges2, results_after = _build_with_trained(
             graph_data, sample_idx=sample_idx, train_mode=False
         )
-        _, loss_nid2, pred_nid2 = _find_key_nodes(nodes2, edges2)
+        _, loss_nid2, pred_nid2 = find_key_nodes(nodes2, edges2)
         loss_after_tensor = results_after.get(loss_nid2, {}).get("out") if loss_nid2 else None
         loss_after = _safe_float(float(loss_after_tensor.detach().item())) if loss_after_tensor is not None else None
         pred_after = prediction_from_logits(
@@ -961,12 +949,10 @@ def _eval_point(
 
     p_true, pred = None, None
     if pred_nid:
-        logits = res.get(pred_nid, {}).get("out")
-        if isinstance(logits, torch.Tensor) and logits.dim() == 2:
-            probs = torch.softmax(logits.detach(), dim=1)[0]
-            pred = int(probs.argmax())
-            if true_label is not None and 0 <= true_label < probs.numel():
-                p_true = _safe_float(float(probs[true_label]))
+        info = prediction_from_logits(res.get(pred_nid, {}).get("out"), true_label=true_label)
+        if info is not None:
+            pred = info["predictedClass"]
+            p_true = info.get("trueLabelProb")
     return {"loss": loss, "pTrue": p_true, "pred": pred}
 
 
@@ -1009,7 +995,7 @@ def run_weight_wiggle(
     modules, nodes, edges, results = _build_with_trained(
         graph_data, sample_idx=sample_idx, train_mode=False
     )
-    data_nid, loss_nid, pred_nid = _find_key_nodes(nodes, edges)
+    data_nid, loss_nid, pred_nid = find_key_nodes(nodes, edges)
     module = modules.get(node_id)
     weight = getattr(module, "weight", None)
     # Works for any layer whose weight is a matrix or kernel — Linear [out, in] and

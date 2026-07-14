@@ -169,12 +169,12 @@ The bigger, costly-to-reverse choices have full write-ups in [`docs/adr/`](docs/
 
 Read this before adding a visualization/panel or backprop-style feature — it's where past work drifted or broke.
 
-### Reuse before duplicating (real, current duplication — consolidate, don't add a 6th copy)
+### Reuse before duplicating (use the shared helper — don't paste a fresh copy)
 
-- **Pixel-array → `<canvas>`.** ~12 components hand-roll the same `createImageData` grayscale/RGB loop (`EngineNode`, `StageCard`, `step-through/*`, `backprop/*`, `dashboard/samples`, `inspector/*`). Prefer/extract a single `PixelCanvas({ pixels, channels })` instead of pasting the loop again.
-- **Number formatting.** `fmt`/`signed` (scientific notation for tiny gradients, `—` for null) is copy-pasted across `src/ui/backprop/*` and `MseLossViz`. Put it in one shared util and import it.
-- **Backend logits → prediction.** `softmax(dim=1) → argmax → {predictedClass, confidence, probabilities}` is re-implemented in `engine/graph_builder/inference.py`, `runners.py`, and `visualize/backprop_sim.py`. Reuse one helper; don't re-derive per-sample loss/prediction inline.
-- **Node discovery.** Finding the data / loss / prediction (`"predictions"` port) nodes is a recurring pattern — reuse a `_find_key_nodes`-style helper rather than re-walking `nodes`/`edges`.
+- **Pixel-array → `<canvas>`.** `src/ui/PixelCanvas.tsx` (`PixelCanvas({ pixels, channels, className, style })`) is the canonical grayscale/RGB image renderer — the image previews in `EngineNode`, `PropertyInspector`, `DatasetDetail`, `LayerDetail` (feature maps) and step-through `GrayscaleCanvas` all delegate to it. Reuse it for any new sample/feature-map/generated-image preview instead of hand-rolling `createImageData`. (Color-mapped **heatmaps** — attention, MSE error map, `LayerDetail` heatmaps — are a separate concern with per-view palettes; they are *not* PixelCanvas cases.)
+- **Number formatting.** `src/ui/format.ts` is the single source: `fmt`/`signed` (scientific fallback for tiny/huge magnitudes, `—` for null), `fmtValue` (adaptive fixed-decimal, per-view options), `fmtAxis`. `backprop/format.ts` and `step-through/transformations/format.ts` re-export from it. Import from there; don't add another local `fmtV`.
+- **Backend logits → prediction.** `prediction_from_logits(logits, true_label=, top_k=)` in `engine/graph_builder/stats.py` is the one helper (softmax → predictedClass/confidence/probabilities, optional trueLabelProb/topK, returns None for non-2D). Reused in `inference.py` and `backprop_sim.py`. (The loss-seed error-signal path in `backprop_sim.py` legitimately needs the raw `probs` tensor, so it stays inline.)
+- **Node discovery.** `find_key_nodes(nodes, edges)` in `engine/graph_builder/build.py` (exported from `engine.graph_builder`) returns `(data_nid, loss_nid, pred_nid)` — the pred node is whatever feeds the loss's `"predictions"` port. Reuse it (inference/backprop already do) rather than re-walking `nodes`/`edges`.
 
 ### Backend gotchas
 

@@ -29,7 +29,7 @@ from engine.graph_builder.stats import (
     gradient_info, activation_info, prediction_from_logits,
 )
 from engine.graph_builder.build import (
-    topological_sort, gather_inputs, SubGraphModule,
+    topological_sort, gather_inputs, find_key_nodes, SubGraphModule,
     build_subgraph_module, build_modules,
 )
 from engine.graph_builder.forward import build_and_run_graph, inspect_graph

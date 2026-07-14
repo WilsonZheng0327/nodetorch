@@ -9,6 +9,7 @@ import type { PropertyDefinition } from '../../core/nodedef';
 import { DomainCtx } from '../contexts';
 import { DatasetDetail } from './DatasetDetail';
 import { LayerDetail } from './LayerDetail';
+import { PixelCanvas } from '../PixelCanvas';
 import { tutorialEvent } from '../tutorial/tutorialEvent';
 
 interface Props {
@@ -369,46 +370,11 @@ function InspectorImage({
   pixels: number[][] | number[][][];
   channels?: number;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !pixels || pixels.length === 0) return;
-
-    const h = pixels.length;
-    const w = (pixels[0] as number[]).length ?? (pixels[0] as number[][]).length;
-    canvas.width = w;
-    canvas.height = h;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const isRGB = channels && channels >= 3;
-    const imageData = ctx.createImageData(w, h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        if (isRGB) {
-          const px = (pixels as number[][][])[y][x];
-          imageData.data[idx] = px[0];
-          imageData.data[idx + 1] = px[1];
-          imageData.data[idx + 2] = px[2];
-        } else {
-          const v = (pixels as number[][])[y][x];
-          imageData.data[idx] = v;
-          imageData.data[idx + 1] = v;
-          imageData.data[idx + 2] = v;
-        }
-        imageData.data[idx + 3] = 255;
-      }
-    }
-    ctx.putImageData(imageData, 0, 0);
-  }, [pixels, channels]);
-
   return (
     <div style={{ display: 'flex', justifyContent: 'center' }}>
-      <canvas
-        ref={canvasRef}
+      <PixelCanvas
+        pixels={pixels}
+        channels={channels}
         style={{
           width: 112,
           height: 112,
