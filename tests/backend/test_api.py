@@ -34,9 +34,6 @@ EXPECTED_PATHS = {
     "/activation-max",
     "/layer-detail",
     # models
-    "/save-model",
-    "/load-model",
-    "/saved-models",
     "/download-weights",
     "/upload-weights",
     "/download-model",
@@ -100,7 +97,7 @@ def test_route_count():
             http_endpoints += len(methods - {"HEAD", "OPTIONS"})
         else:
             ws_endpoints += 1
-    assert http_endpoints + ws_endpoints == 45
+    assert http_endpoints + ws_endpoints == 42
 
 
 def test_health():

@@ -84,7 +84,7 @@ full public API, so callers just write `from engine.graph_builder import X`.
 | `_state.py` | **shared mutable state**: `_device`, `_model_store`, `_last_run` |
 | `stats.py` | tensor/param statistics for the UI (`tensor_info`, `activation_info`, …) |
 | `build.py` | `topological_sort`, `gather_inputs`, `SubGraphModule`, `build_modules` |
-| `forward.py` | `build_and_run_graph` (the workhorse), `execute_graph` |
+| `forward.py` | `build_and_run_graph` (the workhorse), `inspect_graph` (`no_grad` wrapper) |
 | `detail.py` | `get_layer_detail` (inspector modal data) |
 | `inference.py` | `infer_graph`, `evaluate_test_set`, tracked-sample helpers |
 
@@ -106,7 +106,7 @@ stay single shared instances (they do; verified after the package split).
 
 ### `gather_inputs` — how data flows along edges
 
-`engine/graph_builder/build.py:49`. Given a node, it walks every edge targeting
+`engine/graph_builder/build.py`, `gather_inputs`. Given a node, it walks every edge targeting
 that node, reads the source node's output at the named source port, and returns
 `{target_port: tensor}`:
 
@@ -131,7 +131,7 @@ def gather_inputs(node_id, edges, results):
 
 ### `build_and_run_graph` — the workhorse
 
-`engine/graph_builder/forward.py:28`. Walks nodes in topological order and, for
+`engine/graph_builder/forward.py`, `build_and_run_graph`. Walks nodes in topological order and, for
 each, branches on its type:
 
 | Node kind | What happens |
@@ -159,47 +159,46 @@ _last_run["edges"]   = edges
 return modules, results, node_results, nodes, edges
 ```
 
-`execute_graph` (`forward.py:393`) just wraps this in `torch.no_grad()` for the
-`/forward` endpoint and returns `node_results` (per-node display metadata).
+`inspect_graph` just wraps this in `torch.no_grad()` and returns `node_results`
+(per-node display metadata). It is currently unused by any endpoint — see below.
 
 ## Where the ML knowledge lives
 
-- `engine/node_builders.py` — `NODE_BUILDERS` (`node_builders.py:691`), a
-  `{node_type: build_fn}` registry of ~47 entries. Each `build_*(props,
-  input_shapes)` returns an `nn.Module`. This is the **only** place that knows
-  `"ml.layers.conv2d"` means `nn.Conv2d`.
+- `engine/node_builders.py` — `NODE_BUILDERS` (a `{node_type: build_fn}`
+  registry of ~47 entries). Each `build_*(props, input_shapes)` returns an
+  `nn.Module`. This is the **only** place that knows `"ml.layers.conv2d"` means
+  `nn.Conv2d`.
 - `dataprep/data_loaders.py` — parallel registries keyed by dataset type:
-  `DATA_LOADERS` (batches for forward, `:548`), `TRAIN_DATASETS`/`TEST_DATASETS`
+  `DATA_LOADERS` (batches for forward), `TRAIN_DATASETS`/`TEST_DATASETS`
   (full datasets for training/eval), `DENORMALIZERS` (image previews),
   `CLASS_NAMES`, `DATASET_DETAILS`, `LM_DATASET_TYPES`.
 
 ---
 
-# Walkthrough 1: pressing **Forward**
+# Walkthrough 1: the forward-inspection pass
 
-The simplest path — no backend state changes except the `_last_run` cache.
+There is **no public forward endpoint** — the standalone "Forward Pass" mode was
+removed once it left the UI, so `POST /forward` and its `inspect_graph` wrapper
+are gone/dead. Node shapes and param counts shown on the canvas are computed
+purely in the frontend (shape mode, TypeScript). The backend still needs the same
+build-and-run pass internally, though: `build_and_run_graph` in `forward.py` is the
+shared workhorse behind step-through, layer-detail, backprop viz, loss-landscape,
+activation-max, and training setup (`build_training_context`).
 
 ```
-Frontend  ── POST /forward { graph } ─────────────►  main.py:118  forward()
-                                                          │
-                                                          ▼
-                                              execute_graph(graph_data)      forward.py:393
-                                                          │ no_grad
-                                                          ▼
-                                              build_and_run_graph(...)       forward.py:28
-                                                  topological_sort           build.py:21
-                                                  for each node:
-                                                    gather_inputs            build.py:49
-                                                    NODE_BUILDERS[type](...) node_builders.py
-                                                    module(inputs)
-                                                    record tensor_info + metadata
-                                                  populate _last_run
-                                                          │
-Frontend  ◄── { status, results } ◄──────────────────────┘
+build_and_run_graph(graph_data)                         forward.py
+    topological_sort(nodes, edges)                      build.py
+    for each node:
+      gather_inputs(...)                                build.py
+      NODE_BUILDERS[type](props, input_shapes)          node_builders.py
+      module(inputs)
+      record tensor_info + metadata
+    populate _last_run                                  (cache for later
+                                                         layer-detail queries)
 ```
 
-The frontend then renders each node's `metadata` (output shape, param count,
-weight/activation histograms) directly on the canvas node.
+Callers that only need architecture (not a live run) use the lighter
+`build_modules` in `build.py` instead.
 
 ---
 
@@ -216,33 +215,36 @@ User clicks Train
   │            send { type: "train", graph: {...} }
   │
   ▼
-main.py  websocket_endpoint            (main.py:600)
+websocket_endpoint                     (api/training.py — `@router.websocket("/ws")`)
   │  reader_task drains client msgs into msg_queue   (so "cancel" can interrupt)
   │  on {type:"train"}:
   │    cancel_event = threading.Event()
-  │    train_task = loop.run_in_executor(None, train_graph, ...)   (main.py:665)
+  │    train_task = loop.run_in_executor(None, train_graph, ...)
   │    while not train_task.done():
-  │       drain epoch_queue → ws.send_text({type:"epoch", ...})    (main.py:670)
+  │       drain epoch_queue → ws.send_text({type:"epoch", ...})
   │       check msg_queue for "cancel" / "_disconnect"
   │
   ▼ (on the worker thread)
-train_graph(graph, on_epoch, on_batch, cancel_event)   (graph_builder/__init__.py:42)
-  └─ run_training(...)                                  (training/__init__.py:43)
-       1. ctx  = build_training_context(graph_data, ...)   (training/base.py:113)
-       2. mode = detect_training_mode(ctx.nodes)           (training/__init__.py:30)
-       3. result = TRAINING_LOOPS[mode](ctx)               (e.g. standard.py:39)
-       4. return save_training_results(ctx, result)        (training/base.py:667)
+train_graph(graph, on_epoch, on_batch, cancel_event)   (graph_builder/__init__.py)
+  └─ run_training(...)                                  (training/__init__.py)
+       1. ctx  = build_training_context(graph_data, ...)   (training/base.py:158)
+       2. mode = detect_training_mode(ctx.nodes)           (training/__init__.py:60)
+       3. result = TRAINING_LOOPS[mode](ctx)               (e.g. standard.py:38)
+       4. return save_training_results(ctx, result)        (training/base.py:626)
 ```
+
+`main.py` is now just a thin router dispatcher (~65 lines) that mounts one
+`APIRouter` per concern; each endpoint lives in `backend/api/<concern>.py`.
 
 ### Step 1 — the WebSocket handler dispatches to a thread
 
-`backend/main.py:600`. The handler runs an async message loop. A separate
+`backend/api/training.py`, `websocket_endpoint`. The handler runs an async message loop. A separate
 `reader_task` continuously reads client messages into `msg_queue`, so a `cancel`
 can arrive *while training is running*. PyTorch is blocking, so training can't run
 on the event loop — it goes to a thread executor:
 
 ```python
-# main.py — inside websocket_endpoint, on {"type": "train"}
+# api/training.py — inside websocket_endpoint, on {"type": "train"}
 cancel_event = threading.Event()
 epoch_queue = asyncio.Queue()
 
@@ -272,7 +274,7 @@ the loop checks between batches.
 
 ### Step 2 — `build_training_context` does all setup once
 
-`backend/training/base.py:113`. This runs once before any epoch and returns a
+`backend/training/base.py:158`. This runs once before any epoch and returns a
 `TrainingContext` dataclass (or an `{"error": ...}` dict). It:
 
 1. Finds the optimizer node(s), reads `epochs`, `gradClip`, `valSplit`, `seed`.
@@ -295,7 +297,7 @@ the loop checks between batches.
 
 ### Step 3 — `detect_training_mode` picks the paradigm
 
-`backend/training/__init__.py:30`. A plugin registry chooses the loop by scanning
+`backend/training/__init__.py:60`. A plugin registry chooses the loop by scanning
 node types:
 
 ```python
@@ -313,7 +315,7 @@ TRAINING_LOOPS = {"standard": standard_train, "gan": gan_train,
 
 ### Step 4 — the standard loop runs
 
-`backend/training/standard.py:39` is the canonical pattern. The inner loop is the
+`backend/training/standard.py:38` is the canonical pattern. The inner loop is the
 classic forward → loss → backward → step, using the shared executor from
 `engine/forward_utils.py`:
 
@@ -340,7 +342,7 @@ for epoch in range(ctx.epochs):
             # ... accumulate accuracy, confusion matrix, misclassified samples
 ```
 
-`run_forward_pass` (`engine/forward_utils.py:71`) walks the topological order and
+`run_forward_pass` (`engine/forward_utils.py:79`) walks the topological order and
 calls `execute_node` for each, which centralizes the per-type dispatch (loss nodes
 take named args, multi-input nodes take `**kwargs`, layers take a single `"in"`,
 LSTM/GRU return dicts). This is the same dispatch used by validation, step-through,
@@ -359,7 +361,7 @@ After each epoch the loop also:
 
 ### Step 5 — `save_training_results` persists everything
 
-`backend/training/base.py:667`. After the last epoch, the trained modules and the
+`backend/training/base.py:626`. After the last epoch, the trained modules and the
 final forward results are stored into the shared state so inference, test
 evaluation, and the node inspector all work afterward:
 
@@ -399,10 +401,10 @@ recomputing it.
 This shows why the shared state matters.
 
 ```
-Frontend ── POST /infer { graph } ──►  main.py:254  infer()
+Frontend ── POST /infer { graph } ──►  api/inference.py  infer()
                                             │
                                             ▼
-                                   infer_graph(graph_data)     inference.py:201
+                                   infer_graph(graph_data)     inference.py:164
                                        if not has_trained_model():   return error
                                        trained = get_trained_modules()   # _model_store["current"]
                                        for node in topological order:
@@ -423,12 +425,12 @@ attention maps / confusion matrices without re-running anything.
 
 # Request → endpoint cheat sheet
 
-The frontend's execution modes map directly to endpoints (all in `main.py`):
+The frontend's execution modes map directly to endpoints (each registered by an
+`APIRouter` in `backend/api/<concern>.py`):
 
 | User action | Endpoint | Backend entry point |
 |---|---|---|
 | Shape mode | *(none — pure frontend TS)* | — |
-| Forward | `POST /forward` | `execute_graph` |
 | Train | `WS /ws` (streamed) | `train_graph` → `run_training` |
 | Test | `POST /evaluate-test` | `evaluate_test_set` |
 | Infer | `POST /infer` | `infer_graph` |
@@ -457,7 +459,7 @@ The frontend's execution modes map directly to endpoints (all in `main.py`):
 
 ## Related docs
 
-- `docs/explanation/training-flow.md` — the frontend half of the train flow (validation,
+- `docs/explanation/training-flow-walkthrough.md` — the frontend half of the train flow (validation,
   WebSocket, dashboard).
 - `docs/explanation/training-plugins.md` — the training-paradigm plugin system in depth.
 - `docs/explanation/shape-inference.md`, `docs/explanation/visualization.md`,

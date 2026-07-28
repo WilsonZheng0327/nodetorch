@@ -240,6 +240,6 @@ for the other side of the wire.
 
 - `docs/explanation/backend-architecture.md` — the other side of the wire (graph → PyTorch).
 - `docs/explanation/shape-inference.md` — how the shape executors compute dimensions.
-- `docs/explanation/training-flow.md` — the frontend half of the train flow.
+- `docs/explanation/training-flow-walkthrough.md` — the frontend half of the train flow.
 - `docs/features/custom-blocks.md` — subgraph blocks (Layer 3 recursion in depth).
 - `docs/features/undo-redo.md`, `docs/features/copy-paste.md` — the `useGraph` subsystems.

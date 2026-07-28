@@ -64,16 +64,6 @@ def get_trained_modules() -> dict[str, nn.Module]:
     return _model_store.get("current", {})
 
 
-def save_model(filepath: str = "storage/weights/current.pt") -> dict:
-    """Save trained module state dicts to disk."""
-    if "current" not in _model_store:
-        return {"error": "No trained model to save"}
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    state = {nid: mod.state_dict() for nid, mod in _model_store["current"].items()}
-    torch.save(state, filepath)
-    return {"status": "ok", "path": filepath}
-
-
 def save_model_bytes() -> bytes | None:
     """Serialize trained module state dicts to bytes for download."""
     if "current" not in _model_store:
@@ -91,26 +81,6 @@ def load_model_bytes(graph_data: "SerializedGraph", data: bytes) -> dict:
     from engine.graph_builder.build import build_modules  # local: avoids import cycle
     saved_states = torch.load(io.BytesIO(data), map_location=get_device(), weights_only=True)
     modules = build_modules(graph_data)
-    loaded = 0
-    for nid, state_dict in saved_states.items():
-        if nid in modules:
-            modules[nid].load_state_dict(state_dict)
-            loaded += 1
-    if loaded == 0:
-        return {"error": "No matching layers found — graph structure may have changed"}
-    _model_store["current"] = modules
-    return {"status": "ok"}
-
-
-def load_model(graph_data: "SerializedGraph", filepath: str = "storage/weights/current.pt") -> dict:
-    """Load saved state dicts into freshly built modules from the graph."""
-    if not os.path.exists(filepath):
-        return {"error": f"No saved model at {filepath}"}
-    saved_states = torch.load(filepath, map_location=get_device(), weights_only=True)
-    # Build modules from graph (lightweight — no metadata/results)
-    from engine.graph_builder.build import build_modules  # local: avoids import cycle
-    modules = build_modules(graph_data)
-    # Load saved state dicts
     loaded = 0
     for nid, state_dict in saved_states.items():
         if nid in modules:

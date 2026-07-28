@@ -127,7 +127,7 @@ During training, `build_training_context()` detects the tokenizer node's mode. I
 3. **Backend viz**: create or edit a file in `backend/visualize/layers/` with the forward/backward viz function, then register it in `backend/visualize/node_viz.py`'s `FORWARD_VIZ` / `BACKWARD_VIZ` registries. Optional — default fallback provides basic shape-based viz.
 
 Additional design docs live in `docs/`, grouped into subfolders and indexed by [`docs/README.md`](docs/README.md):
-- `docs/explanation/` — how the system works & why: `frontend-architecture.md` (the 6-layer frontend stack — what each layer does, why, and a "what happens when you edit a node" walkthrough), `backend-architecture.md` (backend overview + "what happens when you press Train" walkthrough), `shape-inference.md`, `training-flow.md`, `training-plugins.md`, `visualization.md`, `agent.md`.
+- `docs/explanation/` — how the system works & why: `frontend-architecture.md` (the 6-layer frontend stack — what each layer does, why, and a "what happens when you edit a node" walkthrough), `backend-architecture.md` (backend overview + "what happens when you press Train" walkthrough), `shape-inference.md`, `training-flow-walkthrough.md`, `training-plugins.md`, `visualization.md`, `agent.md`.
 - `docs/features/` — cross-cutting feature deep dives: `custom-blocks.md`, `multi-output-nodes.md`, `undo-redo.md`, `copy-paste.md`.
 - `docs/reference/` — lookup facts: `core-abstractions.md` (flat glossary of the load-bearing frontend + backend types and registries, each with a one-liner and where it lives).
 - `docs/adr/` — Architecture Decision Records (dated, immutable rationale for significant choices).

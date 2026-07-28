@@ -346,6 +346,14 @@ export function Toolbar({
             </div>
           )}
         </div>
+        <button
+          className="toolbar-btn toolbar-btn-icon"
+          onClick={onOrganize}
+          disabled={busy}
+          title="Auto-organize node layout"
+        >
+          <LayoutGrid size={15} />
+        </button>
         <div ref={presetsRef} style={{ position: 'relative' }}>
           <button
             className="toolbar-btn toolbar-btn-icon"
@@ -375,14 +383,6 @@ export function Toolbar({
           title="Clear all nodes and edges"
         >
           <Trash2 size={15} />
-        </button>
-        <button
-          className="toolbar-btn toolbar-btn-icon"
-          onClick={onOrganize}
-          disabled={busy}
-          title="Auto-organize node layout"
-        >
-          <LayoutGrid size={15} />
         </button>
         <div className="toolbar-separator" />
         <button

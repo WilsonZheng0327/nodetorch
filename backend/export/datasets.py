@@ -290,11 +290,303 @@ train_loader = torch.utils.data.DataLoader(dataset, batch_size={batch_size}, shu
 '''
 
 
+# Standalone byte-pair-encoding tokenizer, learned from the corpus. Same
+# implementation the built-in BPE export emits; kept as a plain string (no
+# f-string) so the generated class body needs no brace escaping.
+_BPE_TOKENIZER_CLASS = '''class BPETokenizer:
+    def __init__(self):
+        self.merges, self.vocab = [], {}
+    def train(self, text, vocab_size):
+        words = re.findall(r'[a-zA-Z]+|[0-9]+|[^\\s]', text.lower())
+        word_freqs = Counter()
+        for w in words:
+            word_freqs[tuple(w) + ('</w>',)] += 1
+        self.vocab = {'<pad>': 0, '<unk>': 1}
+        chars = set()
+        for wt in word_freqs:
+            chars.update(wt)
+        for ch in sorted(chars):
+            if ch not in self.vocab:
+                self.vocab[ch] = len(self.vocab)
+        self.merges = []
+        while len(self.vocab) < vocab_size:
+            pairs = Counter()
+            for wt, freq in word_freqs.items():
+                for i in range(len(wt) - 1):
+                    pairs[(wt[i], wt[i+1])] += freq
+            if not pairs: break
+            best = pairs.most_common(1)[0][0]
+            self.merges.append(best)
+            new_tok = best[0] + best[1]
+            self.vocab[new_tok] = len(self.vocab)
+            new_freqs = {}
+            for wt, freq in word_freqs.items():
+                nw, i = [], 0
+                while i < len(wt):
+                    if i < len(wt)-1 and wt[i] == best[0] and wt[i+1] == best[1]:
+                        nw.append(new_tok); i += 2
+                    else:
+                        nw.append(wt[i]); i += 1
+                new_freqs[tuple(nw)] = freq
+            word_freqs = new_freqs
+    def encode(self, text, max_len=None):
+        unk = self.vocab.get('<unk>', 1)
+        words = re.findall(r'[a-zA-Z]+|[0-9]+|[^\\s]', text.lower())
+        ids = []
+        for w in words:
+            syms = list(w) + ['</w>']
+            for a, b in self.merges:
+                m, i = a + b, 0
+                while i < len(syms)-1:
+                    if syms[i] == a and syms[i+1] == b:
+                        syms[i] = m; del syms[i+1]
+                    else: i += 1
+            ids.extend(self.vocab.get(s, unk) for s in syms)
+        if max_len is not None:
+            ids = ids[:max_len] + [0] * max(0, max_len - len(ids))
+        return ids'''
+
+
+def _parse_norm_export(v):
+    """Parse a normalization vector ("0.5,0.5" string or list) → tuple or None."""
+    if v is None or v == "":
+        return None
+    if isinstance(v, str):
+        return tuple(float(x) for x in v.split(",") if x.strip())
+    return tuple(float(x) for x in v)
+
+
+def _custom_dataset_code(data_node: dict) -> str:
+    """Generate standalone loading code for a `data.custom` node.
+
+    Mirrors backend/dataprep/custom_dataset.py's CustomDataset in a self-contained
+    script: loads a HuggingFace dataset and interprets the node's (input_kind, task)
+    spec — image/text/vector × classification/regression/autoencoder/language_model.
+    The spec is baked in as module-level constants; the dataset class body is emitted
+    as plain (non-f) strings referencing them, so no brace escaping is needed.
+    """
+    props = data_node.get("properties", {})
+    input_kind = props.get("inputKind", "image")
+    task = props.get("task", "classification")
+    hf_id = str(props.get("hfId", "")).strip()
+    hf_config = props.get("hfConfig") or None
+    train_split = props.get("trainSplit", "train")
+    test_split = props.get("testSplit") or None
+    trust = bool(props.get("trustRemoteCode", False))
+    input_col = props.get("inputColumn", "text")
+    label_col = props.get("labelColumn") or "label"
+    image_size = int(props.get("imageSize", 32))
+    channels = int(props.get("channels", 3))
+    norm_mean = _parse_norm_export(props.get("normalizeMean"))
+    norm_std = _parse_norm_export(props.get("normalizeStd"))
+    tokenizer = props.get("tokenizer", "word")
+    vocab_size = int(props.get("vocabSize", 10000))
+    max_len = int(props.get("maxLen", 128))
+    seq_len = int(props.get("seqLen", 128))
+    batch_size = int(props.get("batchSize", 32))
+
+    is_lm = task == "language_model"
+    needs_bpe = input_kind == "text" and tokenizer == "bpe"
+    needs_wordchar = input_kind == "text" and tokenizer in ("word", "char")
+
+    L: list[str] = [
+        f"# --- Custom dataset (HuggingFace: {hf_id or '<unset hfId>'}) ---",
+        "# Requires: pip install datasets" + (" torchvision pillow" if input_kind == "image" else ""),
+        "from datasets import load_dataset",
+    ]
+    if input_kind == "image":
+        L += ["import io", "import torchvision.transforms as transforms", "from PIL import Image"]
+    if needs_bpe or needs_wordchar or (is_lm and tokenizer in ("word", "bpe")):
+        L += ["import re", "from collections import Counter"]
+
+    # Baked spec constants.
+    L += [
+        "",
+        f"HF_ID = {hf_id!r}",
+        f"HF_CONFIG = {hf_config!r}",
+        f"INPUT_COLUMN = {input_col!r}",
+        f"LABEL_COLUMN = {label_col!r}",
+        f"MAX_LEN = {max_len}",
+        f"SEQ_LEN = {seq_len}",
+        f"VOCAB_SIZE = {vocab_size}",
+        "",
+        f"_raw_train = load_dataset(HF_ID, HF_CONFIG, split={train_split!r}, trust_remote_code={trust!r})",
+    ]
+
+    if is_lm:
+        L += _custom_lm_body(input_col, tokenizer, seq_len, batch_size)
+        return "\n".join(L)
+
+    # --- Row path (classification / regression / autoencoder) ---
+    if test_split:
+        L += [
+            "try:",
+            f"    _raw_test = load_dataset(HF_ID, HF_CONFIG, split={test_split!r}, trust_remote_code={trust!r})",
+            "except Exception:",
+            "    _raw_test = None",
+        ]
+    else:
+        L += ["_raw_test = None"]
+
+    # Tokenizer setup for text inputs (fit once on a 5k sample, like the backend).
+    if needs_wordchar:
+        L += ["", "_sample = _raw_train[INPUT_COLUMN][:5000]"]
+        if tokenizer == "word":
+            L += [
+                "def _tokenize(t):",
+                "    return re.findall(r'[a-z]+', t.lower())",
+                "_counter = Counter()",
+                "for _t in _sample:",
+                "    _counter.update(_tokenize(_t))",
+                "vocab = {'<pad>': 0, '<unk>': 1}",
+                "for _w, _ in _counter.most_common(VOCAB_SIZE - 2):",
+                "    vocab[_w] = len(vocab)",
+                "UNK = vocab['<unk>']",
+                "def _encode(text):",
+                "    ids = [vocab.get(t, UNK) for t in _tokenize(text)[:MAX_LEN]]",
+                "    return ids + [0] * (MAX_LEN - len(ids))",
+            ]
+        else:  # char
+            L += [
+                "_chars = set()",
+                "for _t in _sample:",
+                "    _chars.update(_t)",
+                "char2idx = {'<pad>': 0, '<unk>': 1}",
+                "for _c in sorted(_chars):",
+                "    char2idx[_c] = len(char2idx)",
+                "def _encode(text):",
+                "    ids = [char2idx.get(c, 1) for c in text[:MAX_LEN]]",
+                "    return ids + [0] * (MAX_LEN - len(ids))",
+            ]
+    elif needs_bpe:
+        L += [
+            "",
+            _BPE_TOKENIZER_CLASS,
+            "print('Learning BPE merges...')",
+            "bpe = BPETokenizer()",
+            "bpe.train('\\n'.join(_raw_train[INPUT_COLUMN][:5000]), vocab_size=VOCAB_SIZE)",
+            "VOCAB_SIZE = len(bpe.vocab)",
+            "def _encode(text):",
+            "    return bpe.encode(text, max_len=MAX_LEN)",
+        ]
+
+    # Image transform.
+    if input_kind == "image":
+        norm = ""
+        if norm_mean is not None and norm_std is not None:
+            norm = f", transforms.Normalize({tuple(norm_mean)}, {tuple(norm_std)})"
+        L += [
+            "",
+            f"_img_tf = transforms.Compose([transforms.Resize(({image_size}, {image_size})), "
+            f"transforms.ToTensor(){norm}])",
+            f"_CHANNELS = {channels}",
+            "def _to_pil(v):",
+            "    if isinstance(v, Image.Image): return v",
+            "    if isinstance(v, dict):",
+            "        return Image.open(io.BytesIO(v['bytes'])) if v.get('bytes') else Image.open(v['path'])",
+            "    return Image.fromarray(v)",
+        ]
+
+    L += ["", "class CustomDataset(torch.utils.data.Dataset):"]
+    L += ["    def __init__(self, hf): self.hf = hf"]
+    L += ["    def __len__(self): return len(self.hf)"]
+    L += ["    def __getitem__(self, idx):", "        row = self.hf[idx]"]
+
+    # Input tensor.
+    if input_kind == "image":
+        L += [
+            "        _img = _to_pil(row[INPUT_COLUMN]).convert('L' if _CHANNELS == 1 else 'RGB')",
+            "        x = _img_tf(_img)",
+        ]
+    elif input_kind == "text":
+        L += ["        x = torch.tensor(_encode(row[INPUT_COLUMN]), dtype=torch.long)"]
+    else:  # vector
+        L += ["        x = torch.tensor(row[INPUT_COLUMN], dtype=torch.float32)"]
+
+    # Target.
+    if task == "classification":
+        L += ["        y = torch.tensor(int(row[LABEL_COLUMN]), dtype=torch.long)"]
+    elif task == "regression":
+        L += ["        y = torch.tensor(row[LABEL_COLUMN], dtype=torch.float32)"]
+    else:  # autoencoder — reconstruct the input
+        L += ["        y = x"]
+    L += ["        return x, y"]
+
+    L += [
+        "",
+        "train_dataset = CustomDataset(_raw_train)",
+        f"train_loader = torch.utils.data.DataLoader(train_dataset, batch_size={batch_size}, shuffle=True, num_workers=0)",
+        "if _raw_test is not None:",
+        "    test_dataset = CustomDataset(_raw_test)",
+        f"    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size={batch_size}, shuffle=False, num_workers=0)",
+        "else:",
+        "    test_loader = train_loader",
+    ]
+    return "\n".join(L)
+
+
+def _custom_lm_body(input_col: str, tokenizer: str, seq_len: int, batch_size: int) -> list[str]:
+    """Corpus (language-model) path for a custom text dataset: tokenize the whole
+    corpus into one id stream and chunk it into next-token windows."""
+    L = ["", "_corpus = '\\n'.join(_raw_train[INPUT_COLUMN])"]
+    if tokenizer == "char":
+        L += [
+            "_chars = sorted(set(_corpus))",
+            "char2idx = {c: i for i, c in enumerate(_chars)}",
+            "idx2char = {i: c for c, i in char2idx.items()}",
+            "VOCAB_SIZE = len(char2idx)",
+            "_ids = [char2idx[c] for c in _corpus]",
+        ]
+    elif tokenizer == "word":
+        L += [
+            "def _tokenize(t):",
+            "    return re.findall(r'[a-z]+', t.lower())",
+            "_counter = Counter(_tokenize(_corpus))",
+            "vocab = {'<pad>': 0, '<unk>': 1}",
+            "for _w, _ in _counter.most_common(VOCAB_SIZE - 2):",
+            "    vocab[_w] = len(vocab)",
+            "VOCAB_SIZE = len(vocab)",
+            "UNK = vocab['<unk>']",
+            "_ids = [vocab.get(t, UNK) for t in _tokenize(_corpus)]",
+        ]
+    else:  # bpe
+        L += [
+            _BPE_TOKENIZER_CLASS,
+            "print('Learning BPE merges...')",
+            "bpe = BPETokenizer()",
+            "bpe.train(_corpus, vocab_size=VOCAB_SIZE)",
+            "VOCAB_SIZE = len(bpe.vocab)",
+            "_ids = bpe.encode(_corpus)",
+        ]
+    L += [
+        "_data = torch.tensor(_ids, dtype=torch.long)",
+        "",
+        "class CustomLMDataset(torch.utils.data.Dataset):",
+        "    def __len__(self):",
+        "        return max(1, (len(_data) - 1) // SEQ_LEN)",
+        "    def __getitem__(self, idx):",
+        "        start = idx * SEQ_LEN",
+        "        chunk = _data[start : start + SEQ_LEN + 1]",
+        "        if len(chunk) < SEQ_LEN + 1:",
+        "            chunk = torch.cat([chunk, torch.zeros(SEQ_LEN + 1 - len(chunk), dtype=torch.long)])",
+        "        return chunk[:-1], chunk[1:]",
+        "",
+        "train_dataset = CustomLMDataset()",
+        f"train_loader = torch.utils.data.DataLoader(train_dataset, batch_size={batch_size}, shuffle=True, num_workers=0)",
+        "test_loader = train_loader  # char/word/bpe LM: no separate test split",
+    ]
+    return L
+
+
 def _generate_dataset_code(data_node: dict, bpe_config: dict | None = None) -> str:
     """Generate dataset loading code."""
     dtype = data_node["type"]
     props = data_node.get("properties", {})
     batch_size = props.get("batchSize", 32)
+
+    # Custom HuggingFace dataset — spec-driven (image/text/vector × task).
+    if dtype == "data.custom":
+        return _custom_dataset_code(data_node)
 
     # BPE mode — generate BPE tokenizer + dataset code
     if bpe_config:
