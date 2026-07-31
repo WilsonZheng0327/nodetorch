@@ -255,6 +255,46 @@ describe('executeGraphTool', () => {
     expect(good).not.toMatch(/WARNING/);
   });
 
+  it('connect auto-orients a reversed optimizer edge (the sink has no outputs)', async () => {
+    const { api, g } = makeApi();
+    addNode(g, createNode('ce', 'ml.loss.cross_entropy', { x: 2, y: 0 }, {}));
+    addNode(g, createNode('opt', 'ml.optimizers.adam', { x: 3, y: 0 }, {}));
+
+    // The exact thrash from the field: model wires optimizer -> loss with a
+    // guessed "in" port. The optimizer is a pure sink (no output ports), so the
+    // direction is unambiguously backwards — flip it to loss.out -> opt.loss and
+    // recover the single output port the model mis-named as "in".
+    const res = await executeGraphTool(api, domain, 'connect', {
+      sourceId: 'opt',
+      sourcePort: 'loss',
+      targetId: 'ce',
+      targetPort: 'in',
+    });
+    expect(res).toMatch(/^ok: connected ce\.out -> opt\.loss/);
+    expect(res).toMatch(/flipped direction/);
+
+    // Same recovery when the model passes ids as "opt.loss" / "ce.out".
+    const res2 = await executeGraphTool(api, domain, 'connect', {
+      sourceId: 'opt.loss',
+      targetId: 'ce.out',
+    });
+    expect(res2).toMatch(/^ok: connected ce\.out -> opt\.loss/);
+  });
+
+  it('connect does NOT flip a normal edge and still errors on a bad port', async () => {
+    const { api, g } = makeApi();
+    addNode(g, createNode('r1', 'ml.activations.relu', { x: 1, y: 0 }, {}));
+    // relu has both in and out, so a wrong target port is a real mistake, not a
+    // reversed edge — it must still error (no silent single-port "fix").
+    const res = await executeGraphTool(api, domain, 'connect', {
+      sourceId: 'c1',
+      sourcePort: 'out',
+      targetId: 'r1',
+      targetPort: 'bad',
+    });
+    expect(res).toMatch(/"r1" has no input port "bad"/);
+  });
+
   it('add_node reports when the requested id is already taken', async () => {
     const { api } = makeApi();
     const msg = await executeGraphTool(api, domain, 'add_node', {

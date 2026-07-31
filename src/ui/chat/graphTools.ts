@@ -565,53 +565,79 @@ async function connect(graph: GraphToolApi, domain: Domain, args: Args) {
   const tNode = g.nodes.get(t.nodeId);
   if (!tNode) return `error: no node "${args.targetId}"`;
 
+  // Auto-orient reversed edges. The model routinely flips the optimizer edge:
+  // the optimizer's only port is an *input* named "loss", easily misread as an
+  // output that feeds the loss node — so it wires optimizer -> loss when the
+  // data flows loss.out -> optimizer.loss. A stated source that can't be a
+  // source (no output ports, i.e. a pure sink like the optimizer) — or a stated
+  // target that can't be a target (no input ports, i.e. a pure source like a
+  // data node) — is an unambiguous "backwards" signal, so we flip and
+  // re-resolve. Nodes with both in and out ports (relu, conv, …) are never
+  // flipped; they fall through to the exact-port errors below.
+  const flipped =
+    (portsOf(domain, sNode, 'output').length === 0 || portsOf(domain, tNode, 'input').length === 0) &&
+    portsOf(domain, tNode, 'output').length > 0 &&
+    portsOf(domain, sNode, 'input').length > 0;
+  const srcNode = flipped ? tNode : sNode;
+  const tgtNode = flipped ? sNode : tNode;
+  const srcName = flipped ? targetPort : sourcePort;
+  const tgtName = flipped ? sourcePort : targetPort;
+
   // Precise diagnostics before the generic validity check, so the model gets an
-  // actionable reason instead of a catch-all "invalid connection".
-  const outs = portsOf(domain, sNode, 'output');
-  if (!outs.some((p) => p.id === sourcePort)) {
-    return `error: "${s.nodeId}" has no output port "${sourcePort}" — its outputs: ${outs.map((p) => p.id).join(', ') || '(none)'}`;
+  // actionable reason instead of a catch-all "invalid connection". When we've
+  // flipped, also accept the sole port in a direction if the model's name miss —
+  // it typically guessed a generic "in"/"out" for a single-port node.
+  const outs = portsOf(domain, srcNode, 'output');
+  const outPort = outs.find((p) => p.id === srcName) ?? (flipped && outs.length === 1 ? outs[0] : undefined);
+  if (!outPort) {
+    return `error: "${srcNode.id}" has no output port "${srcName}" — its outputs: ${outs.map((p) => p.id).join(', ') || '(none)'}`;
   }
-  const ins = portsOf(domain, tNode, 'input');
-  const inPort = ins.find((p) => p.id === targetPort);
+  const ins = portsOf(domain, tgtNode, 'input');
+  const inPort = ins.find((p) => p.id === tgtName) ?? (flipped && ins.length === 1 ? ins[0] : undefined);
   if (!inPort) {
-    return `error: "${t.nodeId}" has no input port "${targetPort}" — its inputs: ${ins.map((p) => p.id).join(', ') || '(none)'}`;
+    return `error: "${tgtNode.id}" has no input port "${tgtName}" — its inputs: ${ins.map((p) => p.id).join(', ') || '(none)'}`;
+  }
+  if (flipped) {
+    notes.push(
+      `flipped direction — edges run output → input, so connected ${srcNode.id}.${outPort.id} -> ${tgtNode.id}.${inPort.id}`,
+    );
   }
   if (!inPort.allowMultiple) {
     const occupied = g.edges.find(
-      (e) => e.target.nodeId === t.nodeId && e.target.portId === targetPort,
+      (e) => e.target.nodeId === tgtNode.id && e.target.portId === inPort.id,
     );
     if (occupied) {
       return (
-        `error: ${t.nodeId}.${targetPort} is already connected (from ${occupied.source.nodeId}.${occupied.source.portId}) and takes a single connection — ` +
-        `to insert a node there, first remove_edge(${occupied.source.nodeId}, ${occupied.source.portId}, ${t.nodeId}, ${targetPort})`
+        `error: ${tgtNode.id}.${inPort.id} is already connected (from ${occupied.source.nodeId}.${occupied.source.portId}) and takes a single connection — ` +
+        `to insert a node there, first remove_edge(${occupied.source.nodeId}, ${occupied.source.portId}, ${tgtNode.id}, ${inPort.id})`
       );
     }
   }
 
   const connection: RF.Connection = {
-    source: s.nodeId,
-    sourceHandle: sourcePort,
-    target: t.nodeId,
-    targetHandle: targetPort,
+    source: srcNode.id,
+    sourceHandle: outPort.id,
+    target: tgtNode.id,
+    targetHandle: inPort.id,
   };
   if (!graph.isValidConnection(connection)) {
-    return `error: invalid connection ${s.nodeId}.${sourcePort} -> ${t.nodeId}.${targetPort} (incompatible data types, or a self-connection/cycle)`;
+    return `error: invalid connection ${srcNode.id}.${outPort.id} -> ${tgtNode.id}.${inPort.id} (incompatible data types, or a self-connection/cycle)`;
   }
   await graph.connect(connection);
   // Labels fed by a computed tensor pass the shape checks but are semantically
   // wrong essentially always (seen: tokenizer.out wired as labels to silence a
   // sequence-shape error). Warn loudly, but don't block exotic graphs.
   if (
-    targetPort === 'labels' &&
-    domain.nodeRegistry.get(tNode.type)?.category.includes('Loss') &&
-    domain.nodeRegistry.get(sNode.type)?.category[0] !== 'Data'
+    inPort.id === 'labels' &&
+    domain.nodeRegistry.get(tgtNode.type)?.category.includes('Loss') &&
+    domain.nodeRegistry.get(srcNode.type)?.category[0] !== 'Data'
   ) {
     notes.push(
       'WARNING: loss labels normally come straight from a data node\'s labels output — feeding a computed tensor as labels is almost always wrong',
     );
   }
   const note = notes.length ? ` (note: ${notes.join('; ')})` : '';
-  return `ok: connected ${s.nodeId}.${sourcePort} -> ${t.nodeId}.${targetPort}${note}`;
+  return `ok: connected ${srcNode.id}.${outPort.id} -> ${tgtNode.id}.${inPort.id}${note}`;
 }
 
 async function removeNode(graph: GraphToolApi, args: Args) {

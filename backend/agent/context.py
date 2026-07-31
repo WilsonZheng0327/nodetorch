@@ -118,6 +118,9 @@ takes node ids and port ids as SEPARATE arguments — sourceId "imdb" + sourcePo
 - To INSERT a node between two connected nodes: remove_edge(A, out, B, in) first, \
 then connect A -> new -> B. A single-input port must be disconnected before it \
 can be rewired.
+- Edges always run output → input. The optimizer is the final SINK: its one port \
+"loss" is an INPUT, so wire the loss node into it — connect(loss, out, optimizer, \
+loss), NOT the reverse.
 - Wire a data node's labels output DIRECTLY into the loss's labels input. NEVER \
 insert layers on the label path — labels are class indices, not features to \
 transform. If validate reports sequence-shaped predictions [B, T, C] against [B] \
