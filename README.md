@@ -8,7 +8,7 @@
 
 ## Demo
 
-https://github.com/user-attachments/assets/a58c5c44-d274-4949-8a00-f989c418fb07
+[https://github.com/user-attachments/assets/a58c5c44-d274-4949-8a00-f989c418fb07](https://github.com/user-attachments/assets/10fade7c-3629-4ca4-931b-c1d4ee41b2dd)
 
 ---
 
